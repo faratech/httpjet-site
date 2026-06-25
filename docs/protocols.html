@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protocol stacks — httpjet docs</title>
+<meta name="description" content="httpjet's pure io_uring protocol paths: custom HTTP/1.1, native HTTP/2 with zero-allocation HPACK, HTTP/3 over QUIC, all behind one unified rustls TLS layer with Cloudflare mutual TLS.">
+<meta property="og:title" content="httpjet — Protocol stacks">
+<meta property="og:description" content="HTTP/1.1, a native HTTP/2 stack, and HTTP/3 over QUIC behind one unified TLS layer with Cloudflare-style mutual TLS.">
+<meta property="og:image" content="https://httpjet.net/og.jpg">
+<meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:url" content="https://httpjet.net/docs/protocols.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="httpjet — Protocol stacks">
+<meta name="twitter:description" content="HTTP/1.1, a native HTTP/2 stack, and HTTP/3 over QUIC behind one unified TLS layer with Cloudflare-style mutual TLS.">
+<meta name="twitter:image" content="https://httpjet.net/og.jpg">
+<link rel="canonical" href="https://httpjet.net/docs/protocols.html">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
+<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-ZR4WV214JT');
+</script>
+</head>
+<body>
+
+<main class="content">
+    <p class="crumbs"><a href="./">Docs</a><span>/</span>Protocol stacks</p>
+    <p class="eyebrow">Internals</p>
+    <h1>Protocol stacks</h1>
+    <p class="lede">httpjet speaks <strong>HTTP/1.1</strong>, a <strong>from-scratch native HTTP/2</strong> stack, and <strong>HTTP/3 over QUIC</strong> through one unconditional <strong>io_uring / monoio</strong> transport layer. TCP and QUIC still converge behind one unified rustls TLS configuration with Cloudflare-style mutual TLS, and every protocol hands requests to the same LiteSpeed-compatible pipeline.</p>
+
+    <div class="rail locator" role="img" aria-label="You are here on the request pipeline: transport and TLS touch the resolve, acl, and dispatch stages."><div class="rail__track"><span class="stage on"><span class="k">resolve</span></span><span class="stage on"><span class="k">acl</span></span><span class="stage"><span class="k">rewrite</span></span><span class="stage"><span class="k">cache</span></span><span class="stage on"><span class="k">dispatch</span></span><span class="stage"><span class="k">finalize</span></span><span class="stage"><span class="k">store</span></span></div></div>
+
+    <section>
+      <h2 id="overview">Overview</h2>
+      <p>The transport paths now live in the binary's <code>uring/</code> module. HTTP/1.1 is a custom monoio + <code>httparse</code> codec; HTTP/2 and cleartext <code>h2c</code> use httpjet's native <code>hj-h2</code> stack through its monoio serve path; HTTP/3 is driven by <code>uring/h3.rs</code>, a <code>quinn-proto</code> QUIC loop with <code>quinn-udp</code> socket state over io_uring UDP. <code>hj-http</code> remains in the workspace as shared <code>ServeConfig</code> connection tuning, not as a transport adapter crate.</p>
+      <p>Protocol selection happens at the connection boundary. Over TLS it is ALPN: the negotiated token (<code>h2</code> or <code>http/1.1</code>) picks the TCP stack, while QUIC connections use the HTTP/3 path. In cleartext, a non-destructive preface sniff detects an HTTP/2 prior-knowledge client and routes it to the native h2 stack; everything else is HTTP/1.1. Whichever protocol wins, the request is bridged into the same request pipeline and returns to the monoio core for framing and writes.</p>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span>HTTP/1.1 · custom monoio codec</span>
+        <span class="chip"><span class="dot"></span>HTTP/2 · native <code>hj-h2</code></span>
+        <span class="chip"><span class="dot"></span>h2c · prior-knowledge sniff</span>
+        <span class="chip"><span class="dot"></span>HTTP/3 · <code>quinn-proto</code> + <code>quinn-udp</code></span>
+        <span class="chip"><span class="dot"></span>HPACK · RFC 7541, zero-alloc</span>
+        <span class="chip"><span class="dot"></span>TLS + mTLS · rustls / aws-lc-rs</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="http1">HTTP/1.1 &amp; h2c detection</h2>
+      <p>HTTP/1.1 is served by a custom monoio codec in the io_uring transport. It parses with <code>httparse</code>, enforces strict request framing, supports keep-alive and pipelining, honors LiteSpeed's <code>maxKeepAliveReq</code> cap (<code>0</code> = unlimited), decodes chunked bodies, and streams large or long-lived responses back from the shared pipeline without buffering the whole body.</p>
+      <p>Cleartext HTTP/2 (<code>h2c</code>) by prior knowledge has no upgrade handshake — the client just sends the connection preface. httpjet detects it <em>non-destructively</em> while the bytes remain available to the selected stack. If the preface matches, those leading bytes are handed to the native h2 path; if not, the same unread bytes flow into the HTTP/1.1 parser. No replay buffer, no lost bytes.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>uring</b> · ALPN + cleartext routing</span></div>
+        <pre><code><span class="t-c">// over TLS: ALPN decides the TCP stack</span>
+<span class="t-k">match</span> alpn {
+    <span class="t-s">b"h2"</span>       =&gt; hj_h2::server::serve_local_with_prefix(io, prefix, service, cfg).<span class="t-k">await</span>,
+    <span class="t-s">b"http/1.1"</span> =&gt; handle_h1_bridged(io, prefix, service).<span class="t-k">await</span>,
+    _          =&gt; handle_h1_bridged(io, prefix, service).<span class="t-k">await</span>,
+}
+
+<span class="t-c">// cleartext: sniff the preface and pass the bytes to the chosen stack</span>
+<span class="t-k">match</span> sniff_cleartext(&amp;<span class="t-k">mut</span> stream).<span class="t-k">await</span>? {
+    Proto::Http2(prefix) =&gt; hj_h2::server::serve_local_with_prefix(stream, prefix, service, cfg).<span class="t-k">await</span>,
+    Proto::Http1(prefix) =&gt; handle_h1_bridged(stream, prefix, service).<span class="t-k">await</span>,
+};
+</code></pre>
+      </div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Why the prefix matters</span><p>The h2c detector must not consume bytes invisibly. The selected stack receives exactly the prefix already observed plus the rest of the stream, so h1 and h2 both parse the connection as if no router sat in front of them.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="http2">Native HTTP/2</h2>
+      <p><code>hj-h2</code> is httpjet's own HTTP/2 server. It serves every h2 connection the server takes: ALPN <code>h2</code>-over-TLS and cleartext <code>h2c</code> both land here through the monoio local serve path. The design is built around the Cloudflare→origin shape — a small number of long-lived connections each carrying many concurrent streams — so it optimizes for multiplexing one connection cheaply rather than spreading work over many connections.</p>
+      <figure class="figure">
+  <svg viewBox="0 0 880 300" role="img" aria-label="The HTTP/2 single-task model: one connection task multiplexes all streams via FuturesUnordered, doing one vectored write per wake.">
+    <defs><linearGradient id="brandgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".5" stop-color="#818cf8"/><stop offset="1" stop-color="#e879f9"/></linearGradient><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2c3856"/></marker></defs>
+    <g><rect class="node-box" x="20" y="118" width="146" height="52" rx="10"/><text class="node-t" x="93" y="140" text-anchor="middle">TLS conn</text><text class="node-d" x="93" y="155" text-anchor="middle">ALPN h2 / h2c</text></g>
+    <path class="edge" d="M166,144 L214,144" marker-end="url(#ar)"/>
+    <g><rect class="node-core" x="216" y="40" width="432" height="222" rx="12"/><text class="node-d" x="236" y="64" fill="#8b95ad">ONE connection task</text>
+      <text class="node-d" x="236" y="92">FuturesUnordered⟨stream⟩</text>
+      <rect x="236" y="98" width="182" height="30" rx="6" fill="#13203a" stroke="#2c3856"/><text class="node-t" x="327" y="118" text-anchor="middle" font-size="10.5">stream 1 · handler</text>
+      <rect x="236" y="134" width="182" height="30" rx="6" fill="#13203a" stroke="#2c3856"/><text class="node-t" x="327" y="154" text-anchor="middle" font-size="10.5">stream 2 · handler</text>
+      <text class="node-d" x="327" y="186" text-anchor="middle">… stream N</text>
+      <rect x="438" y="98" width="192" height="30" rx="6" fill="#0d1526" stroke="#243049"/><text class="node-t" x="534" y="118" text-anchor="middle" font-size="10.5">HPACK enc / dec</text>
+      <rect x="438" y="134" width="192" height="30" rx="6" fill="#0d1526" stroke="#243049"/><text class="node-t" x="534" y="154" text-anchor="middle" font-size="10.5">send flow control</text>
+      <text class="node-d" x="534" y="210" text-anchor="middle">one vectored writev / wake</text>
+    </g>
+    <path class="edge-b" d="M648,144 L716,144"/>
+    <g><rect x="718" y="118" width="142" height="52" rx="10" fill="#13203a" stroke="url(#brandgrad)" stroke-width="1.6"/><text class="node-t" x="789" y="140" text-anchor="middle" fill="#fff">wire</text><text class="node-d" x="789" y="155" text-anchor="middle">zero-copy Bytes</text></g>
+    <path class="edge" d="M432,262 L432,288" marker-end="url(#ar)" stroke-dasharray="3 3"/>
+    <text class="node-d" x="444" y="284">bridge dispatch → shared pipeline → monoio writes</text>
+  </svg>
+  <figcaption>One connection task multiplexes every stream and emits a single vectored write per wake. Request handlers cross the bridge into the shared pipeline; response framing stays on the monoio core.</figcaption>
+</figure>
+      <ul>
+        <li><strong>One task per connection.</strong> A single local task multiplexes <em>all</em> streams on the connection via <code>FuturesUnordered</code> — there is no per-stream spawn on the hot path, so a 100-stream connection costs one task, not a hundred.</li>
+        <li><strong>Send-side flow control.</strong> The server honors per-stream and connection windows on egress, pacing body writes to the peer's advertised capacity.</li>
+        <li><strong>Streaming bodies.</strong> PHP/LSAPI, reverse-proxy, and SSE responses stream through without buffering, alongside async file streaming for static content.</li>
+        <li><strong>One vectored write per wake.</strong> The task coalesces ready frames into a single vectored write each time it wakes; large bodies are <strong>zero-copy</strong> straight from page-cache <code>Bytes</code>.</li>
+        <li><strong>Inbound RFC 9113 validation.</strong> Frames are validated on the way in, with a graceful <code>GOAWAY</code> drain on shutdown so in-flight streams finish.</li>
+        <li><strong>Shared pipeline bridge.</strong> Stream dispatch uses the same bridge as h1 and h3, so rewrite, LSAPI, proxying, cache lookup, metrics, and reload state are identical across protocols.</li>
+      </ul>
+      <p>Because handlers behind every protocol are the same closure, HTTP/2 does not have a separate backend path: a busy h2 connection exercises the same request pipeline as HTTP/1.1 and HTTP/3, then returns framed bytes to the monoio writer.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>The native h2 stack passes <strong>146 of 146</strong> h2spec conformance cases while preserving the Cloudflare-origin shape it is tuned for.</p><span class="regime">h2spec conformance suite</span></div></div>
+      <p>For the full standards breakdown — including how the current audit maps HTTP/2 checks to RFC 9113 — see <a href="conformance.html">Conformance</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="hpack">HPACK</h2>
+      <p>HTTP/2 header compression is <strong>HPACK</strong> (RFC 7541), and httpjet's codec is the <code>hpack</code> submodule of <code>hj-h2</code> — once a standalone crate, now folded in so it lives next to the only code that uses it. It is <strong>zero-allocation</strong>: header fields are decoded and encoded by slicing frame bytes in place rather than copying into intermediate buffers.</p>
+      <p>That in-place slicing is where <code>hj-h2</code>'s <code>unsafe</code> lives — bounded bitwise indexing into the frame buffer, with the safety invariant documented above each block. HPACK's static and dynamic tables and the integer/string primitives all operate over borrowed frame slices, so a header block carries no per-field allocation on the hot path.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Where it lives</span><p>HPACK is not a separate dependency — it is <code>hj-h2::hpack</code>. Keeping the codec inside the h2 crate means the frame layout it slices and the connection state that drives it evolve together, with no cross-crate API to version.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="http3">HTTP/3 &amp; QUIC</h2>
+      <p>HTTP/3 is implemented in <code>crates/httpjet/src/uring/h3.rs</code>. It uses <strong>quinn-proto</strong> for QUIC state, <strong>quinn-udp</strong> for UDP socket metadata/GSO/GRO handling, drives UDP from monoio/io_uring, decodes and encodes QPACK, and dispatches requests through the same bridge used by H1 and H2. The H3 path currently collects the response body before encoding it; H1 and H2 stream large and SSE bodies incrementally.</p>
+      <p>Discovery is via <strong>Alt-Svc</strong>: TLS responses advertise the HTTP/3 endpoint, so an HTTP/2 client that connected over TCP learns it can upgrade to QUIC for subsequent requests. The advertisement is emitted on TLS responses as the last response transform, after the body is finalized.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">One TLS config, two transports</span><p>TCP and QUIC do not maintain separate certificate stores or verifiers. <code>build_server_config_alpn</code> produces the rustls config used by the TCP path and by the QUIC crypto setup. A cert rotation or mTLS change lands in both at once.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="tls">TLS &amp; mutual TLS</h2>
+      <p><code>hj-tls</code> builds <strong>one</strong> <code>rustls::ServerConfig</code> for TCP <em>and</em> QUIC via <code>build_server_config_alpn(cfg, listener, alpn)</code>. The installed crypto provider is <strong>aws-lc-rs</strong>, and key parsing, TCP TLS, and QUIC setup all use that provider. Two pieces make up the config: how a certificate is selected per connection, and how (and whether) the client is verified.</p>
+      <p>Certificate selection is a custom <code>SniCertMap</code> resolver with <strong>no cert-name-match</strong>, mirroring OpenLiteSpeed: the SNI hostname maps directly to configured certificate material without re-validating that the chosen leaf's subject/SAN matches the SNI. The resolver is shared by both transports through the single config.</p>
+      <p>Client verification is Cloudflare <strong>mutual TLS</strong>. A <code>WebPkiClientVerifier</code> is attached on the <em>listener CA</em>: when the listener is configured with <code>clientVerify=2</code>, an external peer must present a valid Cloudflare client certificate to complete the handshake. Loopback and private-LAN sources are exempt, so local tooling and node-to-node traffic don't need a CF cert.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>hj-tls</b> · one config, SNI + mTLS</span></div>
+        <pre><code><span class="t-k">fn</span> <span class="t-f">build_server_config_alpn</span>(cfg, listener, alpn) -&gt; rustls::ServerConfig {
+    <span class="t-c">// SNI → cert, NO cert-name-match (mirrors OpenLiteSpeed)</span>
+    <span class="t-k">let</span> resolver = SniCertMap::from(cfg, listener);
+
+    <span class="t-c">// Cloudflare mTLS: client verifier on the LISTENER CA only.</span>
+    <span class="t-c">// clientVerify=2 ⇒ external peers must present a valid CF cert;</span>
+    <span class="t-c">// loopback / private-LAN are exempt.</span>
+    <span class="t-k">let</span> verifier = WebPkiClientVerifier::builder(listener.ca).build();
+
+    rustls::ServerConfig::builder()
+        .with_client_cert_verifier(verifier)
+        .with_cert_resolver(resolver)
+        .alpn(alpn)            <span class="t-c">// shared by TCP and QUIC</span>
+}</code></pre>
+      </div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Load-bearing distinction</span><p>A per-vhost <code>&lt;vhssl&gt;&lt;CACertFile&gt;</code> is server <em>chain</em> material — intermediates the server presents to the client — <strong>not</strong> a client-verify root. Only the <em>listener</em> CA is the client verifier. Conflating the two would either reject legitimate Cloudflare clients or accept the wrong ones; httpjet keeps them strictly separate.</p></div></div>
+      <p>The zero-copy <code>Bytes</code> the h2 stack writes for large bodies come straight from the origin <a href="page-cache.html">page cache</a>, and the PHP/LSAPI streaming bodies these transports carry originate in the <a href="lsapi.html">LSAPI &amp; PHP</a> backend.</p>
+    </section>
+
+    <nav class="pager" aria-label="Pagination">
+      <a class="prev" href="architecture.html"><div class="dir">← Prev</div><div class="ttl">Architecture</div></a>
+      <a class="next" href="lsapi.html"><div class="dir">Next →</div><div class="ttl">LSAPI &amp; PHP</div></a>
+    </nav>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The transport paths live in the binary's <code>uring/</code> module, with <code>hj-h2</code> (native HTTP/2 + HPACK), <code>hj-http</code> (<code>ServeConfig</code> tuning), and <code>hj-tls</code> (unified rustls config + Cloudflare mTLS).</p>
+</main>
+<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/docs.min.js?v=20260621n"></script>
+</body>
+</html>

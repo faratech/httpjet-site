@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>httpjet — documentation</title>
+<meta name="description" content="httpjet is a from-scratch async Rust web server — a drop-in replacement for LiteSpeed that reads the same config, speaks native LSAPI, runs the same .htaccess, and ships an LSCache-equivalent origin page cache.">
+<meta property="og:title" content="httpjet — documentation">
+<meta property="og:description" content="A Rust drop-in replacement for LiteSpeed: same config, native LSAPI, .htaccess, and an LSCache-equivalent origin page cache. Documentation.">
+<meta property="og:image" content="https://httpjet.net/og.jpg">
+<meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:url" content="https://httpjet.net/docs/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="httpjet — documentation">
+<meta name="twitter:description" content="A Rust drop-in replacement for LiteSpeed: same config, native LSAPI, .htaccess, and an LSCache-equivalent origin page cache. Documentation.">
+<meta name="twitter:image" content="https://httpjet.net/og.jpg">
+<link rel="canonical" href="https://httpjet.net/docs/">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
+<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-ZR4WV214JT');
+</script>
+</head>
+<body>
+
+<main class="content">
+    <section id="top">
+      <p class="eyebrow reveal d1">httpjet · documentation</p>
+      <h1 class="reveal d1" style="font-size:clamp(40px,8vw,76px);line-height:1"><span style="background:var(--brand);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent">httpjet</span></h1>
+      <p class="lede reveal d2">A from-scratch async <strong>Rust web server</strong>, built as a drop-in replacement for <strong>LiteSpeed</strong>. It reads the same LiteSpeed XML config, speaks native <strong>LSAPI</strong> to the same <code>lsphp</code>, runs the same <code>.htaccess</code> rules, and ships an <strong>LSCache-equivalent origin page cache</strong>. Two nodes serve production behind Cloudflare.</p>
+
+      <!-- SIGNATURE: the request-pipeline rail -->
+      <div class="rail reveal d3" role="img" aria-label="Request pipeline: resolve, access control, rewrite, page-cache lookup, dispatch, finalize, cache store">
+        <div class="rail__track">
+          <a class="stage" href="architecture.html#pipeline"><span class="k">resolve</span><span class="d">SNI / Host → vhost</span></a>
+          <a class="stage" href="architecture.html#pipeline"><span class="k">acl</span><span class="d">real-IP / deny</span></a>
+          <a class="stage" href="rewrite.html"><span class="k">rewrite</span><span class="d">.htaccess</span></a>
+          <a class="stage on" href="page-cache.html"><span class="k">cache</span><span class="d">lookup → hit?</span></a>
+          <a class="stage" href="protocols.html"><span class="k">dispatch</span><span class="d">ws · proxy · php · static</span></a>
+          <a class="stage" href="architecture.html#pipeline"><span class="k">finalize</span><span class="d">headers · errors</span></a>
+          <a class="stage" href="page-cache.html#store"><span class="k">store</span><span class="d">cache write</span></a>
+        </div>
+      </div>
+      <span class="rail__cap reveal d3">one pipeline per request — every page documents where it lives on this rail</span>
+
+      <div class="chips reveal d4">
+        <span class="chip"><span class="dot"></span>Same LiteSpeed XML config</span>
+        <span class="chip"><span class="dot"></span>HTTP/1.1 · native HTTP/2 · HTTP/3</span>
+        <span class="chip"><span class="dot"></span>Native LSAPI → lsphp</span>
+        <span class="chip"><span class="dot"></span>Apache .htaccess rewrite</span>
+        <span class="chip"><span class="dot"></span>LSCache-equivalent page cache</span>
+        <span class="chip ok"><span class="dot"></span>Live: active-active behind Cloudflare</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="what">What httpjet is</h2>
+      <p>httpjet reimplements the parts of <strong>LiteSpeed Web Server (LSWS 6.3.5)</strong> that matter for a real deployment, on a memory-safe, observable Rust core. It is not a config translator or a proxy in front of LiteSpeed — it is a full origin server that consumes LiteSpeed's own configuration and protocols directly:</p>
+      <ul>
+        <li>Parses the same <code>httpd_config.xml</code> + per-vhost XML — the two servers are interchangeable for cutover and rollback.</li>
+        <li>Speaks the <strong>native LSAPI wire protocol</strong> to the same <code>lsphp</code> binary (no FastCGI shim).</li>
+        <li>Evaluates the same <code>.htaccess</code> rewrite rules, access control, and header directives.</li>
+        <li>Serves HTTP/1.1, a <strong>from-scratch HTTP/2 stack</strong>, and HTTP/3 over QUIC, with Cloudflare-style mutual TLS.</li>
+        <li>Provides an <strong>LSCache-equivalent origin page cache</strong> driven by the same <code>X-LiteSpeed-*</code> headers the application already emits.</li>
+      </ul>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">In production</span><p>There is no LiteSpeed serving anymore. httpjet runs on <code>:80</code>/<code>:443</code> as an active-active pair (x86-64 + aarch64) behind Cloudflare, systemd-managed and monit-watched, with the origin page cache live.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="why">Why it exists</h2>
+      <p>LiteSpeed is fast and feature-rich, but closed and license-gated. httpjet reproduces the behavior a production site actually depends on — the config surface, LSAPI, <code>.htaccess</code>, TLS, and the cache — while keeping the core open, memory-safe, and deeply observable. Because it reuses LiteSpeed's configuration verbatim, adopting it was a cutover, not a migration: the same config file boots either server, so rollback was always one restart away.</p>
+    </section>
+
+    <section>
+      <h2 id="status">Production status</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Aspect</th><th>State</th></tr></thead>
+          <tbody>
+            <tr><td>Edge</td><td>Active-active pair on <code>:80</code>/<code>:443</code> — x86-64 + aarch64 — behind Cloudflare (origin pull over mTLS)</td></tr>
+            <tr><td>Process model</td><td>systemd unit (<code>Restart=always</code>), monit-watched; PGO-optimized binary per architecture</td></tr>
+            <tr><td>PHP</td><td>Persistent <code>lsphp</code> external-app pool for zero-downtime binary deploys</td></tr>
+            <tr><td>Page cache</td><td>Live (<code>--page-cache</code>) on both nodes, including the per-session private tier</td></tr>
+            <tr><td>Deploys</td><td>One node at a time with cache-correctness gates between, so Cloudflare always has a live origin</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="next">Read next</h2>
+      <p>The docs follow the request: how the server is structured, the protocols it speaks, how it runs PHP and rewrites, the page cache, and how it's measured and operated.</p>
+      <div class="stats">
+        <a class="stat" href="quickstart.html" style="text-decoration:none"><div class="v" style="font-size:18px">Quickstart →</div><div class="l">Build it, lint a LiteSpeed config, and run a development origin.</div></a>
+        <a class="stat" href="architecture.html" style="text-decoration:none"><div class="v" style="font-size:18px">Architecture →</div><div class="l">15 crates, the frozen <code>hj-core</code> contract, and the request pipeline.</div></a>
+        <a class="stat" href="page-cache.html" style="text-decoration:none"><div class="v" style="font-size:18px">Page cache →</div><div class="l">The flagship: the LSCache-equivalent origin cache, tier by tier.</div></a>
+        <a class="stat" href="performance.html" style="text-decoration:none"><div class="v" style="font-size:18px">Performance →</div><div class="l">Real numbers, the PGO/mimalloc story, and honest attribution.</div></a>
+        <a class="stat" href="operations.html" style="text-decoration:none"><div class="v" style="font-size:18px">Operations →</div><div class="l">How it's deployed, gated, and kept alive in production.</div></a>
+      </div>
+    </section>
+
+    <nav class="pager" aria-label="Pagination">
+      <a class="next" href="quickstart.html" style="margin-left:auto"><div class="dir">Next →</div><div class="ttl">Quickstart</div></a>
+    </nav>
+    <p class="docfoot">httpjet · documentation. Built from the project's own source &amp; design notes.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a></p>
+</main>
+<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/docs.min.js?v=20260621n"></script>
+</body>
+</html>

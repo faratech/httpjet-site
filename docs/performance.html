@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance — httpjet docs</title>
+<meta name="description" content="httpjet's performance, told honestly: every number names its regime — a loopback benchmark is not production telemetry. PGO + mimalloc, the page-cache result, and where the time actually goes (PHP, not httpjet).">
+<meta property="og:title" content="httpjet — Performance">
+<meta property="og:description" content="Honest measurement: loopback benchmarks vs prod telemetry. PHP is 86–99% of wall time; httpjet's own CPU is ~0.2%.">
+<meta property="og:image" content="https://httpjet.net/og.jpg">
+<meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:url" content="https://httpjet.net/docs/performance.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="httpjet — Performance">
+<meta name="twitter:description" content="Honest measurement: loopback benchmarks vs prod telemetry. PHP is 86–99% of wall time; httpjet's own CPU is ~0.2%.">
+<meta name="twitter:image" content="https://httpjet.net/og.jpg">
+<link rel="canonical" href="https://httpjet.net/docs/performance.html">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
+<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-ZR4WV214JT');
+</script>
+</head>
+<body>
+
+<main class="content">
+    <p class="crumbs"><a href="./">Docs</a><span>/</span>Performance</p>
+    <p class="eyebrow">Running it</p>
+    <h1>Performance</h1>
+    <p class="lede">httpjet is fast — but these docs are unusually honest about <em>where</em> the time goes. Every number on this page names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real Cloudflare-fronted traffic). The short version: on a CF-fronted PHP site, almost all the wall time is in PHP, and httpjet's own CPU is a rounding error.</p>
+
+    <div class="stats">
+      <div class="stat accent"><div class="v">44.7k<span class="u">rps</span></div><div class="l">PHP/LSAPI over HTTP/1.1 (loopback benchmark, PGO)</div></div>
+      <div class="stat"><div class="v">~19k<span class="u">rps</span></div><div class="l">cache memory serve (loopback benchmark)</div></div>
+      <div class="stat"><div class="v">~2<span class="u">ms</span></div><div class="l">p50 on a cache hit (loopback)</div></div>
+      <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache serve vs a full PHP render</div></div>
+      <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet CPU share of prod request latency</div></div>
+      <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation (hardware counters)</div></div>
+    </div>
+
+    <section>
+      <h2 id="framing">The honest framing</h2>
+      <p>It is easy to publish a single impressive requests-per-second number and let the reader assume it describes their workload. It usually doesn't. A measurement only means something paired with the conditions that produced it, so this page attaches one of three regimes to every figure:</p>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span>loopback benchmark · synthetic, on-box, PGO</span>
+        <span class="chip"><span class="dot"></span>production telemetry · real CF-fronted traffic</span>
+        <span class="chip"><span class="dot"></span>hardware counters · perf at saturation</span>
+      </div>
+      <p>A loopback benchmark removes the network, the TLS handshake cost of real clients, and Cloudflare entirely — it isolates the server's own code path, which is exactly what you want when comparing two servers, and exactly what you must <em>not</em> generalize to end-user latency. Production telemetry is the opposite: it measures what users actually feel, dominated by the backend and the edge. Both are below; neither is wrong; they answer different questions.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Read the regime, not just the number</span><p>The same server can show ~44.7k req/s on loopback and contribute ~0.2% of user-visible latency in production. Those are not in tension — the first measures httpjet in isolation, the second measures httpjet as one thin layer in a PHP-and-Cloudflare stack. Most "is it fast?" questions are really asking one or the other.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="codegen">The codegen tier — PGO + mimalloc</h2>
+      <p>The production binary is not a stock <code>cargo build --release</code>. It is built with three compounding levers: <strong>Profile-Guided Optimization (PGO)</strong>, the <strong>mimalloc</strong> global allocator, and <code>-C target-cpu=native</code>. Skipping any of them changes the numbers enough that a benchmark built without them is not meaningful — binary layout alone accounts for roughly 10% of run-to-run variance.</p>
+      <p>The PGO flow (<code>scripts/build-pgo.sh</code>) is the classic three-step: build an instrumented binary, drive a representative workload through it on loopback, then merge the recorded profile and rebuild optimized. The gathered workload is deliberately shaped like production — dominated by HTTP/2 cache-HITs, with HTTP/2 and HTTP/1.1 static and PHP mixed in — so the compiler's branch and layout decisions favor the paths real traffic exercises.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>scripts/build-pgo.sh</b> · instrument → gather → optimize</span></div>
+        <pre><code><span class="t-c"># 1. build an instrumented binary, 2. drive a representative loopback</span>
+<span class="t-c">#    workload (h2 cache-HITs dominant, plus h2/h1 static + PHP),</span>
+<span class="t-c"># 3. merge the profile and rebuild optimized.</span>
+<span class="t-n">$</span> <span class="t-s">scripts/build-pgo.sh</span>
+
+<span class="t-c"># PGO is built PER ARCHITECTURE — the profile comes from running the</span>
+<span class="t-c"># instrumented binary on THAT arch, so aarch64 is built natively on</span>
+<span class="t-c"># the ARM node, never cross-compiled.</span>
+<span class="t-n">$</span> <span class="t-s">ssh</span> root@arm-node <span class="t-s">bash /usr/local/httpjet/scripts/build-pgo.sh</span></code></pre>
+      </div>
+      <p>Because the profile is captured by <em>running</em> the instrumented binary, PGO is per-architecture: the x86_64 binary is built here, and the aarch64 binary is built natively on the ARM node rather than cross-compiled, so each carries a profile gathered on its own instruction set.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">A non-PGO benchmark is not a benchmark</span><p>Debug builds are roughly 5× slower and meaningless for comparison, but even a plain release build differs from PGO by enough that a regression hunt can chase a phantom. When A/B-testing a change, build <em>both</em> sides the same way (both PGO, or both plain release) and interleave them — mixing a PGO binary against a non-PGO one fakes a ~10% delta out of pure binary layout.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="loopback">Loopback throughput</h2>
+      <p>These are isolated, on-box, PGO-build figures against a LiteSpeed baseline captured 2026-06-01 on the same hardware. They describe httpjet's own code path with the network and Cloudflare removed — the right comparison for "how fast is the server itself," and the wrong one for end-user latency.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>On the current io_uring PGO build, HTTP/2 static peaks well above the historical LiteSpeed baseline: empty bodies at c=50 are <strong>~454k requests/s vs ~244k</strong>, and 1&nbsp;KB bodies are <strong>~353k vs ~221k</strong>. Over HTTP/1.1 the PHP / LSAPI path runs at <strong>~44.8k requests/s vs LiteSpeed's ~38.5k at the same c=40</strong> (LiteSpeed's best historical c=60 run was ~41.2k).</p><span class="regime">loopback benchmark · io_uring PGO build · vs 2026-06-01 LiteSpeed baseline</span></div></div>
+      <p>The remaining raw-serving caveat is the heavy <code>.htaccess</code> HTTP/2 rewrite workload: the current build reaches <strong>~161k requests/s</strong>, while the historical LiteSpeed run reached <strong>~207k</strong>. For cacheable guest traffic, the origin page cache makes that path much less important; for uncached heavy-rewrite traffic it remains the axis where LiteSpeed still leads.</p>
+    </section>
+
+    <section>
+      <h2 id="cache-result">The origin cache result</h2>
+      <p>The single largest performance fact about the real workload is not a server micro-optimization — it is the <a href="page-cache.html">origin page cache</a>. For the cacheable fraction of forum traffic, serving from the in-memory cache replaces an entire PHP render with a memory copy.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Cache memory serves run at <strong>~19,000 requests/s</strong> with a <strong>p50 of ~2&nbsp;ms</strong> — roughly <strong>40× faster</strong> than producing the same page through a full PHP render. The cache dominates the real CF-fronted forum workload precisely because it removes the backend from the request entirely.</p><span class="regime">loopback benchmark · PGO build · memory tier</span></div></div>
+      <p>This is the result that actually moves production: the lever is not shaving microseconds off httpjet's own path but avoiding the PHP render altogether for everything the app marks cacheable. The cache's design, admission policy, and the <code>X-LiteSpeed-*</code> protocol that drives it are covered under <a href="page-cache.html">Page cache</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="attribution">Where the time actually goes</h2>
+      <p>The loopback numbers above isolate the server. Production telemetry answers the different, more important question: of the time a user waits, how much is httpjet? The answer came out of a layered diagnostic that walked from production attribution down through on-CPU profiling per regime, off-CPU syscall analysis, concurrency scaling, and finally hardware counters. The headline result is blunt.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>In production, the <code>lsphp</code> / PHP render is <strong>86.5–98.8% of total request wall time</strong>, measured across millions of requests on both nodes. httpjet's <em>own</em> CPU is about <strong>0.2% of request latency</strong> — roughly <strong>138&nbsp;µs per request</strong>, or ~38&nbsp;µs of CPU per cache HIT, and that 38&nbsp;µs already includes TLS, HTTP/2, rewrite, the cache lookup, and access logging.</p><span class="regime">production telemetry · both nodes · millions of requests</span></div></div>
+      <p>Put plainly: httpjet-side CPU is effectively invisible to users. The real levers for end-user latency are PHP and opcache speed and the cache hit ratio — not micro-optimizing a 0.2% share. The team chased the httpjet hot path to its floor (see below) and concluded exactly this: there is no meaningful user-facing win left in the server's own CPU, so the work that moves the needle lives in <a href="lsapi.html">PHP / LSAPI</a> speed and in cache hit-ratio and bypass behavior.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Why this changes the priorities</span><p>If httpjet is 0.2% of latency, halving its CPU would shave ~0.1% off the page — imperceptible. Conversely, turning a PHP render into a cache hit removes the other ~99%. That asymmetry is why the project stopped optimizing the server's CPU and instead invested in the cache, in PHP/opcache tuning, and in raising the cacheable fraction.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="instruction-floor">At the instruction floor</h2>
+      <p>Before concluding that the server's CPU was a dead end, the team confirmed the HTTP/2 cache-HIT path was genuinely at its limit rather than merely slow. Two complementary measurements settled it.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>At saturation the h2 cache-HIT path shows <strong>IPC 1.55</strong>, a <strong>0.31% branch-miss rate</strong>, and <strong>1.6 L1d misses per 100 instructions</strong>. Execution is efficient — the bottleneck is the <em>number</em> of instructions retired per request, not memory locality. The only CPU lever left is doing less work per request, not improving cache behavior.</p><span class="regime">hardware counters · perf at saturation</span></div></div>
+      <p>The second measurement cleared up a red herring. Syscall profiling showed futex traffic accounting for ~85% of syscall time, which superficially looks like lock contention — the kind of thing that caps throughput.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>That futex traffic is <strong>idle parking and cross-thread waker churn, not lock contention</strong>. At the apparent ceiling the box was about <strong>50% idle</strong> — the threads were waiting on work, not fighting over a lock. There was no contention bottleneck to remove.</p><span class="regime">strace / off-CPU analysis</span></div></div>
+      <p>Together these say the same thing from two directions: the hit path is instruction-bound and already efficient, and what looked like a concurrency wall was idle parking. There is no locality win and no contention win waiting to be found here.</p>
+    </section>
+
+    <section>
+      <h2 id="concurrency">Concurrency scaling</h2>
+      <p>A natural worry with single-task-per-connection HTTP/2 multiplexing is that one connection becomes a ceiling. It doesn't. A single connection sustains roughly <strong>78k req/s</strong>, and the current io_uring benchmark peaks around c=50 before very high concurrency starts paying scheduler and queueing cost.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Connections</th><th>Throughput (req/s)</th><th>Note</th></tr></thead>
+          <tbody>
+            <tr><td>c1</td><td>~78k</td><td>one connection is <em>not</em> a ceiling</td></tr>
+            <tr><td>c50</td><td>~454k</td><td>current empty-body peak</td></tr>
+            <tr><td>c200</td><td>~179k</td><td>queueing cost visible</td></tr>
+            <tr><td>c1000</td><td>~74k</td><td>stress regime, not the target shape</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Part of the historical "h2 gap vs LiteSpeed" was a <strong>benchmark-client artifact</strong>. The current fork benchmark, using the corrected harness and io_uring transport, reverses that gap on static HTTP/2 at c=50: <strong>~454k vs ~244k</strong> for empty bodies and <strong>~353k vs ~221k</strong> for 1&nbsp;KB bodies.</p><span class="regime">current fork benchmark · h2 static · c=50</span></div></div>
+      <p>The takeaway mirrors the rest of the page: measure carefully, name the regime, and check the harness before blaming the server. The corrected harness changed the HTTP/2 static story from a deficit into a lead; the heavy rewrite path remains the honest exception.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">The plain takeaway</span><p>For a Cloudflare-fronted PHP site, the performance work that moves the needle is <a href="lsapi.html">PHP speed</a> and <a href="page-cache.html">cache hit-ratio / bypass</a> — not micro-optimizing httpjet's already-tiny CPU share. The hot path has been chased to its instruction floor and the conclusion is settled. Deployment and tuning of these levers live under <a href="operations.html">Operations</a>.</p></div></div>
+    </section>
+
+    <nav class="pager" aria-label="Pagination">
+      <a class="prev" href="compression.html"><div class="dir">← Prev</div><div class="ttl">Compression</div></a>
+      <a class="next" href="conformance.html"><div class="dir">Next →</div><div class="ttl">Conformance</div></a>
+    </nav>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The figures here are from the current loopback benchmark CSVs and historical LiteSpeed baseline runs on the same box.</p>
+</main>
+<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/docs.min.js?v=20260621n"></script>
+</body>
+</html>

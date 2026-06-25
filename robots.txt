@@ -1,0 +1,4 @@
+User-agent: *
+Disallow:
+
+Sitemap: https://httpjet.net/sitemap.xml

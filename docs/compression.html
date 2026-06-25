@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compression — httpjet docs</title>
+<meta name="description" content="httpjet's response compression: gzip, brotli, and zstd negotiated by server priority but bounded by the client's Accept-Encoding, with streaming-safe encoding, per-thread zstd contexts, and forced zstd egress to Cloudflare.">
+<meta property="og:title" content="httpjet — Compression">
+<meta property="og:description" content="gzip, brotli, and zstd — server-priority negotiation, streaming-safe encoding, per-thread zstd contexts, and CF-zstd egress.">
+<meta property="og:image" content="https://httpjet.net/og.jpg">
+<meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:url" content="https://httpjet.net/docs/compression.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="httpjet — Compression">
+<meta name="twitter:description" content="gzip, brotli, and zstd — server-priority negotiation, streaming-safe encoding, per-thread zstd contexts, and CF-zstd egress.">
+<meta name="twitter:image" content="https://httpjet.net/og.jpg">
+<link rel="canonical" href="https://httpjet.net/docs/compression.html">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
+<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-ZR4WV214JT');
+</script>
+</head>
+<body>
+
+<main class="content">
+    <p class="crumbs"><a href="./">Docs</a><span>/</span>Compression</p>
+    <p class="eyebrow">Internals</p>
+    <h1>Compression</h1>
+    <p class="lede"><code>hj-compress</code> encodes responses with three codecs — <strong>gzip</strong>, <strong>brotli</strong>, and <strong>zstd</strong> — chosen by server priority but always bounded by what the client's <code>Accept-Encoding</code> actually allows. Buffered bodies are encoded in one shot; streamed bodies stay streaming through a lazy per-chunk wrapper; and a trusted-proxy peer (Cloudflare) can be handed forced zstd egress to push the brotli cost off the origin.</p>
+
+    <div class="rail locator" role="img" aria-label="Pipeline locator: this page covers the finalize stage, where the chosen codec compresses the response body before it goes to the wire.">
+      <div class="rail__track">
+        <span class="stage"><span class="k">resolve</span></span>
+        <span class="stage"><span class="k">acl</span></span>
+        <span class="stage"><span class="k">rewrite</span></span>
+        <span class="stage"><span class="k">cache</span></span>
+        <span class="stage"><span class="k">dispatch</span></span>
+        <span class="stage on"><span class="k">finalize</span></span>
+        <span class="stage"><span class="k">store</span></span>
+      </div>
+    </div>
+
+    <section>
+      <h2 id="overview">Overview</h2>
+      <p>Compression runs in the <code>finalize</code> stage of the pipeline, after a handler has produced a response and before it goes to the wire. It is a response transform: it inspects the negotiated codec, encodes the body, and sets <code>Content-Encoding</code> accordingly. The crate is self-contained — it carries the three codec backends and the negotiation logic, and it also provides the shared zstd dictionary that the page cache uses for internal storage dedup.</p>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span>gzip · flate2</span>
+        <span class="chip"><span class="dot"></span>brotli</span>
+        <span class="chip"><span class="dot"></span>zstd</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="codecs">Codecs</h2>
+      <p>Three codecs ship in <code>hj-compress</code>, each behind its own backend:</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Codec</th><th>Backend</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><span class="crate">gzip</span></td><td><code>flate2</code></td><td>The universal fallback — every client accepts it.</td></tr>
+            <tr><td><span class="crate">brotli</span></td><td><code>brotli</code></td><td>Dense text encoding; broadly accepted by browsers.</td></tr>
+            <tr><td><span class="crate">zstd</span></td><td><code>zstd</code></td><td>Cheapest to produce at comparable ratios; preferred when the client accepts it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="negotiation">Server-priority negotiation</h2>
+      <p>The server expresses a fixed preference — <strong>zstd &gt; brotli &gt; gzip</strong> — but it only ever picks a codec the client's <code>Accept-Encoding</code> actually allows. The negotiation walks the server's priority order and selects the first codec the client permits. So a modern client that accepts zstd is served zstd; a client that only accepts gzip is served gzip; a client that accepts nothing gets the body uncompressed.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Client <code>Accept-Encoding</code></th><th>Served codec</th></tr></thead>
+          <tbody>
+            <tr><td><code>zstd, br, gzip</code></td><td>zstd</td></tr>
+            <tr><td><code>br, gzip</code></td><td>brotli</td></tr>
+            <tr><td><code>gzip</code></td><td>gzip</td></tr>
+            <tr><td><code>gzip, deflate</code></td><td>gzip</td></tr>
+            <tr><td><em>(absent / identity)</em></td><td>none (identity)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>hj-compress</b> · negotiation</span></div>
+        <pre><code><span class="t-c">// server priority is fixed: zstd &gt; brotli &gt; gzip,</span>
+<span class="t-c">// but bounded by what the client's Accept-Encoding allows.</span>
+Accept-Encoding: <span class="t-s">zstd, br, gzip</span>   <span class="t-c">// modern client</span>  -&gt; <span class="t-f">zstd</span>
+Accept-Encoding: <span class="t-s">br, gzip</span>         <span class="t-c">// no zstd</span>        -&gt; <span class="t-f">brotli</span>
+Accept-Encoding: <span class="t-s">gzip</span>             <span class="t-c">// gzip only</span>      -&gt; <span class="t-f">gzip</span></code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="buffered-vs-streamed">Buffered vs streamed bodies</h2>
+      <p>The encoding strategy depends on the body shape from <code>hj-core</code>:</p>
+      <ul>
+        <li>A <strong>buffered body</strong> (<code>Body::Full</code>) is encoded in one shot via <code>encode_bytes</code> — the whole payload is already in memory, so the codec runs once over the full slice.</li>
+        <li>A <strong>streamed body</strong> (<code>Body::Stream</code> — proxy responses, SSE) is wrapped in a lazy per-chunk <code>CompressStream</code>. Each inbound chunk is encoded as it arrives, so the response stays streaming and is <em>never</em> aggregated or buffered. This keeps proxy and server-sent-event responses pass-through, with no latency penalty from collecting the whole body before sending the first byte.</li>
+      </ul>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Why it matters</span><p>Buffering a streamed body to compress it in one shot would defeat the point of streaming — SSE would stop being real-time and a slow proxy backend would hold the first byte hostage. <code>CompressStream</code> keeps the stream flowing while still compressing it.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="per-thread-contexts">Per-thread zstd contexts</h2>
+      <p>zstd encoding uses a <strong>per-thread <code>ZSTD_CCTX</code> pool</strong> — a thread-local compress context that is reused across calls on the same worker thread. Allocating a fresh context per call would add an allocation to every compressed response; the thread-local pool amortizes that to roughly once per thread for the life of the process.</p>
+    </section>
+
+    <section>
+      <h2 id="cf-zstd">Cloudflare zstd egress</h2>
+      <p>When httpjet sits behind a trusted proxy (Cloudflare), the <code>--cf-send-zstd</code> flag (equivalently the <code>CF_SEND_ZSTD=1</code> environment variable) forces zstd egress for that peer, <strong>ignoring the forwarded <code>Accept-Encoding</code></strong>. Cloudflare decodes the zstd at its edge and re-encodes per browser, so the origin only ever has to produce the cheapest-to-make form. This moves the brotli cost off the origin and onto Cloudflare's edge, where it can be cached and shared across requests. It is live in production on both nodes.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">forced zstd egress to a trusted proxy</span></div>
+        <pre><code><span class="t-c"># flag form (systemd drop-in)</span>
+httpjet serve <span class="t-n">--cf-send-zstd</span> ...
+
+<span class="t-c"># env form (cf-send-zstd.conf in prod)</span>
+<span class="t-n">CF_SEND_ZSTD</span>=<span class="t-s">1</span></code></pre>
+      </div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Trusted peers only</span><p>CF-zstd <strong>never</strong> affects untrusted or direct clients. A browser hitting the origin directly still gets only what its own <code>Accept-Encoding</code> asked for — the forced-zstd override applies strictly to the configured trusted-proxy peer.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="cache-interaction">Interaction with the page cache</h2>
+      <p>The <a href="page-cache.html">page cache</a> stores <strong>one best variant</strong> per entry, chosen by the request's <code>Accept-Encoding</code> under the same server priority (zstd &gt; br &gt; gzip). A client whose acceptable encodings don't match the stored variant falls back to per-serve compression — the body is re-encoded on the way out. Either way the <em>served</em> bytes always stay standard zstd, brotli, or gzip.</p>
+      <p>The cache's internal dict-compression (the shared zstd dictionary <code>hj-compress</code> provides) is a storage optimization only: it shrinks the stored copy roughly 3.5–9×, but it is <strong>decode-only</strong> and never reaches the wire. A cached hit is dict-decoded back to identity and then re-compressed with a standard codec for the client.</p>
+    </section>
+
+    <section>
+      <h2 id="decode-safety">Decode safety</h2>
+      <p>Decoding is hardened against malformed input as defense-in-depth. The zstd decoder caps <code>windowLogMax</code> and bounds the decoded output size, so a hostile or corrupt frame can't coerce httpjet into an outsized allocation. A malformed frame fails the decode rather than ballooning memory.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>In production telemetry, compression accounts for ≈ <strong>0.22–0.7% of total request wall time</strong> — a rounding error against the PHP render that dominates a cache miss. On a PHP cache-<em>miss</em>, about <strong>37% of httpjet's (small) CPU share</strong> goes to zstd-encoding the rendered HTML, but that share is itself a tiny fraction of the machine because the PHP render is the wall-clock cost.</p><span class="regime">prod telemetry · PHP-miss on-CPU profile</span></div></div>
+    </section>
+
+    <nav class="pager" aria-label="Pagination">
+      <a class="prev" href="page-cache.html"><div class="dir">← Prev</div><div class="ttl">Page cache</div></a>
+      <a class="next" href="performance.html"><div class="dir">Next →</div><div class="ttl">Performance</div></a>
+    </nav>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Compression lives in the <code>hj-compress</code> crate.</p>
+</main>
+<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/docs.min.js?v=20260621n"></script>
+</body>
+</html>

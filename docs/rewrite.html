@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rewrite engine — httpjet docs</title>
+<meta name="description" content="httpjet's Apache mod_rewrite / .htaccess engine: per-directory loading, a cacheless dense-DFA prefilter, linear-vs-backtracking matching with fancy-regex fallback, lazy-header SetEnvIf, and front-controller-correct REQUEST_URI handling.">
+<meta property="og:title" content="httpjet — Rewrite engine">
+<meta property="og:description" content="The .htaccess engine: dense-DFA prefilter, linear-vs-backtracking matching, lazy SetEnvIf, and front-controller-correct rewriting.">
+<meta property="og:image" content="https://httpjet.net/og.jpg">
+<meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:url" content="https://httpjet.net/docs/rewrite.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="httpjet — Rewrite engine">
+<meta name="twitter:description" content="The .htaccess engine: dense-DFA prefilter, linear-vs-backtracking matching, lazy SetEnvIf, and front-controller-correct rewriting.">
+<meta name="twitter:image" content="https://httpjet.net/og.jpg">
+<link rel="canonical" href="https://httpjet.net/docs/rewrite.html">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
+<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-ZR4WV214JT');
+</script>
+</head>
+<body>
+
+<main class="content">
+    <p class="crumbs"><a href="./">Docs</a><span>/</span>Rewrite engine</p>
+    <p class="eyebrow">Internals</p>
+    <h1>Rewrite engine</h1>
+    <p class="lede"><code>hj-rewrite</code> is httpjet's Apache <strong>mod_rewrite</strong> / <code>.htaccess</code> engine. It is one of three deliberately <em>isolated</em> crates — it takes no <code>hj-*</code> dependencies, so the rewrite semantics stay portable. It uses <strong><code>fancy-regex</code></strong>, not the <code>regex</code> crate, because real <code>.htaccess</code> files use negative lookahead — which the linear <code>regex</code> engine can't express.</p>
+
+    <div class="rail locator" role="img" aria-label="Pipeline locator: this page covers the rewrite stage, where inline rules and the .htaccess chain resolve the request path before any backend.">
+      <div class="rail__track">
+        <span class="stage"><span class="k">resolve</span></span>
+        <span class="stage"><span class="k">acl</span></span>
+        <span class="stage on"><span class="k">rewrite</span></span>
+        <span class="stage"><span class="k">cache</span></span>
+        <span class="stage"><span class="k">dispatch</span></span>
+        <span class="stage"><span class="k">finalize</span></span>
+        <span class="stage"><span class="k">store</span></span>
+      </div>
+    </div>
+
+    <section>
+      <h2 id="overview">Overview</h2>
+      <p>The rewrite stage runs the inline <code>&lt;rewrite&gt;</code> rules first, then the <code>.htaccess</code> chain for the resolved directory — mirroring OpenLiteSpeed's dispatch order. The whole engine lives behind one entry point, <code>evaluate()</code>, which returns exactly one outcome per request: <code>Rewritten</code>, <code>Redirect</code>, <code>Proxy</code>, <code>Forbidden</code>, <code>Gone</code>, or <code>Unchanged</code>. Because the crate is dependency-isolated from the rest of the workspace, its match semantics can be reasoned about — and ported — on their own.</p>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span>fancy-regex (lookahead + backrefs)</span>
+        <span class="chip"><span class="dot"></span>Cacheless dense-DFA prefilter</span>
+        <span class="chip"><span class="dot"></span>Per-directory .htaccess</span>
+        <span class="chip"><span class="dot"></span>Front-controller correct</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="loading">Per-directory loading</h2>
+      <p>An <code>HtaccessCache</code> loads each directory's <code>.htaccess</code> with <strong>mtime invalidation</strong> — a changed file is reparsed on its next access. In production the config tree is read-only, so in practice each file is parsed once and then served from the cache for the life of the process. The parsed form holds the directive list, the compiled regexes, and the scoping blocks ready to evaluate.</p>
+      <p><code>evaluate()</code> walks that parsed form once and produces a single outcome. There is no re-entrant re-evaluation per directive: a terminal flag (<code>[L]</code>, a redirect, a forbid, a proxy hand-off) stops the walk, and an exhausted chain returns <code>Unchanged</code> so dispatch falls through to suffix routing.</p>
+    </section>
+
+    <section>
+      <h2 id="prefilter">The dense-DFA prefilter</h2>
+      <p>The hot-path optimization. Rather than test every rule's regex on every request, the eligible rule patterns are compiled once into <strong>one fully-determinized dense DFA</strong> (<code>regex_automata::dfa::dense</code>) and searched a single time per request to learn <em>which</em> rules could possibly match. Only the rules the prefilter flags are then evaluated for real.</p>
+      <p>The reason it is a <em>dense</em> (fully-determinized) DFA and not the usual lazy one is contention: a fully-determinized DFA holds no lazy transition state, so the search is <strong>cacheless</strong> — there is no per-search <code>Cache</code> to allocate and no cross-thread <code>Pool</code> to lock. At high concurrency that removes a mutex from the request path entirely.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>hot path</b> · prefilter then evaluate</span></div>
+        <pre><code><span class="t-c">// one determinized DFA over all eligible patterns — no Cache, no Pool</span>
+<span class="t-k">let</span> hits = prefilter.<span class="t-f">search</span>(path);   <span class="t-c">// which rules *could* match</span>
+<span class="t-k">for</span> rule <span class="t-k">in</span> hits {
+    <span class="t-k">if</span> <span class="t-k">let</span> Some(m) = rule.regex.<span class="t-f">find</span>(path) {
+        <span class="t-k">return</span> rule.<span class="t-f">apply</span>(m);     <span class="t-c">// substitute + flags</span>
+    }
+}
+<span class="t-k">return</span> Outcome::<span class="t-n">Unchanged</span>;</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="matching">Linear vs backtracking matching</h2>
+      <p>A rule the prefilter flags runs its pattern through a <code>CompiledRegex</code> that <strong>prefers the linear-time engine</strong> — <code>regex_automata::meta::Regex</code>, driven with an explicit thread-local <code>Cache</code> keyed per pattern so it sidesteps the high-level API's cross-thread mutex slow path. It falls back to <code>fancy-regex</code> only for the patterns the linear engine cannot express: lookaround <code>(?=…)</code>/<code>(?!…)</code> and in-pattern backreferences <code>\1</code>.</p>
+      <p>This split is safe because it is not a behavioral approximation. A pattern the linear engine <em>accepts</em> has <strong>identical match semantics</strong> under both engines, so choosing the linear path for it is transparent — the result is the same captures, the same boundaries, just without the backtracking cost. Only genuinely backtracking constructs ever reach <code>fancy-regex</code>.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Pattern shape</th><th>Engine</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Ordinary anchors, classes, alternation</td><td><code>regex_automata::meta</code></td><td>Linear time; per-pattern thread-local <code>Cache</code>, no shared pool lock.</td></tr>
+            <tr><td>Negative lookahead <code>(?!…)</code> / lookahead <code>(?=…)</code></td><td><code>fancy-regex</code></td><td>Lookaround isn't expressible in a finite-automaton engine.</td></tr>
+            <tr><td>In-pattern backreference <code>\1</code></td><td><code>fancy-regex</code></td><td>Backreferences require backtracking.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="setenvif">SetEnvIf &amp; lazy headers</h2>
+      <p><code>SetEnvIf</code> / <code>SetEnvIfNoCase</code> rules are evaluated with <strong>lazy header access</strong>: the engine hands the rule a callback that only materializes the HTTP headers if that rule actually references one. A request that matches no <code>SetEnvIf</code> rule therefore pays <em>no</em> header-materialization allocation at all — the common case stays free.</p>
+      <p>The attribute compare is case-insensitive <em>without</em> allocating a lowercased copy of either side, so even a matching rule avoids the obvious per-request <code>String</code> churn.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>.htaccess</b> · SetEnvIf with lazy access</span></div>
+        <pre><code><span class="t-k">SetEnvIfNoCase</span> User-Agent <span class="t-s">"bot|crawler"</span> is_bot=1
+<span class="t-k">SetEnvIf</span> Request_URI <span class="t-s">"\.(?:png|jpg|css|js)$"</span> is_asset=1
+<span class="t-c"># headers are only read if a rule above references them</span></code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="front-controller">Front-controller routing</h2>
+      <p>This is the load-bearing correctness rule. XenForo's front controller rewrites <em>every</em> page to <code>/index.php</code>. If the engine let that rewrite overwrite the request identity, every distinct URL would look like <code>/index.php</code> to everything downstream.</p>
+      <p>So the engine keeps the <strong>original <code>REQUEST_URI</code></strong> even after a rewrite to <code>index.php</code> — the resolved script path is pinned <em>separately</em> (it becomes <code>SCRIPT_FILENAME</code>, with <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> pushed into the request env). PHP sees the front controller; the rest of the pipeline still sees the real URL the visitor asked for.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Why the cache keys by the original URI</span><p>Because the rewrite to <code>index.php</code> preserves the original <code>REQUEST_URI</code>, the <a href="page-cache.html">page cache</a> must key by that <em>original</em> URI, never the rewrite-resolved path. Keying by the resolved path would collapse every page on the site to a single cache entry — and serve the wrong page to everyone after the first.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="access-control">Access control</h2>
+      <p>The engine also enforces <code>.htaccess</code> access control: <code>&lt;Files&gt;</code> / <code>&lt;FilesMatch&gt;</code> / <code>&lt;Directory&gt;</code> / <code>&lt;DirectoryMatch&gt;</code> / <code>&lt;If&gt;</code> scoping carrying <code>allow</code> / <code>deny</code> / <code>Require</code>, ANDed across every enclosing block. A request is permitted only if it survives all the blocks it falls inside.</p>
+      <p>A <code>&lt;Directory&gt;</code> deny applies to the directory <strong>and everything beneath it</strong> — a file inside a denied directory is denied even when its own path doesn't match the directory regex, so you can't tunnel under a block with a deeper path. Matchers <strong>fail closed toward the rule's polarity</strong>: if a <em>deny</em> pattern errors at match time it counts as matched (the deny still applies), and an <em>allow</em> that errors is withheld. A regex failure can therefore only ever make access more restrictive, never less.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Fail-closed, both directions</span><p>The polarity rule is the whole point: a deny that can't evaluate is treated as a deny, and an allow that can't evaluate is treated as absent. Either way the safe outcome is the restrictive one.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="directives">Directives reference</h2>
+      <p>The engine implements the mod_rewrite core plus the header, error-document, env, LSCache, and per-request PHP directives that real <code>.htaccess</code> files lean on:</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Directive</th><th>Support</th></tr></thead>
+          <tbody>
+            <tr><td><code>RewriteEngine</code> · <code>RewriteBase</code></td><td>Toggle and base-path resolution for the rule chain.</td></tr>
+            <tr><td><code>RewriteCond</code> · <code>RewriteRule</code></td><td>The core matcher with the common flags: <code>[L]</code>, <code>[R]</code>, <code>[F]</code>, <code>[G]</code>, <code>[P]</code>, <code>[E=…]</code>, <code>[N]</code>, <code>[NC]</code>, <code>[QSA]</code>, <code>[NE]</code>.</td></tr>
+            <tr><td><code>Header</code></td><td>Scoped response-header ops (set/add/append/unset), honoring the enclosing block.</td></tr>
+            <tr><td><code>ErrorDocument</code></td><td>Path / inline / external forms, each classified — and an <code>ErrorDocument</code> must <em>not</em> clobber an application's own JSON error body.</td></tr>
+            <tr><td><code>SetEnvIf</code> · <code>SetEnvIfNoCase</code></td><td>Lazy-header conditional env setting (see above).</td></tr>
+            <tr><td><code>CacheLookup</code> · <code>CacheEnable</code> · <code>CacheDisable</code> · <code>CacheKeyModify</code></td><td>The LSCache directives that drive the <a href="page-cache.html">page cache</a>.</td></tr>
+            <tr><td><code>php_value</code> · <code>php_admin_value</code> · <code>php_flag</code> · <code>php_admin_flag</code></td><td>Per-request PHP ini overrides carried through to the <a href="lsapi.html">LSAPI</a> env.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Ground truth</span><p>The GPL OpenLiteSpeed source was the reference for the exact flag and dispatch semantics — behavior was extracted and reimplemented cleanly. httpjet is MIT/Apache and never copies GPL code.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="performance">Performance &amp; honesty</h2>
+      <p>The engine's hot path is at its allocation floor: the cacheless dense-DFA prefilter, the per-thread regex caches, and stack-allocated capture arrays leave little left to shave. The remaining gap on one synthetic workload is structural, not an allocation problem.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>On the heavy-<code>.htaccess</code> synthetic workload, LiteSpeed was historically far ahead — because httpjet runs the <strong>full uncacheable <code>.htaccess</code> pipeline on every request, including static files</strong>, where LiteSpeed short-circuits. Micro-optimizing the engine doesn't close it; the real lever for that workload is the <a href="page-cache.html">page cache</a>, which removes the pipeline from the hot path entirely.</p><span class="regime">synthetic heavy-.htaccess loopback</span></div></div>
+    </section>
+
+    <nav class="pager" aria-label="Pagination">
+      <a class="prev" href="lsapi.html"><div class="dir">← Prev</div><div class="ttl">LSAPI &amp; PHP</div></a>
+      <a class="next" href="page-cache.html"><div class="dir">Next →</div><div class="ttl">Page cache</div></a>
+    </nav>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The engine lives in <code>hj-rewrite</code>.</p>
+</main>
+<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/docs.min.js?v=20260621n"></script>
+</body>
+</html>

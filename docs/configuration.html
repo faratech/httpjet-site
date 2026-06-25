@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configuration — httpjet docs</title>
+<meta name="description" content="httpjet's two configuration surfaces: the LiteSpeed XML it reads, and the serve flags that tune the runtime — a full reference.">
+<meta property="og:title" content="httpjet — Configuration">
+<meta property="og:description" content="Every serve flag and the LiteSpeed-XML → httpjet mapping, in one reference.">
+<meta property="og:image" content="https://httpjet.net/og.jpg">
+<meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:url" content="https://httpjet.net/docs/configuration.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="httpjet — Configuration">
+<meta name="twitter:description" content="Every serve flag and the LiteSpeed-XML → httpjet mapping, in one reference.">
+<meta name="twitter:image" content="https://httpjet.net/og.jpg">
+<link rel="canonical" href="https://httpjet.net/docs/configuration.html">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
+<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-ZR4WV214JT');
+</script>
+</head>
+<body>
+
+<main class="content">
+    <p class="crumbs"><a href="./">Docs</a><span>/</span>Configuration</p>
+    <p class="eyebrow">Running it</p>
+    <h1>Configuration &amp; flags</h1>
+    <p class="lede">httpjet has two configuration surfaces: the <strong>LiteSpeed XML</strong> it reads (vhosts, listeners, certs, rewrite, ext-processors) and the <strong>CLI flags</strong> that tune the runtime (workers, PHP, the page cache, TLS, memory). The XML defines <em>what</em> is served; the flags tune <em>how</em>.</p>
+
+    <section>
+      <h2 id="config-tree">The configuration tree</h2>
+      <p>Point httpjet at a LiteSpeed root with <code>--root</code> (default <code>/usr/local/lsws</code>). It parses <code>conf/httpd_config.xml</code> plus <code>conf/vhosts/*.xml</code>, substituting <code>$SERVER_ROOT</code> and <code>$VH_NAME</code> at parse time, into a normalized model. The file tree is treated as read-only.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>LiteSpeed XML</th><th>How httpjet uses it</th></tr></thead>
+          <tbody>
+            <tr><td><code>&lt;listener&gt;</code> + <code>&lt;vhostMap&gt;</code></td><td>Bind addresses and the SNI/Host → vhost map (<code>Router::resolve</code>). The map has no cert-name-match, mirroring OpenLiteSpeed.</td></tr>
+            <tr><td><code>&lt;virtualHost&gt;</code> <code>docRoot</code> / <code>indexFiles</code></td><td>Static document root and directory-index order (e.g. <code>index.html, index.php</code>).</td></tr>
+            <tr><td><code>&lt;vhssl&gt;</code> cert / key / <code>CACertFile</code></td><td>Per-vhost TLS material. The vhost <code>CACertFile</code> is server <em>chain</em> material — <strong>not</strong> a client-verify root; only the listener CA verifies client certs.</td></tr>
+            <tr><td><code>&lt;rewrite&gt;</code> + per-dir <code>.htaccess</code></td><td>The <a href="rewrite.html">rewrite engine</a>: inline rules then the <code>.htaccess</code> chain.</td></tr>
+            <tr><td><code>&lt;context&gt;</code> (proxy / script handler)</td><td>Reverse-proxy contexts and the <code>php</code>/<code>html</code> suffix → LSAPI routing.</td></tr>
+            <tr><td>ext-processor (LSAPI)</td><td>The <code>lsphp</code> pool target. The config's <code>LSAPI_CHILDREN=250</code> is stripped from the spawn env (an OOM hazard) and replaced by <code>--php-children</code>.</td></tr>
+            <tr><td><code>fileETag</code> (default 28)</td><td>The static ETag format — <code>"&lt;size&gt;-&lt;mtime&gt;-&lt;inode&gt;;;;"</code> (note the three trailing semicolons), byte-for-byte LiteSpeed-compatible.</td></tr>
+            <tr><td><code>&lt;tuning&gt;</code> request / keep-alive limits</td><td>Feeds the shared <code>ServeConfig</code>: connection and header timeouts, request URL/header/body caps, and the H1 <code>maxKeepAliveReq</code> close-after-N-requests cap (<code>0</code> = unlimited).</td></tr>
+            <tr><td><code>&lt;fileAccessControl&gt;&lt;followSymbolLink&gt;</code></td><td>Folded into each vhost's effective symlink policy.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="subcommands">Subcommands</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Subcommand</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>serve</code></td><td>Bind the listeners and serve (the flags below apply here).</td></tr>
+            <tr><td><code>check</code></td><td>Parse + lint the config without binding ports. <code>check --strict</code> is the deploy gate.</td></tr>
+            <tr><td><code>lsphp</code></td><td>Run the standalone persistent <code>lsphp</code> "external app" pool that <code>serve --lsphp-external</code> dials — the PHP half of a zero-downtime deploy.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="listeners">Listeners &amp; workers</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Flag</th><th>Default</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>--root &lt;dir&gt;</code></td><td><code>/usr/local/lsws</code></td><td>The LiteSpeed config root to read.</td></tr>
+            <tr><td><code>--http-addr &lt;addr&gt;</code></td><td><code>127.0.0.1:8080</code></td><td>The HTTP listener bind address (production binds <code>0.0.0.0:80</code> through systemd socket activation).</td></tr>
+            <tr><td><code>--https-addr &lt;addr&gt;</code></td><td><code>127.0.0.1:4443</code></td><td>The HTTPS + HTTP/3 listener. <code>""</code> disables the TLS/QUIC listener entirely.</td></tr>
+            <tr><td><code>--workers &lt;n&gt;</code></td><td>CPUs</td><td>Monoio/io_uring worker count for self-bound listeners, plus the shared tokio pipeline runtime size. Socket-activated production inherits systemd listener fds.</td></tr>
+            <tr><td><code>--no-mtls</code></td><td>off</td><td>Relax the mandatory Cloudflare client-cert check for local TLS testing (loopback is exempt regardless).</td></tr>
+            <tr><td><code>--metrics-addr &lt;addr&gt;</code></td><td><code>127.0.0.1:9090</code></td><td>The loopback metrics listener (<code>/metrics</code>, <code>/cache-entries</code>). Empty string disables it; production normally keeps the loopback default.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="observability">Observability</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Flag</th><th>Default</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>--telemetry-file &lt;path&gt;</code></td><td>disabled</td><td>Append cumulative request telemetry snapshots to a TSV file while keeping in-RAM metrics active.</td></tr>
+            <tr><td><code>--telemetry-flush-secs &lt;n&gt;</code></td><td>30</td><td>Disk snapshot interval when <code>--telemetry-file</code> is set.</td></tr>
+            <tr><td><code>--php-slow-log &lt;path&gt;</code></td><td>disabled</td><td>Write slow PHP render rows plus a sampled baseline for request attribution.</td></tr>
+            <tr><td><code>--php-slow-threshold-ms &lt;n&gt;</code></td><td>50</td><td>TTFB threshold for the slow PHP log.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="php">PHP / LSAPI</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Flag</th><th>Default</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>--no-php</code></td><td>off</td><td>Don't spawn <code>lsphp</code>; PHP requests fall back to static serving.</td></tr>
+            <tr><td><code>--php-socket &lt;path&gt;</code></td><td>—</td><td>httpjet's own <code>lsphp</code> socket. Always use a non-production path for tests.</td></tr>
+            <tr><td><code>--php-children &lt;n&gt;</code></td><td>—</td><td>The <code>lsphp</code> worker cap (the config's <code>LSAPI_CHILDREN=250</code> is stripped regardless).</td></tr>
+            <tr><td><code>--lsphp-external &lt;socket&gt;</code></td><td>—</td><td>Dial a <strong>persistent</strong> <code>lsphp</code> pool run by a separate <code>httpjet lsphp</code> process instead of spawning one. This is the production PHP mode — it lets the web tier restart for a binary deploy without cold-starting PHP. Overrides <code>--php-socket</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Sizing PHP</span><p>The live config's <code>LSAPI_CHILDREN=250</code> is a real OOM hazard on a memory-tight box — it's stripped from the spawn env and bounded by <code>--php-children</code>. Profiling shows the pool's acquire latency is ~0–20&nbsp;µs in production, so it never queues; more children buys nothing.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="page-cache">Page cache</h2>
+      <p>All inert (and ~zero-cost) unless <code>--page-cache</code> is set. The cache is in-RAM by default; the tmpfs file tier is explicit opt-in. See <a href="page-cache.html">Page cache</a> for what each tier does.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Flag</th><th>Default</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>--page-cache</code></td><td>off</td><td>Enable the LSCache-equivalent origin page cache.</td></tr>
+            <tr><td><code>--page-cache-mem &lt;bytes&gt;</code></td><td>128&nbsp;MiB</td><td>RAM budget for the in-process page store: metadata, variants, and in-RAM bodies. With the file tier on, a persisted body is charged metadata-only here.</td></tr>
+            <tr><td><code>--page-cache-disk-mem &lt;bytes&gt;</code></td><td>2&nbsp;GiB</td><td>tmpfs body budget (file tier only) — the second cap, enforced by the store's disk-weight LRU. <code>0</code> ⇒ fall back to <code>--page-cache-mem</code>.</td></tr>
+            <tr><td><code>--page-cache-store-path &lt;dir&gt;</code></td><td><code>none</code></td><td>The persistent tmpfs file tier (e.g. <code>/dev/shm/jetcache</code>); <code>default</code>/<code>jetcache</code> selects httpjet's own root. The cache then survives restarts via a boot scan.</td></tr>
+            <tr><td><code>--page-cache-hot-mem &lt;bytes&gt;</code></td><td>192&nbsp;MiB</td><td>The in-RAM hot tier in front of the file store — hottest bodies serve zero-syscall.</td></tr>
+            <tr><td><code>--page-cache-dict &lt;file&gt;</code></td><td>—</td><td>A shared zstd dictionary for internal body dedup (~3.5–9× smaller stored; served bytes stay standard).</td></tr>
+            <tr><td><code>--page-cache-admit-threshold &lt;N&gt;</code></td><td>2</td><td>Frequency-sketch store-admission bar — minimum reuse to store (1 = first sight; 2 = second sighting, first possible hit on the third request). Rejects one-hit-wonders.</td></tr>
+            <tr><td><code>--page-cache-standard-vhosts &lt;csv&gt;</code></td><td>—</td><td>Vhosts where standard <code>Cache-Control</code> freshness can opt responses into the origin page cache.</td></tr>
+            <tr><td><code>--page-cache-private</code></td><td>off</td><td>Enable the per-session private tier — logged-in requests route to a per-session key, never the public entries.</td></tr>
+            <tr><td><code>--page-cache-private-{session,user}-cookie</code></td><td><code>xf_session</code> / <code>xf_user</code></td><td>Override the session/user cookie names that drive the private tier.</td></tr>
+            <tr><td><code>--page-cache-stale-default-secs &lt;N&gt;</code></td><td>0</td><td>Default stale-while-revalidate window when the app declares none.</td></tr>
+            <tr><td><code>--page-cache-stale-max-secs &lt;N&gt;</code></td><td>86,400</td><td>Hard cap for stale-while-revalidate windows honored from the app.</td></tr>
+            <tr><td><code>--page-cache-stale-if-error-max-secs &lt;N&gt;</code></td><td>86,400</td><td>Hard cap for stale-if-error windows honored from the app.</td></tr>
+            <tr><td><code>--page-cache-stale-if-error-default-secs &lt;N&gt;</code></td><td>0 (off)</td><td>A stale-if-error window applied when the app declares none — a backend 5xx serves the retained stale entry instead of the error page.</td></tr>
+            <tr><td><code>--page-cache-vary-cookies</code> / <code>--page-cache-private-cookies</code></td><td>XenForo sets</td><td>Comma lists for the public-vary and private cookie sets.</td></tr>
+            <tr><td><code>--cache-peer &lt;ip:port&gt;</code></td><td>—</td><td>The other node, for cross-node purge fan-out (active-active coherence). Also gates the loopback purge endpoint.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="runtime">Compression, memory &amp; egress</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Flag (or env)</th><th>Default</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>--cf-send-zstd</code> (or <code>CF_SEND_ZSTD=1</code>)</td><td>off</td><td>Force zstd egress to a trusted-proxy (Cloudflare) peer, ignoring the forwarded <code>Accept-Encoding</code> — CF re-encodes per browser at its edge. Never affects direct clients. Production enables this with the <code>cf-send-zstd.conf</code> systemd drop-in on both nodes. See <a href="compression.html">Compression</a>.</td></tr>
+            <tr><td><code>--mimalloc-trim-secs &lt;n&gt;</code></td><td>120</td><td>Interval for the background mimalloc OS-trim (returns retained arena pages to the OS after a burst). <code>0</code> disables.</td></tr>
+            <tr><td><code>--mimalloc-trim-threshold-mib &lt;n&gt;</code></td><td>768</td><td>Only trim when process RSS+swap exceeds this — a healthy small process skips the collect. <code>0</code> = always trim.</td></tr>
+            <tr><td><code>--profile-token &lt;token&gt;</code></td><td>disabled</td><td>Optional token for the loopback-only profiling endpoint when the binary is built with profiling support.</td></tr>
+            <tr><td><code>--ktls</code></td><td>off</td><td>Staged kernel-TLS path for io_uring TLS in a <code>ktls</code> feature build. Validate on alternate ports before production; non-<code>ktls</code> builds reject the flag.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>For the production launch command, the systemd unit, and the deploy flow that ties these together, see <a href="operations.html">Operations</a>.</p>
+    </section>
+
+    <nav class="pager" aria-label="Pagination">
+      <a class="prev" href="operations.html"><div class="dir">← Prev</div><div class="ttl">Operations</div></a>
+    </nav>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The flags are defined in the binary's <code>Cli</code> (clap); see <code>CLAUDE.md</code>.</p>
+</main>
+<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/docs.min.js?v=20260621n"></script>
+</body>
+</html>

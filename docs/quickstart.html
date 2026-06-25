@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quickstart — httpjet docs</title>
+<meta name="description" content="Build httpjet, lint a LiteSpeed config, and serve it on alt ports with the page cache — a few minutes from clone to a running origin.">
+<meta property="og:title" content="httpjet — Quickstart">
+<meta property="og:description" content="From clone to a running httpjet origin against a LiteSpeed config, in a few minutes.">
+<meta property="og:image" content="https://httpjet.net/og.jpg">
+<meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:url" content="https://httpjet.net/docs/quickstart.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="httpjet — Quickstart">
+<meta name="twitter:description" content="From clone to a running httpjet origin against a LiteSpeed config, in a few minutes.">
+<meta name="twitter:image" content="https://httpjet.net/og.jpg">
+<link rel="canonical" href="https://httpjet.net/docs/quickstart.html">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
+<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-ZR4WV214JT');
+</script>
+</head>
+<body>
+
+<main class="content">
+    <p class="crumbs"><a href="./">Docs</a><span>/</span>Quickstart</p>
+    <p class="eyebrow">Guide</p>
+    <h1>Quickstart</h1>
+    <p class="lede">httpjet reads an existing <strong>LiteSpeed configuration</strong> as-is, so there's nothing to port. This walks from a clean checkout to a running origin you can <code>curl</code> — building the binary, linting the config, and serving on alternate ports with the page cache on. For a real deployment, see <a href="operations.html">Operations</a>; for every flag, see <a href="configuration.html">Configuration</a>.</p>
+
+    <section>
+      <h2 id="prereqs">Prerequisites</h2>
+      <ul>
+        <li>A <strong>LiteSpeed configuration tree</strong> at <code>/usr/local/lsws</code> — <code>conf/httpd_config.xml</code> plus <code>conf/vhosts/*.xml</code>. httpjet consumes the same files LiteSpeed does; you point it at the root and it resolves listeners, vhosts, document roots, and ext-processors from there.</li>
+        <li>The <strong><code>lsphp</code></strong> binary (the LiteSpeed PHP SAPI) for any PHP vhost — httpjet speaks native LSAPI to it. PHP is optional: with <code>--no-php</code>, PHP requests fall back to static serving.</li>
+        <li><strong>Rust 1.96</strong> (edition 2021) and a C toolchain (the crypto + allocator crates build native code).</li>
+      </ul>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">No migration</span><p>The same config file boots either server, so adopting httpjet is a cutover, not a port — and rolling back is one restart away. You do not rewrite anything to try it.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="build">Build the binary</h2>
+      <p>A debug build is fine for trying things out; a release build (LTO + a single codegen unit) is what you measure against, and the PGO build is what production runs.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>build</b> · cargo</span></div>
+        <pre><code><span class="t-c"># debug build — fast to compile, ~5x slower at runtime</span>
+cargo build
+
+<span class="t-c"># release build (REQUIRED for any benchmarking)</span>
+cargo build <span class="t-k">--release</span>          <span class="t-c"># → target/release/httpjet</span>
+
+<span class="t-c"># production build: profile-guided optimization (per architecture)</span>
+scripts/build-pgo.sh</code></pre>
+      </div>
+      <p>The workspace is large (1 binary + 14 <code>hj-*</code> libraries), so when iterating on one crate, scope the build and tests with <code>-p</code>, e.g. <code>cargo test -p hj-rewrite</code>.</p>
+    </section>
+
+    <section>
+      <h2 id="check">Lint the config</h2>
+      <p>Before binding any port, dry-run the configuration. <code>check</code> parses the whole tree — variable substitution, listeners, vhost resolution — and prints errors and warnings without serving.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>check</b> · config lint</span></div>
+        <pre><code>./target/debug/httpjet <span class="t-k">--root</span> /usr/local/lsws check</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="run">Run it — for development</h2>
+      <p>Serve on <strong>alternate ports</strong> with a <strong>separate <code>lsphp</code> socket</strong> and the page cache enabled. <code>--no-mtls</code> relaxes the Cloudflare client-certificate check for local TLS (loopback is exempt anyway), and a low <code>--php-children</code> keeps the worker count sane on a dev box.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · dev (alt ports)</span></div>
+        <pre><code>./target/release/httpjet <span class="t-k">--root</span> /usr/local/lsws serve \
+    <span class="t-k">--http-addr</span>  127.0.0.1:8080 \
+    <span class="t-k">--https-addr</span> 127.0.0.1:4443 \
+    <span class="t-k">--no-mtls</span> \
+    <span class="t-k">--php-socket</span>   /tmp/php8-httpjet-test.sock \
+    <span class="t-k">--php-children</span> 4 \
+    <span class="t-k">--page-cache</span></code></pre>
+      </div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Never touch the live edge</span><p>In production httpjet runs on <code>:80</code>/<code>:443</code> behind Cloudflare. Always test on alternate ports with a separate <code>--php-socket</code> — never the production socket — so a test instance can't share the port (via <code>SO_REUSEPORT</code>) or the PHP pool with the live server.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="verify">Verify</h2>
+      <p>Request a page twice and watch the <code>X-LiteSpeed-Cache</code> response header: the first cacheable request is a <code>miss</code> (it ran and stored), the second is a <code>hit</code> (served from cache, no PHP). An absent header means the response wasn't marked cacheable by the app.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>verify</b> · curl</span></div>
+        <pre><code><span class="t-c"># -k: accept the self-signed dev cert; -H: pick the vhost by Host</span>
+curl <span class="t-k">-skI</span> <span class="t-k">-H</span> <span class="t-s">'Host: example.com'</span> https://127.0.0.1:4443/ | grep -i x-litespeed-cache
+<span class="t-c"># x-litespeed-cache: miss   (first request)</span>
+<span class="t-c"># x-litespeed-cache: hit    (second request — served from cache)</span></code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="next">Where to go next</h2>
+      <ul>
+        <li><a href="configuration.html">Configuration</a> — every <code>serve</code> flag and how the LiteSpeed XML maps onto httpjet.</li>
+        <li><a href="operations.html">Operations</a> — the production model: systemd, the zero-downtime PHP pool, the PGO deploy, and the cache gates.</li>
+        <li><a href="architecture.html">Architecture</a> — how a request actually flows through the server.</li>
+        <li><a href="page-cache.html">Page cache</a> — the flagship: how the <code>X-LiteSpeed-*</code> protocol drives caching.</li>
+      </ul>
+    </section>
+
+    <nav class="pager" aria-label="Pagination">
+      <a class="prev" href="./"><div class="dir">← Prev</div><div class="ttl">Overview</div></a>
+      <a class="next" href="architecture.html"><div class="dir">Next →</div><div class="ttl">Architecture</div></a>
+    </nav>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · See also <code>CLAUDE.md</code> in the repo.</p>
+</main>
+<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/docs.min.js?v=20260621n"></script>
+</body>
+</html>
