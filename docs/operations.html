@@ -5,9 +5,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Operations — httpjet docs</title>
-<meta name="description" content="Running httpjet in production: an active-active pair on :80/:443 behind Cloudflare, systemd + monit supervision, the PGO deploy flow with auto-revert, the mandatory cache-correctness gates, and the build &amp; test commands.">
+<meta name="description" content="Operating httpjet safely: source installation, generic systemd units, strict configuration checks, optional LSAPI pooling, cache validation, and upgrade discipline.">
 <meta property="og:title" content="httpjet — Operations">
-<meta property="og:description" content="Production topology, zero-downtime PHP, the PGO deploy flow with cache-correctness gates, and the build &amp; test commands.">
+<meta property="og:description" content="Generic systemd installation, strict TOML checks, optional PHP pooling, cache validation, and safe upgrades.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -18,20 +18,19 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="httpjet — Operations">
-<meta name="twitter:description" content="Production topology, zero-downtime PHP, the PGO deploy flow with cache-correctness gates, and the build &amp; test commands.">
+<meta name="twitter:description" content="Generic systemd installation, strict TOML checks, optional PHP pooling, cache validation, and safe upgrades.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/docs/operations.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<script defer src="assets/docs-head.min.js?v=20260713a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-ZR4WV214JT');
 </script>
 </head>
@@ -41,211 +40,77 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>Operations</p>
     <p class="eyebrow">Running it</p>
     <h1>Operations &amp; deployment</h1>
-    <p class="lede">httpjet runs in production as an <strong>active-active pair</strong> on <code>:80</code>/<code>:443</code> — one x86-64 node, one aarch64 node — pulled by <strong>Cloudflare</strong> over mutual TLS. It is supervised by <strong>systemd</strong> and watched by <strong>monit</strong>, deployed one node at a time as a PGO binary, and gated by a battery of cache-correctness scripts that <em>must</em> pass before the edge is trusted. This page is the runbook: topology, the deploy flow, the gates, and the build &amp; test commands.</p>
+    <p class="lede">httpjet is designed for a conventional Linux service deployment: a dedicated account, strict native TOML, systemd hardening, and an explicit separation between the web tier, an optional PHP pool, and application-specific integrations. The checked-in units are generic references, not a copy of any live environment.</p>
 
     <section>
-      <h2 id="topology">Production topology</h2>
-      <p>Two nodes serve the live edge: an x86-64 host and an aarch64 host, both bound to <code>:80</code> and <code>:443</code>, both pulled by Cloudflare. Either can carry the whole site, so a deploy that touches one node at a time always leaves Cloudflare a live origin to fall back to. There is no LiteSpeed serving anymore — httpjet <em>is</em> the edge, and the only serving transport is pure io_uring / monoio.</p>
-      <div class="chips">
-        <span class="chip"><span class="dot"></span>Active-active pair · x86-64 + aarch64</span>
-        <span class="chip"><span class="dot"></span>:80 / :443 behind Cloudflare</span>
-        <span class="chip"><span class="dot"></span><code>httpjet.socket</code> activation</span>
-        <span class="chip"><span class="dot"></span>systemd · <code>Restart=always</code></span>
-        <span class="chip"><span class="dot"></span>monit-watched · self-heals in ~2&nbsp;s</span>
-        <span class="chip"><span class="dot"></span>drops to <code>nobody:nobody</code></span>
-      </div>
-      <p>Each node uses three systemd units: <code>httpjet.socket</code> owns the public listener fds, <code>httpjet.service</code> inherits them and serves the web tier, and <code>httpjet-lsphp.service</code> keeps the external PHP pool warm. The service has <code>Restart=always</code>, runs with <code>--page-cache</code>, and is additionally watched by monit, so a stray kill self-heals in roughly two seconds. The unit runs the <strong>stable</strong> binary, deliberately not the build output under <code>target/</code>:</p>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>unit</b> · the stable binary path</span></div>
-        <pre><code><span class="t-c"># /etc/systemd/system/httpjet.service (sketch; fds from httpjet.socket)</span>
-ExecStart=<span class="t-f">/usr/local/httpjet/bin/httpjet</span> --root /usr/local/lsws serve <span class="t-k">--page-cache</span> …
-Restart=<span class="t-s">always</span>
-User=<span class="t-s">nobody</span>
-Group=<span class="t-s">nobody</span></code></pre>
-      </div>
-      <p>The unit points at <code>/usr/local/httpjet/bin/httpjet</code> — a stable install path that <strong>survives a <code>cargo clean</code></strong>, unlike <code>target/release/httpjet</code>. The process drops privileges to <code>nobody:nobody</code>. Start, stop, and restore are always done through systemd (<code>systemctl {start,restart,stop} httpjet</code>): a plain kill just gets respawned, so taking the edge down for maintenance means an actual <code>systemctl stop</code>. Socket activation keeps the listener fds open across a web-tier restart; accepted in-flight requests still have to drain within the normal shutdown window.</p>
+      <h2 id="install">Installation status</h2>
+      <p>Public signed binary packages and an installer are not published yet. Today, build from source and follow the included systemd reference. Do not treat internal build, benchmark, or deployment scripts as a public installation path.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">source install · native static site</span></div><pre><code>cargo build --release -p httpjet
+sudo useradd --system --home-dir /var/lib/httpjet --no-create-home \
+  --shell /usr/sbin/nologin httpjet
+sudo install -m0755 target/release/httpjet /usr/bin/httpjet
+sudo install -d -o root -g httpjet -m0750 /etc/httpjet /etc/httpjet/vhosts
+sudo install -o root -g httpjet -m0640 examples/httpjet.toml /etc/httpjet/httpjet.toml
+sudo install -o root -g httpjet -m0640 examples/vhosts/example.toml /etc/httpjet/vhosts/example.toml
+sudo install -m0644 systemd/httpjet.service /etc/systemd/system/httpjet.service
+sudo /usr/bin/httpjet --config /etc/httpjet/httpjet.toml check --strict
+sudo systemctl daemon-reload
+sudo systemctl enable --now httpjet</code></pre></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Review before start</span><p>The example binds loopback <code>:8080</code> and uses an example document root. Set the listener, domains, document roots, TLS material, and writable application paths deliberately before enabling a public service.</p></div></div>
     </section>
 
     <section>
-      <h2 id="config">Configuration</h2>
-      <p>httpjet reads the <strong>same</strong> LiteSpeed configuration it was built to replace — <code>/usr/local/lsws/conf/httpd_config.xml</code> plus the per-vhost files under <code>vhosts/*.xml</code>. That tree is read-only; httpjet never writes to it. The same XML drives the same virtual hosts, listeners, contexts, and <code>.htaccess</code> behavior.</p>
-      <p>Before serving anything, the config can be linted without binding a single port — this is the first thing the deploy script runs, and the right way to sanity-check an edit:</p>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>check</b> · lint without binding ports</span></div>
-        <pre><code>$ httpjet --root <span class="t-f">/usr/local/lsws</span> <span class="t-k">check</span>
-
-<span class="t-c"># strict mode — the form the deploy script gates on</span>
-$ httpjet --root <span class="t-f">/usr/local/lsws</span> <span class="t-k">check</span> --strict</code></pre>
-      </div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Read-only by design</span><p>Both <code>/usr/local/lsws</code> and the config tree are read-only. httpjet treats the LiteSpeed XML as ground truth and parses it through <code>hj-config</code> (<code>$VAR</code> substitution, listener/vhost resolution). A config mistake is caught at <code>check</code> time, not at the listener.</p></div></div>
+      <h2 id="systemd">Systemd model</h2>
+      <p>The reference <code>httpjet.service</code> runs <code>/usr/bin/httpjet --config /etc/httpjet/httpjet.toml serve</code> as the dedicated <code>httpjet</code> account. It grants only <code>CAP_NET_BIND_SERVICE</code>, makes the filesystem read-only except for systemd-managed runtime/state/cache/log directories, and keeps policy in TOML instead of <code>ExecStart</code> flags.</p>
+      <p>Socket activation is optional. The base service self-binds native listeners; install <code>httpjet.socket</code> only after making every socket address match TOML. Use the service manager for lifecycle operations—never broad process-kill patterns.</p>
     </section>
 
     <section>
-      <h2 id="zero-downtime-php">Zero-downtime PHP</h2>
-      <p>The <code>lsphp</code> pool is its own systemd unit — <code>httpjet-lsphp.service</code> — and the web tier dials it over a Unix socket rather than spawning PHP itself. The server connects with <code>serve --lsphp-external</code>, so restarting the web tier never cold-starts the PHP pool:</p>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · external lsphp pool</span></div>
-        <pre><code><span class="t-c"># the PHP pool is a separate, long-lived unit</span>
-$ systemctl status <span class="t-f">httpjet-lsphp</span>
-
-<span class="t-c"># the web tier dials it — no spawn, no opcache cold-start on restart</span>
-ExecStart=… serve <span class="t-k">--lsphp-external</span> <span class="t-f">/tmp/php8-httpjet-c1.sock</span> <span class="t-k">--page-cache</span></code></pre>
-      </div>
-      <p>The payoff: <code>systemctl restart httpjet</code> redeploys a fresh server binary with <strong>zero PHP downtime</strong> — the warm <code>lsphp</code> children, with their primed opcache, stay up across the restart. (Forcing an opcache recycle is a deliberate, separate <code>systemctl restart httpjet-lsphp</code>.) The full PHP path is covered in <a href="lsapi.html">LSAPI &amp; PHP</a>.</p>
+      <h2 id="changes">Safe change workflow</h2>
+      <ol>
+        <li>Edit selected TOML or application content in a reviewable change.</li>
+        <li>Run <code>httpjet --config … check --strict</code> as the eventual service identity.</li>
+        <li>Test with isolated listeners, a separate PHP socket, and a separate cache root.</li>
+        <li>Restart through systemd for listener, TLS-binding, PHP-pool, cache-runtime, or binary changes. Use reload only for documented soft configuration changes.</li>
+        <li>Probe the origin directly and check service logs; purge any outer cache if an incorrect cacheable response reached it.</li>
+      </ol>
+      <p>Keep installed binaries outside Cargo's <code>target/</code> directory. A source build or <code>cargo clean</code> must never remove the binary a running unit depends on.</p>
     </section>
 
     <section>
-      <h2 id="deploy-flow">The deploy flow</h2>
-      <p>Deploys are PGO, per-architecture, and strictly <strong>one node at a time</strong>. A PGO profile is gathered by running the instrumented binary on its own architecture, so the binaries cannot be cross-compiled — the aarch64 build runs natively on the ARM node. The shape of a deploy is build → install → restart → gate, repeated per node:</p>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>Step</th><th>What happens</th></tr></thead>
-          <tbody>
-            <tr><td><span class="crate">build</span></td><td><code>scripts/build-pgo.sh</code> produces the PGO binary. Run on the x86-64 node for x86-64, and natively on the aarch64 node for aarch64 — the profile is architecture-specific.</td></tr>
-            <tr><td><span class="crate">preflight</span></td><td><code>scripts/deploy-lscache.sh</code> runs <code>check --strict</code> (config lint), a <strong>self-peer guard</strong> (the cache peer must be the <em>other</em> node, never itself), and a <strong>co-listener guard</strong> (nothing else may be sharing the port).</td></tr>
-            <tr><td><span class="crate">install</span></td><td>The fresh build is installed into <code>bin/</code> (the previous binary is kept as <code>bin/httpjet.prev</code>) and the unit is restarted with <code>systemctl restart httpjet</code>.</td></tr>
-            <tr><td><span class="crate">health-check</span></td><td>The deploy script probes the loopback origin. On failure it <strong>auto-reverts</strong> to <code>bin/httpjet.prev</code> and restarts — the previous-good binary is one restart away at all times.</td></tr>
-            <tr><td><span class="crate">soak &amp; gate</span></td><td>Run the cache-correctness gates against the just-deployed node, soak the first node, then repeat the whole flow on the second.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>deploy</b> · PGO build → install → restart</span></div>
-        <pre><code><span class="t-c"># 1) build the PGO binary on this architecture</span>
-$ <span class="t-f">scripts/build-pgo.sh</span>
-
-<span class="t-c"># 2) install into bin/ + systemctl restart httpjet</span>
-<span class="t-c">#    runs check --strict, self-peer guard, co-listener guard,</span>
-<span class="t-c">#    then health-checks loopback and auto-reverts on failure</span>
-$ bash <span class="t-f">scripts/deploy-lscache.sh</span></code></pre>
-      </div>
-      <p>Deploying one node at a time is the load-bearing rule: while the first node is restarting (or rolling back), the second is still serving Cloudflare, so the edge never loses an origin. Soak the first node before touching the second.</p>
-      <p>There is no <code>--io-uring</code> flag and no <code>URING=0</code> environment rollback. The io_uring transport is the normal binary. If a transport-level regression ever requires backing out, rollback means reinstalling the previous-good binary or rebuilding from the previous revision.</p>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">R&amp;D never touches the live edge</span><p>Anything that isn't a deploy — benchmarking, reproducing a bug, kicking the tires — runs on <strong>alternate ports</strong> with a <strong>separate <code>--php-socket</code></strong> and a low <code>--php-children</code>, never the production <code>:80</code>/<code>:443</code> or the prod PHP socket. A leaked alt-port instance silently shares the port via <code>SO_REUSEPORT</code> with its own cache and <code>.htaccess</code> state, so test instances are cleaned up by exact PID and the port is verified clear afterward.</p></div></div>
+      <h2 id="php">Optional persistent PHP pool</h2>
+      <p>Static and reverse-proxy deployments need no PHP. For LSAPI, the supplied <code>httpjet-lsphp.socket</code> and <code>httpjet-lsphp.service</code> units run a separate pool under the <code>httpjet-php</code> account. Set the web configuration's <code>runtime.php.external_socket</code> and the pool configuration's <code>runtime.php.socket</code> to the same Unix socket.</p>
+      <p>This lets the web service restart without cold-starting PHP while keeping PHP configuration and application secrets separate from TLS and cluster secrets. The operator still supplies the LSAPI-capable <code>lsphp</code> executable; httpjet does not install LiteSpeed or PHP packages.</p>
     </section>
 
     <section>
-      <h2 id="cache-gates">Cache-correctness gates</h2>
-      <p>The page cache is the one subsystem that can serve <em>wrong content</em> if a key or isolation rule is broken, so a deploy is not trusted until four regression scripts and a purge smoke all pass. Each targets one historically real failure class:</p>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th>Gate</th><th>What it catches</th></tr></thead>
-          <tbody>
-            <tr><td><span class="crate">cache_xurl_test.sh</span></td><td>Front-controller cache poisoning — three distinct URLs must each keep their own content (XenForo rewrites every page to <code>/index.php</code>, so a key-by-resolved-path bug would collapse the whole site to one entry).</td></tr>
-            <tr><td><span class="crate">cache_scheme_test.sh</span></td><td>The cross-scheme redirect loop — an HTTP <code>:80</code> hit must not poison the HTTPS entry with an origin canonical <code>301</code> that replays to HTTPS clients as a redirect loop.</td></tr>
-            <tr><td><span class="crate">cache_xhost_test.sh</span></td><td>Foreign-host isolation — a request for an unmapped host must not be served content built for another vhost.</td></tr>
-            <tr><td><span class="crate">cache_private_test.sh</span></td><td>Private-tier session isolation — a logged-in (per-session) entry must never cross into the public entries, in either direction.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>gate</b> · run before trusting the edge</span></div>
-        <pre><code><span class="t-c"># front-controller cache-poisoning (three distinct URLs)</span>
-$ HJ=127.0.0.1:443 HOST=windowsforum.com bash <span class="t-f">scripts/cache_xurl_test.sh</span> / /whats-new/ /help/
+      <h2 id="cache-gates">Cache safety and observability</h2>
+      <p>The page cache is off by default. Before enabling it, prove the application has explicit cache headers and exercise URL, host, scheme, cookie/private-tier, purge, persistence, and peer-auth behavior that applies to that application. A cache bug may be retained by an outer CDN after the origin is repaired.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">inspect a configured cache</span></div><pre><code># metrics remain on the configured, normally loopback-only address
+curl -s http://127.0.0.1:9090/cache-entries
 
-<span class="t-c"># cross-scheme HTTP→HTTPS redirect loop</span>
-$ HJ_HTTP=127.0.0.1:80 HJ_HTTPS=127.0.0.1:443 HOST=windowsforum.com bash <span class="t-f">scripts/cache_scheme_test.sh</span> /
+# native applications expose X-HttpJet-Cache and standard Cache-Status
+curl -I -H 'Host: example.test' http://127.0.0.1:8080/ | grep -Ei 'x-httpjet-cache|cache-status'
 
-<span class="t-c"># foreign-host isolation + private-tier session isolation</span>
-$ HJ=127.0.0.1:443 HOST=windowsforum.com bash <span class="t-f">scripts/cache_xhost_test.sh</span> /
-$ HJ=127.0.0.1:443 HOST=windowsforum.com bash <span class="t-f">scripts/cache_private_test.sh</span> /help/
-
-<span class="t-c"># purge smoke — must return 204</span>
-$ curl -s -X POST -H <span class="t-s">'x-litespeed-purge: tag=__deploy_smoke'</span> \
-    -o /dev/null -w <span class="t-s">'%{http_code}\n'</span> http://127.0.0.1/__hj_cache_purge</code></pre>
-      </div>
-      <p>The full mechanics of the cache — keying, the identity guard, the purge protocol — live in <a href="page-cache.html">Page cache</a>. The gates exist because the worst-case blast radius of a cache bug is wide, which is the subject of the next section.</p>
+# loopback tag purge; configured peers also need HMAC authentication
+curl -s -X POST -H 'x-httpjet-purge: tag=example' \
+  -o /dev/null -w '%{http_code}\n' http://127.0.0.1/__hj_cache_purge</code></pre></div>
+      <p><code>/cache-entries</code> reports hits, misses, stores, purges, file-tier errors, and byte budgets. Judge cache health by those counters and direct content checks, not a transient raw file count.</p>
     </section>
 
     <section>
-      <h2 id="cloudflare-coupling">The Cloudflare coupling</h2>
-      <p>Cloudflare sits in front of both nodes, and that changes the cost of a cache mistake. A wrong cached response doesn't just live in the origin cache — Cloudflare <strong>edge-caches it too</strong>, for the response's own <code>max-age</code>. Some permalinks carry a multi-day edge TTL.</p>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">A cache bug can outlive a rollback</span><p>Because Cloudflare pins a wrong response at its edge for up to a <strong>7-day</strong> TTL on some permalinks, rolling the origin binary back does <em>not</em> fix what is already cached upstream. A bad cache requires <strong>two</strong> actions: fix the origin <em>and</em> purge Cloudflare. This is exactly why the cache-correctness gates are mandatory before a deploy — catching the bug at the origin is far cheaper than chasing it across the edge.</p></div></div>
-      <p>So the remediation order for a cache incident is: confirm the origin is now correct over loopback (<code>curl -sk -H 'Host: …' https://127.0.0.1/&lt;path&gt;</code>), then purge Cloudflare for the affected zone — a rollback alone is not enough.</p>
-    </section>
-
-    <section>
-      <h2 id="observability">Observability</h2>
-      <p>The cache exposes its internals on a <strong>loopback-only</strong> metrics listener — <code>--metrics-addr</code>, default <code>127.0.0.1:9090</code>. It is never reachable from the public listeners, so introspection can't leak. The key endpoint is <code>/cache-entries</code>:</p>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>observe</b> · the metrics listener</span></div>
-        <pre><code><span class="t-c"># entries/bytes, per-URL-class counts, hits/misses/stores/purges + error counters</span>
-$ curl -s <span class="t-f">http://127.0.0.1:9090/cache-entries</span>
-
-<span class="t-c"># the per-response verdict — hit / miss — is on the wire</span>
-$ curl -skI -H <span class="t-s">'Host: windowsforum.com'</span> https://127.0.0.1/help/ | grep -i cache
-X-LiteSpeed-Cache: <span class="t-s">hit</span></code></pre>
-      </div>
-      <p>Three signals together tell the operational story:</p>
-      <ul>
-        <li><strong><code>/cache-entries</code></strong> — total entries and bytes, per-URL-class counts, and the health line of <code>hits</code>/<code>misses</code>/<code>stores</code>/<code>purges</code> plus error counters.</li>
-        <li><strong>The <code>X-LiteSpeed-Cache</code> header</strong> — <code>hit</code> when the cache served the response, <code>miss</code> when it ran but stored instead, absent when the response wasn't cacheable.</li>
-        <li><strong>Access &amp; error logs</strong> — non-blocking, and they record the <em>real</em> wire bytes and the <em>real</em> client IP (resolved from the <code>X-Forwarded-For</code> chain behind the trusted Cloudflare proxy, not the edge IP).</li>
-      </ul>
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">In production</span><p>The production unit keeps the default loopback metrics listener at <code>127.0.0.1:9090</code>. It is not exposed on public listeners; disable it with an empty <code>--metrics-addr</code> only when local introspection is intentionally unavailable.</p><span class="regime">loopback-only listener · default <code>127.0.0.1:9090</code></span></div></div>
-    </section>
-
-    <section>
-      <h2 id="kill-switch">The cache kill switch</h2>
-      <p>If the page cache itself needs to be taken out of the loop — without reverting a binary — drop <code>--page-cache</code> from the unit and restart. The cache code is <strong>inert without the flag</strong>: the lookup and store seams become a near-free pass-through, and every request goes straight to its backend.</p>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>kill switch</b> · disable the cache only</span></div>
-        <pre><code><span class="t-c"># drop --page-cache from ExecStart (override or edit the unit), then:</span>
-$ systemctl <span class="t-k">restart</span> <span class="t-f">httpjet</span>
-<span class="t-c"># the cache is now bypassed entirely; the rest of the server is unchanged</span></code></pre>
-      </div>
-    </section>
-
-    <section>
-      <h2 id="build-test">Build &amp; test</h2>
-      <p>The local development and CI commands. Builds come in two flavors: a fast release build for everyday work, and the PGO build used for production and for any benchmark that's meant to be believed. Both builds use the same pure io_uring transport; transport rollback is a source/binary rollback, not a build flag.</p>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>build</b> · release vs PGO</span></div>
-        <pre><code><span class="t-c"># release: LTO thin + codegen-units=1 (slow link, fast binary)</span>
-$ cargo build <span class="t-k">--release</span>
-
-<span class="t-c"># the production build — profile-guided optimization</span>
-$ <span class="t-f">scripts/build-pgo.sh</span></code></pre>
-      </div>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>test</b> · full suite to one file</span></div>
-        <pre><code><span class="t-c"># the full suite — ~1,050 tests across the 15 crates</span>
-$ cargo test
-
-<span class="t-c"># one crate</span>
-$ cargo test <span class="t-k">-p</span> hj-rewrite
-
-<span class="t-c"># one integration-test file</span>
-$ cargo test <span class="t-k">-p</span> hj-rewrite <span class="t-k">--test</span> redirect_repro
-
-<span class="t-c"># live tests (#[ignore]): spawn lsphp, read certs — run separately</span>
-$ cargo test <span class="t-k">--</span> --ignored</code></pre>
-      </div>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>inspect</b> · lint the config</span></div>
-        <pre><code>$ ./target/debug/httpjet --root <span class="t-f">/usr/local/lsws</span> <span class="t-k">check</span></code></pre>
-      </div>
-      <p>For local serving, the rule from the deploy section applies in full: never bind the production ports or socket. A development instance takes alternate ports and its own PHP socket so the live edge is untouched —</p>
-      <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · R&amp;D on alt ports only</span></div>
-        <pre><code>$ ./target/release/httpjet --root <span class="t-f">/usr/local/lsws</span> <span class="t-k">serve</span> \
-    <span class="t-k">--http-addr</span>  <span class="t-n">127.0.0.1:8080</span> \
-    <span class="t-k">--https-addr</span> <span class="t-n">127.0.0.1:4443</span> \
-    <span class="t-k">--no-mtls</span> \
-    <span class="t-k">--php-socket</span>   <span class="t-f">/tmp/php8-test.sock</span> \
-    <span class="t-k">--php-children</span> <span class="t-n">4</span> \
-    <span class="t-k">--page-cache</span></code></pre>
-      </div>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Never the prod socket</span><p>A development serve uses a throwaway <code>--php-socket</code> (e.g. <code>/tmp/php8-test.sock</code>) and a low <code>--php-children</code> — never the production <code>/tmp/php8-httpjet-c1.sock</code>. <code>--no-mtls</code> relaxes the Cloudflare client-cert check for local TLS; loopback is exempt anyway. Benchmark only release or PGO builds — a debug build is several times slower and tells you nothing.</p></div></div>
+      <h2 id="release">Release and upgrade discipline</h2>
+      <p>A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, a license, and a documented Linux/kernel/libc support floor. Existing architecture-tuned PGO and cross-build helpers are deployment-specific and must not be uploaded as generic binaries.</p>
+      <p>Package upgrades should preserve <code>/etc/httpjet</code>, dictionaries, and state; stage and validate a new binary before restart; and retain a known-good binary for rollback. Dictionary rotation is deliberate: write the new file atomically, validate its configuration, restart the service, and expect old dictionary-generation cache entries to become safe misses.</p>
     </section>
 
     <nav class="pager" aria-label="Pagination">
       <a class="prev" href="conformance.html"><div class="dir">← Prev</div><div class="ttl">Conformance</div></a>
       <a class="next" href="configuration.html"><div class="dir">Next →</div><div class="ttl">Configuration</div></a>
     </nav>
-    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The operational ground truth lives in <code>CLAUDE.md</code> in the repo.</p>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · See the generic systemd units and the native cutover guide in the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260713a"></script>
 <script defer src="assets/docs.min.js?v=20260621n"></script>
 </body>
 </html>

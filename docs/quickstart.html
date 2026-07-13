@@ -5,9 +5,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quickstart — httpjet docs</title>
-<meta name="description" content="Build httpjet, lint a LiteSpeed config, and serve it on alt ports with the page cache — a few minutes from clone to a running origin.">
+<meta name="description" content="Build httpjet from source, start with a strict native TOML configuration, and use LiteSpeed XML only as an explicit migration input.">
 <meta property="og:title" content="httpjet — Quickstart">
-<meta property="og:description" content="From clone to a running httpjet origin against a LiteSpeed config, in a few minutes.">
+<meta property="og:description" content="From source checkout to a running native-TOML httpjet origin, with an explicit LiteSpeed migration path.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -18,13 +18,13 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="httpjet — Quickstart">
-<meta name="twitter:description" content="From clone to a running httpjet origin against a LiteSpeed config, in a few minutes.">
+<meta name="twitter:description" content="From source checkout to a running native-TOML httpjet origin, with an explicit LiteSpeed migration path.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/docs/quickstart.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<script defer src="assets/docs-head.min.js?v=20260713a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -41,79 +41,76 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>Quickstart</p>
     <p class="eyebrow">Guide</p>
     <h1>Quickstart</h1>
-    <p class="lede">httpjet reads an existing <strong>LiteSpeed configuration</strong> as-is, so there's nothing to port. This walks from a clean checkout to a running origin you can <code>curl</code> — building the binary, linting the config, and serving on alternate ports with the page cache on. For a real deployment, see <a href="operations.html">Operations</a>; for every flag, see <a href="configuration.html">Configuration</a>.</p>
+    <p class="lede">Native, versioned <strong>TOML</strong> is httpjet's public configuration model. This walks from a source checkout to a running static origin: build the binary, copy the neutral example, validate it, and serve. LiteSpeed XML remains an explicit compatibility and migration input, not the default deployment model.</p>
 
     <section>
       <h2 id="prereqs">Prerequisites</h2>
       <ul>
-        <li>A <strong>LiteSpeed configuration tree</strong> at <code>/usr/local/lsws</code> — <code>conf/httpd_config.xml</code> plus <code>conf/vhosts/*.xml</code>. httpjet consumes the same files LiteSpeed does; you point it at the root and it resolves listeners, vhosts, document roots, and ext-processors from there.</li>
-        <li>The <strong><code>lsphp</code></strong> binary (the LiteSpeed PHP SAPI) for any PHP vhost — httpjet speaks native LSAPI to it. PHP is optional: with <code>--no-php</code>, PHP requests fall back to static serving.</li>
-        <li><strong>Rust 1.96</strong> (edition 2021) and a C toolchain (the crypto + allocator crates build native code).</li>
+        <li>Linux with usable io_uring support, plus a C toolchain for the crypto and allocator dependencies.</li>
+        <li><strong>Rust 1.97</strong> (edition 2024) for a source build. Public binary packages are being prepared; until then, build from the checkout.</li>
+        <li>Only for PHP: an LSAPI-capable <code>lsphp</code> executable supplied by the operator. Static and reverse-proxy deployments do not need PHP or a LiteSpeed installation.</li>
       </ul>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">No migration</span><p>The same config file boots either server, so adopting httpjet is a cutover, not a port — and rolling back is one restart away. You do not rewrite anything to try it.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Release status</span><p>The repository does not yet publish signed installable binaries or distribution packages. Treat this guide as the source-install path; do not use deployment-specific scripts as a general installer.</p></div></div>
     </section>
 
     <section>
       <h2 id="build">Build the binary</h2>
-      <p>A debug build is fine for trying things out; a release build (LTO + a single codegen unit) is what you measure against, and the PGO build is what production runs.</p>
+      <p>A debug build is fine for iteration. Use a normal release build for local serving and reproducible tests. The checked-in PGO helper is tailored to one deployment and is not a general release-build command.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>build</b> · cargo</span></div>
         <pre><code><span class="t-c"># debug build — fast to compile, ~5x slower at runtime</span>
-cargo build
+cargo build -p httpjet
 
 <span class="t-c"># release build (REQUIRED for any benchmarking)</span>
-cargo build <span class="t-k">--release</span>          <span class="t-c"># → target/release/httpjet</span>
-
-<span class="t-c"># production build: profile-guided optimization (per architecture)</span>
-scripts/build-pgo.sh</code></pre>
+cargo build <span class="t-k">--release</span> -p httpjet  <span class="t-c"># → target/release/httpjet</span></code></pre>
       </div>
       <p>The workspace is large (1 binary + 14 <code>hj-*</code> libraries), so when iterating on one crate, scope the build and tests with <code>-p</code>, e.g. <code>cargo test -p hj-rewrite</code>.</p>
     </section>
 
     <section>
-      <h2 id="check">Lint the config</h2>
-      <p>Before binding any port, dry-run the configuration. <code>check</code> parses the whole tree — variable substitution, listeners, vhost resolution — and prints errors and warnings without serving.</p>
+      <h2 id="check">Create and validate a native config</h2>
+      <p>Copy the neutral example and its vhost file, then set the listener address, domain, and document root for your machine. Native paths are resolved relative to the TOML file that declares them.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>check</b> · config lint</span></div>
-        <pre><code>./target/debug/httpjet <span class="t-k">--root</span> /usr/local/lsws check</code></pre>
+        <pre><code>mkdir -p /tmp/httpjet/vhosts /srv/example.test/public
+cp examples/httpjet.toml /tmp/httpjet/httpjet.toml
+cp examples/vhosts/example.toml /tmp/httpjet/vhosts/example.toml
+printf 'hello from httpjet\n' &gt; /srv/example.test/public/index.html
+
+<span class="t-c"># edit /tmp/httpjet/vhosts/example.toml for your domain and document root, then:</span>
+./target/debug/httpjet <span class="t-k">--config</span> /tmp/httpjet/httpjet.toml check <span class="t-k">--strict</span></code></pre>
       </div>
     </section>
 
     <section>
       <h2 id="run">Run it — for development</h2>
-      <p>Serve on <strong>alternate ports</strong> with a <strong>separate <code>lsphp</code> socket</strong> and the page cache enabled. <code>--no-mtls</code> relaxes the Cloudflare client-certificate check for local TLS (loopback is exempt anyway), and a low <code>--php-children</code> keeps the worker count sane on a dev box.</p>
+      <p>The supplied example is HTTP-only on <code>127.0.0.1:8080</code> with PHP and the page cache disabled. It is intentionally safe to run alongside an existing server. Native runtime policy belongs in TOML, so operational flags after <code>serve</code> are rejected.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · dev (alt ports)</span></div>
-        <pre><code>./target/release/httpjet <span class="t-k">--root</span> /usr/local/lsws serve \
-    <span class="t-k">--http-addr</span>  127.0.0.1:8080 \
-    <span class="t-k">--https-addr</span> 127.0.0.1:4443 \
-    <span class="t-k">--no-mtls</span> \
-    <span class="t-k">--php-socket</span>   /tmp/php8-httpjet-test.sock \
-    <span class="t-k">--php-children</span> 4 \
-    <span class="t-k">--page-cache</span></code></pre>
+        <pre><code>./target/release/httpjet <span class="t-k">--config</span> /tmp/httpjet/httpjet.toml serve</code></pre>
       </div>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Never touch the live edge</span><p>In production httpjet runs on <code>:80</code>/<code>:443</code> behind Cloudflare. Always test on alternate ports with a separate <code>--php-socket</code> — never the production socket — so a test instance can't share the port (via <code>SO_REUSEPORT</code>) or the PHP pool with the live server.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Keep test state isolated</span><p>Use alternate HTTP/HTTPS/metrics ports, a separate PHP socket if PHP is enabled, and a separate page-cache root. Do not bind a test instance to a service manager's production listeners.</p></div></div>
     </section>
 
     <section>
       <h2 id="verify">Verify</h2>
-      <p>Request a page twice and watch the <code>X-LiteSpeed-Cache</code> response header: the first cacheable request is a <code>miss</code> (it ran and stored), the second is a <code>hit</code> (served from cache, no PHP). An absent header means the response wasn't marked cacheable by the app.</p>
+      <p>Fetch the example page. The page cache is off in the neutral starter configuration; when you later enable it, native applications use the <code>X-HttpJet-*</code> cache protocol. LiteSpeed header aliases require an explicit compatibility profile.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>verify</b> · curl</span></div>
-        <pre><code><span class="t-c"># -k: accept the self-signed dev cert; -H: pick the vhost by Host</span>
-curl <span class="t-k">-skI</span> <span class="t-k">-H</span> <span class="t-s">'Host: example.com'</span> https://127.0.0.1:4443/ | grep -i x-litespeed-cache
-<span class="t-c"># x-litespeed-cache: miss   (first request)</span>
-<span class="t-c"># x-litespeed-cache: hit    (second request — served from cache)</span></code></pre>
+        <pre><code>curl -i -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/
+
+<span class="t-c"># after enabling a cacheable native application response, inspect:</span>
+curl -I -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/ | grep -Ei 'x-httpjet-cache|cache-status'</code></pre>
       </div>
     </section>
 
     <section>
       <h2 id="next">Where to go next</h2>
       <ul>
-        <li><a href="configuration.html">Configuration</a> — every <code>serve</code> flag and how the LiteSpeed XML maps onto httpjet.</li>
-        <li><a href="operations.html">Operations</a> — the production model: systemd, the zero-downtime PHP pool, the PGO deploy, and the cache gates.</li>
+        <li><a href="configuration.html">Configuration</a> — the strict native schema, runtime policy, integration profiles, and XML migration commands.</li>
+        <li><a href="operations.html">Operations</a> — generic systemd installation, safe upgrades, PHP pooling, and cache gates.</li>
         <li><a href="architecture.html">Architecture</a> — how a request actually flows through the server.</li>
-        <li><a href="page-cache.html">Page cache</a> — the flagship: how the <code>X-LiteSpeed-*</code> protocol drives caching.</li>
+        <li><a href="page-cache.html">Page cache</a> — native cache headers, optional compatibility aliases, storage tiers, and dictionaries.</li>
       </ul>
     </section>
 
@@ -123,7 +120,7 @@ curl <span class="t-k">-skI</span> <span class="t-k">-H</span> <span class="t-s"
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · See also <code>CLAUDE.md</code> in the repo.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260713a"></script>
 <script defer src="assets/docs.min.js?v=20260621n"></script>
 </body>
 </html>

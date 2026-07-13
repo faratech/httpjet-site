@@ -7,7 +7,7 @@
 <title>Protocol stacks — httpjet docs</title>
 <meta name="description" content="httpjet's pure io_uring protocol paths: custom HTTP/1.1, native HTTP/2 with zero-allocation HPACK, HTTP/3 over QUIC, all behind one unified rustls TLS layer with Cloudflare mutual TLS.">
 <meta property="og:title" content="httpjet — Protocol stacks">
-<meta property="og:description" content="HTTP/1.1, a native HTTP/2 stack, and HTTP/3 over QUIC behind one unified TLS layer with Cloudflare-style mutual TLS.">
+<meta property="og:description" content="HTTP/1.1, a native HTTP/2 stack, and HTTP/3 over QUIC behind one unified TLS layer with optional mTLS.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -18,13 +18,13 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="httpjet — Protocol stacks">
-<meta name="twitter:description" content="HTTP/1.1, a native HTTP/2 stack, and HTTP/3 over QUIC behind one unified TLS layer with Cloudflare-style mutual TLS.">
+<meta name="twitter:description" content="HTTP/1.1, a native HTTP/2 stack, and HTTP/3 over QUIC behind one unified TLS layer with optional mTLS.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/docs/protocols.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<script defer src="assets/docs-head.min.js?v=20260713a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -41,7 +41,7 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>Protocol stacks</p>
     <p class="eyebrow">Internals</p>
     <h1>Protocol stacks</h1>
-    <p class="lede">httpjet speaks <strong>HTTP/1.1</strong>, a <strong>from-scratch native HTTP/2</strong> stack, and <strong>HTTP/3 over QUIC</strong> through one unconditional <strong>io_uring / monoio</strong> transport layer. TCP and QUIC still converge behind one unified rustls TLS configuration with Cloudflare-style mutual TLS, and every protocol hands requests to the same LiteSpeed-compatible pipeline.</p>
+    <p class="lede">httpjet speaks <strong>HTTP/1.1</strong>, a <strong>from-scratch native HTTP/2</strong> stack, and <strong>HTTP/3 over QUIC</strong> through one unconditional <strong>io_uring / monoio</strong> transport layer. TCP and QUIC converge behind one unified rustls TLS configuration with optional client-certificate verification, and every protocol hands requests to the same request pipeline.</p>
 
     <div class="rail locator" role="img" aria-label="You are here on the request pipeline: transport and TLS touch the resolve, acl, and dispatch stages."><div class="rail__track"><span class="stage on"><span class="k">resolve</span></span><span class="stage on"><span class="k">acl</span></span><span class="stage"><span class="k">rewrite</span></span><span class="stage"><span class="k">cache</span></span><span class="stage on"><span class="k">dispatch</span></span><span class="stage"><span class="k">finalize</span></span><span class="stage"><span class="k">store</span></span></div></div>
 
@@ -137,16 +137,14 @@
       <h2 id="tls">TLS &amp; mutual TLS</h2>
       <p><code>hj-tls</code> builds <strong>one</strong> <code>rustls::ServerConfig</code> for TCP <em>and</em> QUIC via <code>build_server_config_alpn(cfg, listener, alpn)</code>. The installed crypto provider is <strong>aws-lc-rs</strong>, and key parsing, TCP TLS, and QUIC setup all use that provider. Two pieces make up the config: how a certificate is selected per connection, and how (and whether) the client is verified.</p>
       <p>Certificate selection is a custom <code>SniCertMap</code> resolver with <strong>no cert-name-match</strong>, mirroring OpenLiteSpeed: the SNI hostname maps directly to configured certificate material without re-validating that the chosen leaf's subject/SAN matches the SNI. The resolver is shared by both transports through the single config.</p>
-      <p>Client verification is Cloudflare <strong>mutual TLS</strong>. A <code>WebPkiClientVerifier</code> is attached on the <em>listener CA</em>: when the listener is configured with <code>clientVerify=2</code>, an external peer must present a valid Cloudflare client certificate to complete the handshake. Loopback and private-LAN sources are exempt, so local tooling and node-to-node traffic don't need a CF cert.</p>
+      <p>Client verification is optional <strong>mutual TLS</strong>. A <code>WebPkiClientVerifier</code> is attached to the <em>listener CA</em> when the native listener requests it; configured exempt IPs are a separate policy. A proxy-specific profile may supply trusted ranges and request metadata, but TLS verification itself is not tied to a provider.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>hj-tls</b> · one config, SNI + mTLS</span></div>
         <pre><code><span class="t-k">fn</span> <span class="t-f">build_server_config_alpn</span>(cfg, listener, alpn) -&gt; rustls::ServerConfig {
     <span class="t-c">// SNI → cert, NO cert-name-match (mirrors OpenLiteSpeed)</span>
     <span class="t-k">let</span> resolver = SniCertMap::from(cfg, listener);
 
-    <span class="t-c">// Cloudflare mTLS: client verifier on the LISTENER CA only.</span>
-    <span class="t-c">// clientVerify=2 ⇒ external peers must present a valid CF cert;</span>
-    <span class="t-c">// loopback / private-LAN are exempt.</span>
+    <span class="t-c">// optional mTLS: client verifier on the LISTENER CA only.</span>
     <span class="t-k">let</span> verifier = WebPkiClientVerifier::builder(listener.ca).build();
 
     rustls::ServerConfig::builder()
@@ -155,7 +153,7 @@
         .alpn(alpn)            <span class="t-c">// shared by TCP and QUIC</span>
 }</code></pre>
       </div>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Load-bearing distinction</span><p>A per-vhost <code>&lt;vhssl&gt;&lt;CACertFile&gt;</code> is server <em>chain</em> material — intermediates the server presents to the client — <strong>not</strong> a client-verify root. Only the <em>listener</em> CA is the client verifier. Conflating the two would either reject legitimate Cloudflare clients or accept the wrong ones; httpjet keeps them strictly separate.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Load-bearing distinction</span><p>A per-vhost certificate chain is server <em>chain</em> material — intermediates the server presents to the client — <strong>not</strong> a client-verify root. Only the <em>listener</em> CA is the client verifier. httpjet keeps these roles strictly separate.</p></div></div>
       <p>The zero-copy <code>Bytes</code> the h2 stack writes for large bodies come straight from the origin <a href="page-cache.html">page cache</a>, and the PHP/LSAPI streaming bodies these transports carry originate in the <a href="lsapi.html">LSAPI &amp; PHP</a> backend.</p>
     </section>
 
@@ -163,9 +161,9 @@
       <a class="prev" href="architecture.html"><div class="dir">← Prev</div><div class="ttl">Architecture</div></a>
       <a class="next" href="lsapi.html"><div class="dir">Next →</div><div class="ttl">LSAPI &amp; PHP</div></a>
     </nav>
-    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The transport paths live in the binary's <code>uring/</code> module, with <code>hj-h2</code> (native HTTP/2 + HPACK), <code>hj-http</code> (<code>ServeConfig</code> tuning), and <code>hj-tls</code> (unified rustls config + Cloudflare mTLS).</p>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The transport paths live in the binary's <code>uring/</code> module, with <code>hj-h2</code> (native HTTP/2 + HPACK), <code>hj-http</code> (<code>ServeConfig</code> tuning), and <code>hj-tls</code> (unified rustls configuration and mTLS).</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260713a"></script>
 <script defer src="assets/docs.min.js?v=20260621n"></script>
 </body>
 </html>

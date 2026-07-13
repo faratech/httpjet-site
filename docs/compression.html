@@ -24,7 +24,7 @@
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<script defer src="assets/docs-head.min.js?v=20260713a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -121,15 +121,13 @@ Accept-Encoding: <span class="t-s">gzip</span>             <span class="t-c">// 
     </section>
 
     <section>
-      <h2 id="cf-zstd">Cloudflare zstd egress</h2>
-      <p>When httpjet sits behind a trusted proxy (Cloudflare), the <code>--cf-send-zstd</code> flag (equivalently the <code>CF_SEND_ZSTD=1</code> environment variable) forces zstd egress for that peer, <strong>ignoring the forwarded <code>Accept-Encoding</code></strong>. Cloudflare decodes the zstd at its edge and re-encodes per browser, so the origin only ever has to produce the cheapest-to-make form. This moves the brotli cost off the origin and onto Cloudflare's edge, where it can be cached and shared across requests. It is live in production on both nodes.</p>
+      <h2 id="cf-zstd">Trusted-proxy zstd egress</h2>
+      <p>When httpjet sits behind a configured Cloudflare origin proxy, <code>integrations.cloudflare.send_zstd = true</code> can force zstd egress for that trusted peer, <strong>ignoring the forwarded <code>Accept-Encoding</code></strong>. The proxy decodes that response and re-encodes for browsers. This integration is off by default and never applies to untrusted or direct clients.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">forced zstd egress to a trusted proxy</span></div>
-        <pre><code><span class="t-c"># flag form (systemd drop-in)</span>
-httpjet serve <span class="t-n">--cf-send-zstd</span> ...
-
-<span class="t-c"># env form (cf-send-zstd.conf in prod)</span>
-<span class="t-n">CF_SEND_ZSTD</span>=<span class="t-s">1</span></code></pre>
+        <pre><code><span class="t-c"># native TOML — only after trusted proxy ranges are configured</span>
+[integrations.cloudflare]
+send_zstd = <span class="t-s">true</span></code></pre>
       </div>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Trusted peers only</span><p>CF-zstd <strong>never</strong> affects untrusted or direct clients. A browser hitting the origin directly still gets only what its own <code>Accept-Encoding</code> asked for — the forced-zstd override applies strictly to the configured trusted-proxy peer.</p></div></div>
     </section>
@@ -137,13 +135,13 @@ httpjet serve <span class="t-n">--cf-send-zstd</span> ...
     <section>
       <h2 id="cache-interaction">Interaction with the page cache</h2>
       <p>The <a href="page-cache.html">page cache</a> stores <strong>one best variant</strong> per entry, chosen by the request's <code>Accept-Encoding</code> under the same server priority (zstd &gt; br &gt; gzip). A client whose acceptable encodings don't match the stored variant falls back to per-serve compression — the body is re-encoded on the way out. Either way the <em>served</em> bytes always stay standard zstd, brotli, or gzip.</p>
-      <p>The cache's internal dict-compression (the shared zstd dictionary <code>hj-compress</code> provides) is a storage optimization only: it shrinks the stored copy roughly 3.5–9×, but it is <strong>decode-only</strong> and never reaches the wire. A cached hit is dict-decoded back to identity and then re-compressed with a standard codec for the client.</p>
+      <p>The cache's internal dict compression is a storage optimization only: dictionaries can be configured per vhost, they never reach the wire, and a cached hit is decoded back to identity before standard client compression is selected.</p>
     </section>
 
     <section>
       <h2 id="decode-safety">Decode safety</h2>
       <p>Decoding is hardened against malformed input as defense-in-depth. The zstd decoder caps <code>windowLogMax</code> and bounds the decoded output size, so a hostile or corrupt frame can't coerce httpjet into an outsized allocation. A malformed frame fails the decode rather than ballooning memory.</p>
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>In production telemetry, compression accounts for ≈ <strong>0.22–0.7% of total request wall time</strong> — a rounding error against the PHP render that dominates a cache miss. On a PHP cache-<em>miss</em>, about <strong>37% of httpjet's (small) CPU share</strong> goes to zstd-encoding the rendered HTML, but that share is itself a tiny fraction of the machine because the PHP render is the wall-clock cost.</p><span class="regime">prod telemetry · PHP-miss on-CPU profile</span></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Measure the real bottleneck</span><p>Compression cost depends on body size, codec choice, cache state, and backend latency. Compare representative cache hits and misses before trading response CPU for smaller bytes.</p></div></div>
     </section>
 
     <nav class="pager" aria-label="Pagination">
@@ -152,7 +150,7 @@ httpjet serve <span class="t-n">--cf-send-zstd</span> ...
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Compression lives in the <code>hj-compress</code> crate.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260713a"></script>
 <script defer src="assets/docs.min.js?v=20260621n"></script>
 </body>
 </html>

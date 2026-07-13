@@ -24,7 +24,7 @@
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<script defer src="assets/docs-head.min.js?v=20260713a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -41,11 +41,11 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>Conformance</p>
     <p class="eyebrow">Running it</p>
     <h1>Conformance &amp; standards</h1>
-    <p class="lede">httpjet was built to be <strong>byte-compatible with LiteSpeed</strong> where it matters and <strong>standards-conformant on the wire</strong> everywhere else. Prior differential testing reached <strong>11/11 parity</strong> against LiteSpeed on the behaviors that count; the native HTTP/2 stack passes <strong>146 of 146 h2spec</strong> cases; and the protocol stacks track the current RFCs for HTTP/1.1, HTTP/2, HTTP/3, and the TLS layer beneath them.</p>
+    <p class="lede">httpjet preserves LiteSpeed compatibility where an explicit migration profile requires it and targets standards conformance on the wire everywhere else. Prior differential testing reached <strong>11/11 parity</strong> on the retained compatibility matrix; the native HTTP/2 stack passes <strong>146 of 146 h2spec</strong> cases; and the protocol stacks track the current RFCs for HTTP/1.1, HTTP/2, HTTP/3, and TLS.</p>
 
     <section>
       <h2 id="overview">Overview</h2>
-      <p>Two axes define httpjet's conformance posture, and they pull in slightly different directions. The first is <em>LiteSpeed parity</em>: as a drop-in replacement reading the same XML config, speaking LSAPI to the same <code>lsphp</code>, and processing the same <code>.htaccess</code> files, httpjet must reproduce LiteSpeed's observable behavior byte-for-byte — even the quirks. The second is <em>standards conformance</em>: on the wire, httpjet must be a correct HTTP/1.1, HTTP/2, and HTTP/3 server that any compliant client (and Cloudflare in front of it) can trust.</p>
+      <p>Two axes define httpjet's conformance posture. The first is <em>LiteSpeed compatibility</em>: XML migration, LSAPI, legacy ETags, cache aliases, and <code>.htaccess</code> behavior are retained where a selected compatibility profile needs them. The second is <em>standards conformance</em>: on the wire, httpjet must be a correct HTTP/1.1, HTTP/2, and HTTP/3 server for compliant clients and proxies.</p>
       <p>Where the two agree, there is one right answer. Where LiteSpeed's behavior is a deliberate choice that a strict reading of the spec would call optional, httpjet matches LiteSpeed — the <code>fileETag=28</code> format and the <code>.html</code>→PHP dispatch ordering are the clearest examples.</p>
       <div class="chips">
         <span class="chip"><span class="dot"></span>11/11 LiteSpeed parity (retired)</span>
@@ -53,7 +53,7 @@
         <span class="chip"><span class="dot"></span>HPACK · RFC 7541</span>
         <span class="chip"><span class="dot"></span>HTTP/3 · RFC 9114 over QUIC</span>
         <span class="chip"><span class="dot"></span>TLS + mTLS · rustls / aws-lc-rs</span>
-        <span class="chip"><span class="dot"></span>~1,050 tests across 15 crates</span>
+        <span class="chip"><span class="dot"></span>&gt;1,300 test functions across 15 crates</span>
       </div>
     </section>
 
@@ -80,7 +80,7 @@
 
     <section>
       <h2 id="parity">LiteSpeed parity</h2>
-      <p>Prior differential conformance testing reached <strong>11/11 parity</strong> against LiteSpeed on the behaviors that matter — the ETag format, <code>.html</code>→PHP dispatch, LSAPI encoding, and rewrite flag semantics. Now that httpjet <em>is</em> the production server on <code>:80</code>/<code>:443</code>, the differential test apparatus is retired: there is no LiteSpeed left to diff against.</p>
+      <p>Prior differential conformance testing reached <strong>11/11 parity</strong> against LiteSpeed on retained migration behaviors — ETag format, <code>.html</code>→PHP dispatch, LSAPI encoding, and rewrite flags. The differential apparatus is historical; new features belong in native TOML first and should be tested against their documented contract.</p>
       <p>The authoritative reference for LiteSpeed's <em>exact</em> behavior was the GPL OpenLiteSpeed source. Behavior was extracted and reimplemented cleanly — httpjet is MIT/Apache and never copies GPL code.</p>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Clean-room, not a fork</span><p>OpenLiteSpeed (GPL) was read only to learn the <em>behavior</em> — ETag formatting, the <code>.html</code>→PHP dispatch decision, LSAPI framing, rewrite flag semantics — which was then reimplemented from scratch. No GPL code lives in httpjet's MIT/Apache tree. The license boundary is deliberate and load-bearing.</p></div></div>
     </section>
@@ -142,7 +142,7 @@ ETag: <span class="t-s">"4096-1718800000-1572934;;;"</span></code></pre>
           <tbody>
             <tr><td><span class="crate">unit</span></td><td>Pure logic in each crate: config parsing, rewrite evaluation, HPACK encode/decode, ETag formatting, cache-key generation.</td></tr>
             <tr><td><span class="crate">integration</span></td><td>Crate boundaries: loading real <code>.htaccess</code> files through the full rewrite engine, h2/h3 round-trips, full-pipeline dispatch tests.</td></tr>
-            <tr><td><span class="crate">live (<code>#[ignore]</code>)</span></td><td>Run separately — spawn a real <code>lsphp</code>, read production certs, and bind ports to test against the actual backend and config.</td></tr>
+            <tr><td><span class="crate">live (<code>#[ignore]</code>)</span></td><td>Run individually with their documented prerequisites: explicit LiteSpeed fixtures, an LSAPI binary, capabilities, loopback ports, a backend, or a performance corpus. Do not run all ignored tests as one batch.</td></tr>
           </tbody>
         </table>
       </div>
@@ -162,7 +162,7 @@ ETag: <span class="t-s">"4096-1718800000-1572934;;;"</span></code></pre>
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The conformance matrix and remediation history live in <code>RESULTS.md</code> and <code>REMEDIATION.md</code> in the repo.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260713a"></script>
 <script defer src="assets/docs.min.js?v=20260621n"></script>
 </body>
 </html>

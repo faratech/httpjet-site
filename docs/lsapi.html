@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LSAPI &amp; PHP — httpjet docs</title>
-<meta name="description" content="How httpjet runs PHP: the native LSAPI wire protocol to the same lsphp binary LiteSpeed uses — a wire codec, a UDS pool, the lsphp supervisor, the CGI env builder, and a fail-closed jail.">
+<meta name="description" content="How httpjet runs optional PHP through the native LSAPI wire protocol: a codec, UDS pool, lsphp supervisor, CGI environment builder, and fail-closed jail.">
 <meta property="og:title" content="httpjet — LSAPI &amp; PHP">
 <meta property="og:description" content="The native LSAPI wire protocol, the lsphp supervisor, zero-downtime deploys, and the fail-closed PHP jail.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
@@ -24,7 +24,7 @@
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<script defer src="assets/docs-head.min.js?v=20260713a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -41,7 +41,7 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>LSAPI &amp; PHP</p>
     <p class="eyebrow">Internals</p>
     <h1>LSAPI &amp; PHP</h1>
-    <p class="lede">httpjet speaks the <strong>native LSAPI wire protocol</strong> to the same <code>lsphp</code> binary LiteSpeed uses — no FastCGI shim, no translation layer. The <code>hj-lsapi</code> crate holds the wire codec, a UDS client pool, the <code>lsphp</code> process supervisor, the CGI environment builder, and a security-critical jail.</p>
+    <p class="lede">httpjet speaks the <strong>native LSAPI wire protocol</strong> to an operator-configured <code>lsphp</code> executable — no FastCGI shim or translation layer. The <code>hj-lsapi</code> crate holds the wire codec, a UDS client pool, the <code>lsphp</code> process supervisor, the CGI environment builder, and a security-critical jail.</p>
 
     <div class="rail locator" role="img" aria-label="Pipeline locator: this page covers the dispatch stage, where PHP requests are routed to lsphp over LSAPI.">
       <div class="rail__track">
@@ -57,7 +57,7 @@
 
     <section>
       <h2 id="overview">Overview</h2>
-      <p>When dispatch routes a request to a <code>php</code>/<code>html</code> suffix, httpjet does not reach for FastCGI. It talks LSAPI directly to <code>lsphp</code> — the exact binary LiteSpeed runs — so the engine, the opcache, the JIT, and the <code>php.ini</code> all behave identically. Everything PHP-facing lives in <code>hj-lsapi</code>, split into five concerns: the wire codec, the UDS client pool, the process supervisor, the CGI environment builder, and a fail-closed jail.</p>
+      <p>When dispatch routes a request to a configured PHP suffix, httpjet talks LSAPI directly to <code>lsphp</code>. Everything PHP-facing lives in <code>hj-lsapi</code>, split into five concerns: the wire codec, the UDS client pool, the process supervisor, the CGI environment builder, and a fail-closed jail. PHP is optional; static and proxy deployments do not need an LSAPI executable.</p>
       <figure class="figure">
   <svg viewBox="0 0 880 210" role="img" aria-label="LSAPI request flow: a client request reaches the httpjet LSAPI handler, which sends a native LSAPI BEGIN_REQUEST frame over a Unix socket to the lsphp worker pool, and streams the response back.">
     <defs><linearGradient id="brandgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".5" stop-color="#818cf8"/><stop offset="1" stop-color="#e879f9"/></linearGradient><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2c3856"/></marker></defs>
@@ -78,7 +78,7 @@
 </figure>
       <div class="chips">
         <span class="chip"><span class="dot"></span>Native LSAPI · no FastCGI shim</span>
-        <span class="chip"><span class="dot"></span>Same <code>lsphp</code> binary as LiteSpeed</span>
+        <span class="chip"><span class="dot"></span>Operator-supplied <code>lsphp</code></span>
         <span class="chip"><span class="dot"></span>UDS pool · supervisor · jail</span>
         <span class="chip"><span class="dot"></span>Zero-downtime external pool</span>
       </div>
@@ -108,23 +108,23 @@
     <section>
       <h2 id="supervisor">The lsphp supervisor</h2>
       <p>In its self-managing mode, <code>hj-lsapi</code> spawns and supervises <code>lsphp</code> itself. The supervisor passes the listen socket to the child on <strong>fd 0</strong> (where <code>lsphp</code> expects its LSAPI listener), sets <code>PR_SET_PDEATHSIG</code> so a worker dies with its parent rather than orphaning, and caps the child count. The <code>pre_exec</code> closure that runs between <code>fork</code> and <code>exec</code> calls only async-signal-safe syscalls — the one regime where almost everything else is undefined behavior.</p>
-      <p>One env var is rewritten on the way in: the live config's <code>LSAPI_CHILDREN=250</code> is <strong>stripped from the spawn env</strong> and replaced by the value of <code>--php-children</code>. On a shared box, 250 children is a real OOM hazard, so the supervisor refuses to inherit it and uses the explicit cap instead.</p>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">OOM hazard</span><p>The production config ships <code>LSAPI_CHILDREN=250</code>. Honoring it can fault in roughly seventeen gigabytes of PHP workers on a box already running at high memory pressure. httpjet strips it unconditionally from the spawn env and sizes the pool from <code>--php-children</code> instead — keep that flag set deliberately for the host's headroom.</p></div></div>
+      <p>Native mode sizes an owned pool from <code>runtime.php.children</code>; its configuration is reviewable alongside the PHP socket and request deadline. Treat that count as a memory-capacity decision for the deployment, not a throughput target to maximize blindly.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Packaging boundary</span><p>httpjet does not ship a PHP runtime. The PHP executable, its extensions, <code>php.ini</code>, and writable application paths are explicit operator-managed dependencies.</p></div></div>
     </section>
 
     <section>
       <h2 id="zero-downtime">Zero-downtime deploys (the external pool)</h2>
-      <p>The supervisor mode above couples PHP's lifetime to httpjet's: restarting the server cold-starts the workers. Production runs the other way around. A <code>httpjet lsphp</code> subcommand runs a <strong>persistent <code>lsphp</code> "external app" pool</strong> as its own systemd unit (<code>httpjet-lsphp</code>); the serving process then dials that pool with <code>serve --lsphp-external &lt;socket&gt;</code> instead of spawning one.</p>
+      <p>The supervisor mode above couples PHP's lifetime to httpjet's: restarting the server cold-starts workers. A <code>httpjet lsphp</code> subcommand can instead run a <strong>persistent <code>lsphp</code> pool</strong> as its own systemd unit (<code>httpjet-lsphp</code>); the serving process then dials that pool through the native <code>runtime.php.external_socket</code> setting.</p>
       <p>The payoff is a zero-downtime binary deploy: the web tier can <code>systemctl restart httpjet</code> for a fresh build <em>without</em> cold-starting PHP, because the worker pool is a separate, untouched unit. When you do want an opcache recycle, you restart the <code>httpjet-lsphp</code> unit on its own.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">serve · dial the persistent pool</span></div>
         <pre><code><span class="t-c"># the PHP half: a persistent external-app pool (its own systemd unit)</span>
-httpjet <span class="t-s">--root</span> /usr/local/lsws lsphp <span class="t-s">--php-socket</span> /tmp/php8-httpjet-c1.sock
+httpjet <span class="t-s">--config</span> /etc/httpjet/lsphp.toml lsphp
 
 <span class="t-c"># the serving half: dial that pool, never spawn — restart freely</span>
-httpjet <span class="t-s">--root</span> /usr/local/lsws serve <span class="t-s">--lsphp-external</span> /tmp/php8-httpjet-c1.sock</code></pre>
+httpjet <span class="t-s">--config</span> /etc/httpjet/httpjet.toml serve</code></pre>
       </div>
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>In production telemetry the <code>lsapi_acquire</code> mean sits at <strong>0–20&nbsp;µs</strong>: the <code>lsphp</code> child pool never queues, so adding children buys nothing. The lever for PHP latency is the engine and the cache hit ratio, not the pool size.</p><span class="regime">production telemetry</span></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Separate trust domain</span><p>The supplied pool unit uses a distinct <code>httpjet-php</code> identity and pool-only TOML. Do not grant it access to web-tier TLS or cluster-secret files.</p></div></div>
     </section>
 
     <section>
@@ -175,7 +175,7 @@ httpjet <span class="t-s">--root</span> /usr/local/lsws serve <span class="t-s">
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · See the <code>hj-lsapi</code> crate in the repo.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260713a"></script>
 <script defer src="assets/docs.min.js?v=20260621n"></script>
 </body>
 </html>

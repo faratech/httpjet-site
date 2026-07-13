@@ -7,7 +7,7 @@
 <title>Performance — httpjet docs</title>
 <meta name="description" content="httpjet's performance, told honestly: every number names its regime — a loopback benchmark is not production telemetry. PGO + mimalloc, the page-cache result, and where the time actually goes (PHP, not httpjet).">
 <meta property="og:title" content="httpjet — Performance">
-<meta property="og:description" content="Honest measurement: loopback benchmarks vs prod telemetry. PHP is 86–99% of wall time; httpjet's own CPU is ~0.2%.">
+<meta property="og:description" content="Historical benchmark campaigns, cache results, and guidance for measuring your own workload honestly.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -18,13 +18,13 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="httpjet — Performance">
-<meta name="twitter:description" content="Honest measurement: loopback benchmarks vs prod telemetry. PHP is 86–99% of wall time; httpjet's own CPU is ~0.2%.">
+<meta name="twitter:description" content="Historical benchmark campaigns, cache results, and guidance for measuring your own workload honestly.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/docs/performance.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260621n"></script>
+<script defer src="assets/docs-head.min.js?v=20260713a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -66,8 +66,8 @@
 
     <section>
       <h2 id="codegen">The codegen tier — PGO + mimalloc</h2>
-      <p>The production binary is not a stock <code>cargo build --release</code>. It is built with three compounding levers: <strong>Profile-Guided Optimization (PGO)</strong>, the <strong>mimalloc</strong> global allocator, and <code>-C target-cpu=native</code>. Skipping any of them changes the numbers enough that a benchmark built without them is not meaningful — binary layout alone accounts for roughly 10% of run-to-run variance.</p>
-      <p>The PGO flow (<code>scripts/build-pgo.sh</code>) is the classic three-step: build an instrumented binary, drive a representative workload through it on loopback, then merge the recorded profile and rebuild optimized. The gathered workload is deliberately shaped like production — dominated by HTTP/2 cache-HITs, with HTTP/2 and HTTP/1.1 static and PHP mixed in — so the compiler's branch and layout decisions favor the paths real traffic exercises.</p>
+      <p>Historical campaign binaries combined <strong>Profile-Guided Optimization (PGO)</strong>, the <strong>mimalloc</strong> global allocator, and architecture-specific code generation. Those numbers are not portable release-binary promises. When comparing a change, build both sides with equivalent profiles and record the hardware, workload, cache state, and compiler settings.</p>
+      <p>The checked-in PGO flow is the classic three-step: build an instrumented binary, drive a representative loopback workload, then merge the profile and rebuild optimized. Its workload and CPU tuning belong to one deployment; adapt it or provide an equivalent neutral harness before using it elsewhere.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>scripts/build-pgo.sh</b> · instrument → gather → optimize</span></div>
         <pre><code><span class="t-c"># 1. build an instrumented binary, 2. drive a representative loopback</span>
@@ -75,10 +75,8 @@
 <span class="t-c"># 3. merge the profile and rebuild optimized.</span>
 <span class="t-n">$</span> <span class="t-s">scripts/build-pgo.sh</span>
 
-<span class="t-c"># PGO is built PER ARCHITECTURE — the profile comes from running the</span>
-<span class="t-c"># instrumented binary on THAT arch, so aarch64 is built natively on</span>
-<span class="t-c"># the ARM node, never cross-compiled.</span>
-<span class="t-n">$</span> <span class="t-s">ssh</span> root@arm-node <span class="t-s">bash /usr/local/httpjet/scripts/build-pgo.sh</span></code></pre>
+<span class="t-c"># Profiles and CPU tuning are architecture-specific. Build a neutral</span>
+<span class="t-c"># release artifact separately from any deployment-specific PGO workflow.</span></code></pre>
       </div>
       <p>Because the profile is captured by <em>running</em> the instrumented binary, PGO is per-architecture: the x86_64 binary is built here, and the aarch64 binary is built natively on the ARM node rather than cross-compiled, so each carries a profile gathered on its own instruction set.</p>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">A non-PGO benchmark is not a benchmark</span><p>Debug builds are roughly 5× slower and meaningless for comparison, but even a plain release build differs from PGO by enough that a regression hunt can chase a phantom. When A/B-testing a change, build <em>both</em> sides the same way (both PGO, or both plain release) and interleave them — mixing a PGO binary against a non-PGO one fakes a ~10% delta out of pure binary layout.</p></div></div>
@@ -95,7 +93,7 @@
       <h2 id="cache-result">The origin cache result</h2>
       <p>The single largest performance fact about the real workload is not a server micro-optimization — it is the <a href="page-cache.html">origin page cache</a>. For the cacheable fraction of forum traffic, serving from the in-memory cache replaces an entire PHP render with a memory copy.</p>
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Cache memory serves run at <strong>~19,000 requests/s</strong> with a <strong>p50 of ~2&nbsp;ms</strong> — roughly <strong>40× faster</strong> than producing the same page through a full PHP render. The cache dominates the real CF-fronted forum workload precisely because it removes the backend from the request entirely.</p><span class="regime">loopback benchmark · PGO build · memory tier</span></div></div>
-      <p>This is the result that actually moves production: the lever is not shaving microseconds off httpjet's own path but avoiding the PHP render altogether for everything the app marks cacheable. The cache's design, admission policy, and the <code>X-LiteSpeed-*</code> protocol that drives it are covered under <a href="page-cache.html">Page cache</a>.</p>
+      <p>The general lesson is to avoid backend work for responses an application can safely mark cacheable. The cache's design, admission policy, and native <code>X-HttpJet-*</code> protocol are covered under <a href="page-cache.html">Page cache</a>.</p>
     </section>
 
     <section>
@@ -138,9 +136,9 @@
       <a class="prev" href="compression.html"><div class="dir">← Prev</div><div class="ttl">Compression</div></a>
       <a class="next" href="conformance.html"><div class="dir">Next →</div><div class="ttl">Conformance</div></a>
     </nav>
-    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The figures here are from the current loopback benchmark CSVs and historical LiteSpeed baseline runs on the same box.</p>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The figures here are historical campaign data, not a portable release-SLA or an installation sizing guide.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260713a"></script>
 <script defer src="assets/docs.min.js?v=20260621n"></script>
 </body>
 </html>
