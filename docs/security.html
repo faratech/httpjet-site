@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security &amp; access control — httpjet docs</title>
+<meta name="description" content="httpjet's security model: network ACLs and trusted proxies, per-client-IP throttling, GeoIP/ASN rules, PROXY protocol trust, HTTP Basic auth, TLS hardening, the fail-closed jail, and request limits.">
+<meta property="og:title" content="httpjet — Security &amp; access control">
+<meta property="og:description" content="Network ACLs, per-IP throttling, geo/ASN rules, PROXY protocol trust, Basic auth, TLS hardening, the fail-closed jail, and request limits.">
+<meta property="og:image" content="https://httpjet.net/og.jpg">
+<meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:url" content="https://httpjet.net/docs/security.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="httpjet — Security &amp; access control">
+<meta name="twitter:description" content="Network ACLs, per-IP throttling, geo/ASN rules, PROXY protocol trust, Basic auth, TLS hardening, the fail-closed jail, and request limits.">
+<meta name="twitter:image" content="https://httpjet.net/og.jpg">
+<link rel="canonical" href="https://httpjet.net/docs/security.html">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-ZR4WV214JT');
+</script>
+</head>
+<body>
+
+<main class="content">
+    <div class="callout gotcha construction-notice" role="note" aria-label="Documentation status"><div class="ico" aria-hidden="true">!</div><div class="body"><span class="tag">Under construction</span><p>This documentation is still in progress. Some information may be incomplete or out of date. Please check back later.</p></div></div>
+    <p class="crumbs"><a href="./">Docs</a><span>/</span>Security &amp; access control</p>
+    <p class="eyebrow">Internals</p>
+    <h1>Security &amp; access control</h1>
+    <p class="lede">Everything that decides <strong>who may ask</strong> and <strong>who the client is</strong>: the network ACL and trusted-proxy model, the opt-in per-client-IP throttle, geo/ASN rules served by the offline <code>hj-geo</code> source, PROXY protocol trust, Basic auth, TLS hardening, the fail-closed PHP jail, and the request limits enforced before any backend runs. The recurring design rule is <strong>fail closed</strong>: a control that cannot evaluate acts restrictive, never permissive.</p>
+
+    <div class="rail locator" role="img" aria-label="Pipeline locator: this page covers the resolve and acl stages, where client identity and access rules are decided.">
+      <div class="rail__track">
+        <span class="stage on"><span class="k">resolve</span></span>
+        <span class="stage on"><span class="k">acl</span></span>
+        <span class="stage"><span class="k">rewrite</span></span>
+        <span class="stage"><span class="k">cache</span></span>
+        <span class="stage"><span class="k">dispatch</span></span>
+        <span class="stage"><span class="k">finalize</span></span>
+        <span class="stage"><span class="k">store</span></span>
+      </div>
+    </div>
+
+    <section>
+      <h2 id="overview">Overview</h2>
+      <p>Access control lives in <code>hj-acl</code>, fed by the <code>&lt;security&gt;</code> block of the XML config; geo/ASN membership comes from <code>hj-geo</code>; credentials from <code>hj-rewrite</code>'s auth module; and transport-level identity from <code>hj-tls</code> and the PROXY-protocol gate. All of it runs in the <code>resolve</code>/<code>acl</code> stages — before rewrite, cache, and dispatch — so a rejected request never touches an application.</p>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span>Fail-closed by default</span>
+        <span class="chip"><span class="dot"></span>Trusted-proxy aware client IPs</span>
+        <span class="chip"><span class="dot"></span>Throttle · geo/ASN · Basic auth are opt-in</span>
+        <span class="chip"><span class="dot"></span>Offline geo source — no runtime fetches</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="network-acls">Network ACLs &amp; client identity</h2>
+      <p>Every decision that depends on "the client's IP" starts from the same resolved value, produced once at connection admission:</p>
+      <ul>
+        <li><strong>Direct peers</strong> are simply the socket address.</li>
+        <li><strong>Trusted proxies</strong>: with <code>useIpInProxyHeader</code> at its default <code>2</code>, an <code>X-Forwarded-For</code> chain is honored only when the immediate peer is in a trusted range (an <code>allow</code> rule with the <code>T</code> marker), and the Cloudflare <code>CF-Connecting-IP</code> header is recognized on that path. Levels 0–4 narrow or widen the trust: 0 never believes forwarded headers, 4 always does.</li>
+        <li><strong>Unix-socket peers</strong> have no address — they see a fabricated loopback value, and the access log renders the literal host <code>unix:</code>.</li>
+      </ul>
+      <p>On top of that identity: <code>&lt;accessControl&gt;</code> evaluates <code>allow</code>/<code>deny</code> CIDR rules most-specific-wins, with a trailing <code>T</code> on an <em>allow</em> rule marking a trusted proxy; <code>&lt;accessDenyDir&gt;</code> globs mark paths that are never served (a malformed glob is a hard start/reload error, not a warning); and <code>&lt;fileAccessControl&gt;</code> symlink policy treats owner-restricted mode (<code>2</code>) as fail-closed never-follow.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">One spoofing rule</span><p>Forwarded-client headers are evidence, not identity. They count only from an explicitly trusted peer; from anyone else they are attacker-controlled data and are ignored.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="throttle">Per-client-IP throttle</h2>
+      <p><code>&lt;tuning&gt;&lt;perIpRate&gt;</code> caps requests per second per client IP over a fixed window (<code>perIpRateWindowSecs</code>, default 1&nbsp;s); excess requests get <code>429</code>. The implementation is a sharded fixed-window counter — 64 shards, capped at 4096 tracked IPs per shard — so the hot path is a couple of atomic increments and eviction is amortized, not a per-request scan.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Off by default, and fail-open</span><p>The limit is <strong>0 (disabled) by default</strong> because a shared NAT egress aggregates many real visitors behind one address — a mistuned limit locks out a whole office or carrier. It is also deliberately fail-open: under internal state pressure the throttle admits rather than rejects, because failing closed would let a memory bug become an outage. Two Prometheus counters, <code>httpjet_throttle_allowed_total</code> and <code>httpjet_throttle_rejected_total</code>, expose what it is doing. <code>--per-ip-rate</code> overrides the XML value at launch.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="geo">GeoIP / ASN rules</h2>
+      <p>Country and network membership come from <code>hj-geo</code>, a root crate with no runtime network access: you point <code>&lt;security&gt;&lt;geoipDBFile&gt;</code> at a plain-text CidrList file and refresh it on your own schedule (cron, configuration management — httpjet never fetches). The format is deliberately boring:</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>geo source file</b> · CidrList format</span></div>
+        <pre><code><span class="t-c"># country &lt;ISO-3166 alpha-2&gt; &lt;CIDR...&gt;</span>
+country US 203.0.113.0/24 198.51.100.0/24
+country DE 2001:db8::/32
+<span class="t-c"># asn &lt;number&gt; &lt;CIDR...&gt;</span>
+asn 13335 203.0.113.0/24</code></pre>
+      </div>
+      <p>Ranges load into sorted, merged interval sets queried by binary search — membership is a hot-path <code>O(log n)</code>, and an IPv4-mapped IPv6 address is judged in v4 space so a v4 rule can't be dodged by mapping. Semantics: <code>geoDeny</code>/<code>asnDeny</code> are checked first; an allow list with no deny list is a <strong>fail-closed whitelist</strong> (anything unmatched is refused). Labels resolve once at state build; an unknown label is a <strong>hard build error</strong>, and <code>check</code> warns when geo directives exist without a <code>geoipDBFile</code> — the ACL would be inert.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Geo is as honest as your input</span><p>Country labels come from the file you provide; a stale file enforces yesterday's map. And behind a proxy, geo judgments apply to the <em>resolved client IP</em> — see the trusted-proxy rules above.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="proxy-protocol">PROXY protocol trust</h2>
+      <p>A listener with <code>proxyProtocol</code> enabled requires every connection to open with a PROXY v2 (binary) or v1 (text) header carrying the real client address. The header is consumed before the TLS handshake or the H1/h2c sniff, so the claimed address becomes the socket identity for every later stage — ACLs, throttle, logs, PHP's <code>REMOTE_ADDR</code>.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">The listener opt-in IS the trust decision</span><p>Unlike OpenLiteSpeed's server-level trusted-peer ACL, httpjet binds PROXY-protocol trust to the listener itself: every connection to an enabled listener must present a header, and a missing one fails the connection. Enabling it on an internet-facing bind would let anyone <strong>forge their client address</strong> — <code>check</code> warns on wildcard/public binds for exactly this reason. Point such a listener at your load balancer or local hop only. See <a href="protocols.html#frontdoors">Protocol stacks</a>.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="basic-auth">HTTP Basic auth</h2>
+      <p><code>.htaccess</code> can fence a subtree with standard Basic auth — <code>AuthType Basic</code> / <code>AuthName</code> / <code>AuthUserFile</code> plus a <code>Require</code>. The realm is enforced <strong>before</strong> cache lookup and backend dispatch, so a protected path can't leak through the static fast path or the page cache; valid credentials set <code>REMOTE_USER</code> for PHP. htpasswd supports bcrypt and <code>{SHA}</code> in constant time; <code>apr1</code>/crypt hashes verify <em>false</em> (with a parse-time warning) rather than being weakly accepted. Full semantics live in <a href="rewrite.html#basic-auth">Rewrite engine</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="tls">TLS hardening</h2>
+      <p>The transport security posture (details in <a href="protocols.html#tls">Protocol stacks</a>):</p>
+      <ul>
+        <li><strong>mTLS</strong> — <code>clientVerify</code> 1–3 attaches a webpki client verifier to the listener CA; level 2 requires a client certificate (e.g. Cloudflare origin-pull). Positive chain verdicts are memoized so the verify cost stays off the hot path.</li>
+        <li><strong>Revocation</strong> — <code>crlFile</code> adds PEM CRL enforcement to the verifier. Absent means no revocation checking, stated plainly rather than hidden.</li>
+        <li><strong>Cipher discipline</strong> — TLS 1.3 offers exactly <code>TLS_AES_128_GCM_SHA256</code> (the RFC 8446 mandatory suite); TLS 1.2 keeps its full set. Session resumption uses single-use tickets with 0-RTT off, including on client-cert-verifying listeners.</li>
+        <li><strong>One config, two transports</strong> — TCP and QUIC share a single <code>rustls::ServerConfig</code>, so a cert, verifier, or CRL change cannot land on one transport and miss the other.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 id="jail">The PHP jail (suEXEC, chroot, namespaces)</h2>
+      <p>When PHP runs, its credential and filesystem isolation resolve through a fail-closed jail: suEXEC (<code>&lt;suexec&gt;</code>, off by default, with <code>uidMin</code>/<code>gidMin</code> floors — uid 0 is always rejected), chroot (<code>chrootMode</code> 0–2), and optional Linux namespaces. A namespace flag that the kernel or build cannot honor is stripped fail-safe — <code>pid</code> is accepted for compatibility but deliberately <em>not</em> honored rather than half-applied. If a configured jail turns out unsafe (root uid, below-floor uid, bad chroot), httpjet <strong>disables PHP for that vhost</strong> and returns <code>503</code> — it never falls back to running the script unjailed, and never falls through to the static handler, which would leak the script source. See <a href="lsapi.html#jail">LSAPI &amp; PHP</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="limits">Request limits &amp; resource fences</h2>
+      <p>The fences that bound any single request's cost:</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Limit</th><th>Enforced</th></tr></thead>
+          <tbody>
+            <tr><td>Body size — server-wide, <code>maxReqBodySize</code></td><td>413 past the cap, on <em>all</em> terminals (static, LSAPI, proxy). Chunked uploads charge both decoded and raw bytes to the server-wide body-buffer budget.</td></tr>
+            <tr><td>Body size — per context, <code>&lt;context&gt;maxReqBodySize</code></td><td>Overrides the server-wide cap for the context's URI prefix; checked at dispatch.</td></tr>
+            <tr><td>Egress bandwidth — <code>bandwidthLimit</code></td><td>Token-bucket per connection (burst 2× the rate); a context's value overrides the server-wide one. H2 paces per connection; H3 is not paced.</td></tr>
+            <tr><td><code>.htaccess</code> chain depth</td><td>Capped at 64; beyond it a deny-all sentinel applies (fail closed).</td></tr>
+            <tr><td>File opens</td><td><code>openat2(RESOLVE_BENEATH)</code> (plus <code>RESOLVE_NO_SYMLINKS</code> when policy denies symlinks; missing kernel support fails closed to 404). Opens refuse non-regular files, so a planted FIFO can't park an executor thread.</td></tr>
+            <tr><td>Range requests</td><td>multipart/byteranges capped at 8 ranges / 8 MiB of part bytes — beyond that, a full <code>200</code> with the whole body.</td></tr>
+            <tr><td>Reload safety</td><td>SIGHUP with a broken config keeps the old generation; a malformed <code>accessDenyDir</code> glob is a hard error rather than a warn-and-skip.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="audit">Audit posture</h2>
+      <p>The August 2026 hardening pass closed 20 confirmed findings from an adversarial self-audit plus 25 internal audit findings — the classes above (fail-closed symlinks and deny-globs, CONTINUATION and stream-id h2 errors, phantom-trailer and FIFO-park fixes, chunked double-charging, generation-file permissions, proxy header-injection stripping) came out of that pass. The posture going forward is the one this page repeats: every new control ships opt-in with a safe default, fails closed when it cannot evaluate, and names its trust decision explicitly.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Reporting</span><p>Security issues: please use private responsible disclosure rather than a public issue — see <code>SECURITY.md</code> in the repository.</p></div></div>
+    </section>
+
+    <nav class="pager" aria-label="Pagination">
+      <a class="prev" href="rewrite.html"><div class="dir">← Prev</div><div class="ttl">Rewrite engine</div></a>
+      <a class="next" href="page-cache.html"><div class="dir">Next →</div><div class="ttl">Page cache</div></a>
+    </nav>
+    <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Access control lives in <code>hj-acl</code>, geo/ASN membership in <code>hj-geo</code>, auth in <code>hj-rewrite</code>.</p>
+</main>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
+</body>
+</html>

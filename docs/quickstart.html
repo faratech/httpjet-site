@@ -5,9 +5,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quickstart — httpjet docs</title>
-<meta name="description" content="Build httpjet from source, start with a strict native TOML configuration, and use LiteSpeed XML only as an explicit migration input.">
+<meta name="description" content="Build httpjet from source, validate a LiteSpeed-compatible configuration tree, and serve it. httpjet is a drop-in replacement: it reads conf/httpd_config.xml directly.">
 <meta property="og:title" content="httpjet — Quickstart">
-<meta property="og:description" content="From source checkout to a running native-TOML httpjet origin, with an explicit LiteSpeed migration path.">
+<meta property="og:description" content="From source checkout to a running httpjet origin serving a LiteSpeed-compatible configuration tree.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -18,13 +18,13 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="httpjet — Quickstart">
-<meta name="twitter:description" content="From source checkout to a running native-TOML httpjet origin, with an explicit LiteSpeed migration path.">
+<meta name="twitter:description" content="From source checkout to a running httpjet origin serving a LiteSpeed-compatible configuration tree.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/docs/quickstart.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -42,13 +42,13 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>Quickstart</p>
     <p class="eyebrow">Guide</p>
     <h1>Quickstart</h1>
-    <p class="lede">Native, versioned <strong>TOML</strong> is httpjet's public configuration model. This walks from a source checkout to a running static origin: build the binary, copy the neutral example, validate it, and serve. LiteSpeed XML remains an explicit compatibility and migration input, not the default deployment model.</p>
+    <p class="lede">httpjet is a <strong>drop-in replacement</strong> for LiteSpeed Web Server: it reads the same <code>conf/httpd_config.xml</code> tree your existing deployment already uses. This walks from a source checkout to a running origin using the checked-in example tree — build the binary, validate the configuration, and serve. No migration step exists because there is nothing to migrate.</p>
 
     <section>
       <h2 id="prereqs">Prerequisites</h2>
       <ul>
         <li>Linux with usable io_uring support, plus a C toolchain for the crypto and allocator dependencies.</li>
-        <li><strong>Rust 1.97</strong> (edition 2024) for a source build. Public binary packages are being prepared; until then, build from the checkout.</li>
+        <li><strong>Rust 1.97 or newer</strong> (the workspace MSRV; edition 2024). Public binary packages are being prepared; until then, build from the checkout.</li>
         <li>Only for PHP: an LSAPI-capable <code>lsphp</code> executable supplied by the operator. Static and reverse-proxy deployments do not need PHP or a LiteSpeed installation.</li>
       </ul>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Release status</span><p>The repository does not yet publish signed installable binaries or distribution packages. Treat this guide as the source-install path; do not use deployment-specific scripts as a general installer.</p></div></div>
@@ -56,7 +56,7 @@
 
     <section>
       <h2 id="build">Build the binary</h2>
-      <p>A debug build is fine for iteration. Use a normal release build for local serving and reproducible tests. The checked-in PGO helper is tailored to one deployment and is not a general release-build command.</p>
+      <p>A debug build is fine for iteration. Use a normal release build for local serving and reproducible tests. The checked-in PGO helper (<code>scripts/build-pgo.sh</code>) is tailored to one deployment and is not a general release-build command.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>build</b> · cargo</span></div>
         <pre><code><span class="t-c"># debug build — fast to compile, ~5x slower at runtime</span>
@@ -65,53 +65,59 @@ cargo build -p httpjet
 <span class="t-c"># release build (REQUIRED for any benchmarking)</span>
 cargo build <span class="t-k">--release</span> -p httpjet  <span class="t-c"># → target/release/httpjet</span></code></pre>
       </div>
-      <p>The workspace is large (1 binary + 14 <code>hj-*</code> libraries), so when iterating on one crate, scope the build and tests with <code>-p</code>, e.g. <code>cargo test -p hj-rewrite</code>.</p>
+      <p>The workspace is large (1 binary + 15 <code>hj-*</code> libraries), so when iterating on one crate, scope the build and tests with <code>-p</code>, e.g. <code>cargo test -p hj-rewrite</code>.</p>
     </section>
 
     <section>
-      <h2 id="check">Create and validate a native config</h2>
-      <p>Copy the neutral example and its vhost file, then set the listener address, domain, and document root for your machine. Native paths are resolved relative to the TOML file that declares them.</p>
+      <h2 id="check">Point it at a configuration tree and validate it</h2>
+      <p>httpjet is configured by a <em>server root</em> directory containing <code>conf/httpd_config.xml</code>, an optional <code>conf/mime.properties</code>, and the per-vhost XML files it references — the same layout LiteSpeed uses. The checked-in <code>examples/litespeed/</code> tree is a minimal working example: one plain listener on <code>127.0.0.1:8080</code>, one static vhost (<code>example.test</code>) with PHP and symlinks disabled.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>check</b> · config lint</span></div>
-        <pre><code>mkdir -p /tmp/httpjet/vhosts /srv/example.test/public
-cp examples/httpjet.toml /tmp/httpjet/httpjet.toml
-cp examples/vhosts/example.toml /tmp/httpjet/vhosts/example.toml
-printf 'hello from httpjet\n' &gt; /srv/example.test/public/index.html
+        <pre><code>printf 'hello from httpjet\n' &gt; examples/litespeed/example/public/index.html
 
-<span class="t-c"># edit /tmp/httpjet/vhosts/example.toml for your domain and document root, then:</span>
-./target/debug/httpjet <span class="t-k">--config</span> /tmp/httpjet/httpjet.toml check <span class="t-k">--strict</span></code></pre>
+<span class="t-c"># parse the tree and print a summary (the default subcommand is `check`):</span>
+./target/debug/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" check
+
+<span class="t-c"># strict mode additionally lints the vhost/listener topology and exits
+# non-zero on findings: a docroot shared by two vhosts, an apex domain
+# mapped without its www. twin, a vhost with no exact vhostMap domain.</span>
+./target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" check <span class="t-k">--strict</span></code></pre>
       </div>
+      <p>Paths inside the XML are resolved against the substitution variables <code>$SERVER_ROOT</code>, <code>$VH_ROOT</code>, <code>$VH_NAME</code> and <code>$HOSTNAME</code> — so the example tree works from any checkout location. See <a href="configuration.html">Configuration</a> for the full directive reference.</p>
     </section>
 
     <section>
       <h2 id="run">Run it — for development</h2>
-      <p>The supplied example is HTTP-only on <code>127.0.0.1:8080</code> with PHP and the page cache disabled. It is intentionally safe to run alongside an existing server. Native runtime policy belongs in TOML, so operational flags after <code>serve</code> are rejected.</p>
+      <p>The example is HTTP-only on <code>127.0.0.1:8080</code> with PHP and the page cache disabled, so it is safe to run alongside an existing server. Runtime behavior is controlled by explicit <code>serve</code> flags (the XML holds persistent policy; the flags hold operational overrides).</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · dev (alt ports)</span></div>
-        <pre><code>./target/release/httpjet <span class="t-k">--config</span> /tmp/httpjet/httpjet.toml serve</code></pre>
+        <pre><code>./target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" serve \
+  <span class="t-k">--http-addr</span> 127.0.0.1:8080 <span class="t-k">--https-addr</span> <span class="t-s">""</span> \
+  <span class="t-k">--workers</span> 1 <span class="t-k">--no-php</span></code></pre>
       </div>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Keep test state isolated</span><p>Use alternate HTTP/HTTPS/metrics ports, a separate PHP socket if PHP is enabled, and a separate page-cache root. Do not bind a test instance to a service manager's production listeners.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Keep test state isolated</span><p>Use alternate HTTP/HTTPS/metrics ports, a separate PHP socket if PHP is enabled, and a separate page-cache store path. Do not bind a test instance to a service manager's production listeners. Test lsphp pools also default their control and generation sockets <em>beside the test pool socket</em>, so they can never touch the production epoch.</p></div></div>
     </section>
 
     <section>
       <h2 id="verify">Verify</h2>
-      <p>Fetch the example page. The page cache is off in the neutral starter configuration; when you later enable it, native applications use the <code>X-HttpJet-*</code> cache protocol. LiteSpeed header aliases require an explicit compatibility profile.</p>
+      <p>Fetch the example page. The page cache is off by default; when you later enable it (<code>--page-cache</code>), applications opt in with the LiteSpeed cache protocol (<code>X-LiteSpeed-Cache-Control</code>, <code>X-LiteSpeed-Tag</code>, <code>X-LiteSpeed-Vary</code>) — the same headers LSCache already speaks.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>verify</b> · curl</span></div>
         <pre><code>curl -i -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/
 
-<span class="t-c"># after enabling a cacheable native application response, inspect:</span>
-curl -I -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/ | grep -Ei 'x-httpjet-cache|cache-status'</code></pre>
+<span class="t-c"># after enabling a cacheable application response, inspect:</span>
+curl -I -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/ | grep -Ei 'x-litespeed-cache|cache-status'</code></pre>
       </div>
     </section>
 
     <section>
       <h2 id="next">Where to go next</h2>
       <ul>
-        <li><a href="configuration.html">Configuration</a> — the strict native schema, runtime policy, integration profiles, and XML migration commands.</li>
-        <li><a href="operations.html">Operations</a> — generic systemd installation, safe upgrades, PHP pooling, and cache gates.</li>
+        <li><a href="configuration.html">Configuration</a> — the full XML directive reference, subcommands, <code>serve</code> flags, and environment variables.</li>
+        <li><a href="operations.html">Operations</a> — systemd installation, safe upgrades, PHP pooling, and cache gates.</li>
         <li><a href="architecture.html">Architecture</a> — how a request actually flows through the server.</li>
-        <li><a href="page-cache.html">Page cache</a> — native cache headers, optional compatibility aliases, storage tiers, and dictionaries.</li>
+        <li><a href="page-cache.html">Page cache</a> — the LSCache-compatible opt-in protocol, storage tiers, and dictionaries.</li>
+        <li><a href="security.html">Security &amp; access control</a> — network ACLs, throttling, geo/ASN rules, and auth.</li>
       </ul>
     </section>
 
@@ -121,7 +127,7 @@ curl -I -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/ 
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · See also <code>CLAUDE.md</code> in the repo.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>

@@ -39,7 +39,7 @@
   const sidebar = (() => {
     const groups = [
       ['Guide', [['Overview', './'], ['Quickstart', 'quickstart.html'], ['Architecture', 'architecture.html']]],
-      ['Internals', [['Protocol stacks', 'protocols.html'], ['LSAPI &amp; PHP', 'lsapi.html'], ['Rewrite engine', 'rewrite.html'], ['Page cache', 'page-cache.html'], ['Compression', 'compression.html']]],
+      ['Internals', [['Protocol stacks', 'protocols.html'], ['LSAPI &amp; PHP', 'lsapi.html'], ['Rewrite engine', 'rewrite.html'], ['Security &amp; access control', 'security.html'], ['Page cache', 'page-cache.html'], ['Compression', 'compression.html']]],
       ['Running it', [['Performance', 'performance.html'], ['Conformance', 'conformance.html'], ['Operations', 'operations.html'], ['Configuration', 'configuration.html']]],
     ];
 
@@ -82,7 +82,7 @@
   const top = document.createDocumentFragment();
   appendNodes(top, toNodes(header));
   body.insertBefore(top, shell);
-  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20260713a"]') || body.querySelector('script[src="assets/docs.min.js?v=20260621n"]');
+  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20260831a"]') || body.querySelector('script[src="assets/docs.min.js?v=20260831a"]');
   if (searchSlot) {
     const fragment = document.createDocumentFragment();
     appendNodes(fragment, toNodes(searchOverlay));

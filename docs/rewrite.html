@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/rewrite.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -71,6 +71,7 @@
       <h2 id="loading">Per-directory loading</h2>
       <p>An <code>HtaccessCache</code> loads each directory's <code>.htaccess</code> with <strong>mtime invalidation</strong> — a changed file is reparsed on its next access. In production the config tree is read-only, so in practice each file is parsed once and then served from the cache for the life of the process. The parsed form holds the directive list, the compiled regexes, and the scoping blocks ready to evaluate.</p>
       <p><code>evaluate()</code> walks that parsed form once and produces a single outcome. There is no re-entrant re-evaluation per directive: a terminal flag (<code>[L]</code>, a redirect, a forbid, a proxy hand-off) stops the walk, and an exhausted chain returns <code>Unchanged</code> so dispatch falls through to suffix routing.</p>
+      <p>The chain itself is bounded: the per-directory chain depth is capped at <strong>64</strong>, and walking past the cap fails <em>closed</em> — a deny-all sentinel applies rather than an unbounded walk. A vhost can also opt out entirely: an explicit <code>allowOverride 0</code> kills the whole <code>.htaccess</code> chain for that vhost (even with <code>autoLoadHtaccess</code> on), while <code>autoLoadHtaccess</code> alone loads the files without enabling general overrides.</p>
     </section>
 
     <section>
@@ -130,6 +131,21 @@
       <p>The engine also enforces <code>.htaccess</code> access control: <code>&lt;Files&gt;</code> / <code>&lt;FilesMatch&gt;</code> / <code>&lt;Directory&gt;</code> / <code>&lt;DirectoryMatch&gt;</code> / <code>&lt;If&gt;</code> scoping carrying <code>allow</code> / <code>deny</code> / <code>Require</code>, ANDed across every enclosing block. A request is permitted only if it survives all the blocks it falls inside.</p>
       <p>A <code>&lt;Directory&gt;</code> deny applies to the directory <strong>and everything beneath it</strong> — a file inside a denied directory is denied even when its own path doesn't match the directory regex, so you can't tunnel under a block with a deeper path. Matchers <strong>fail closed toward the rule's polarity</strong>: if a <em>deny</em> pattern errors at match time it counts as matched (the deny still applies), and an <em>allow</em> that errors is withheld. A regex failure can therefore only ever make access more restrictive, never less.</p>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Fail-closed, both directions</span><p>The polarity rule is the whole point: a deny that can't evaluate is treated as a deny, and an allow that can't evaluate is treated as absent. Either way the safe outcome is the restrictive one.</p></div></div>
+      <p>The legacy and modern spellings coexist: <code>Order</code> / <code>Allow from</code> / <code>Deny from</code> accumulate per scope exactly as Apache does, and <code>Require</code> follows one strict rule — <code>Require all granted</code> grants; <code>Require all denied</code> and <em>every other</em> predicate (<code>ip</code>, <code>host</code>, <code>env</code>, <code>expr</code>, <code>method</code>, …) fails <strong>closed</strong> to deny rather than being guessed at.</p>
+    </section>
+
+    <section>
+      <h2 id="basic-auth">HTTP Basic auth</h2>
+      <p>An <code>.htaccess</code> tree can protect itself with standard HTTP Basic authentication: <code>AuthType Basic</code>, <code>AuthName</code> (the realm), and <code>AuthUserFile</code> pointing at an htpasswd file, resolved order-independently into a realm and enforced by <code>Require valid-user</code> or <code>Require user …</code>.</p>
+      <p>The realm is enforced in the request pipeline <strong>before</strong> cache lookup and any backend dispatch — a protected tree never leaks through the on-core static fast path or the page cache. Missing or invalid credentials get <code>401</code> with the right <code>WWW-Authenticate</code> challenge; valid credentials set <code>REMOTE_USER</code> for PHP.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>.htaccess</b> · a protected subtree</span></div>
+        <pre><code><span class="t-k">AuthType</span> <span class="t-n">Basic</span>
+<span class="t-k">AuthName</span> <span class="t-s">"Staging"</span>
+<span class="t-k">AuthUserFile</span> /srv/example.test/conf/htpasswd
+<span class="t-k">Require</span> valid-user</code></pre>
+      </div>
+      <p>htpasswd hashes are verified for <strong>bcrypt</strong> (<code>$2y$</code>/<code>$2b$</code>/<code>$2a$</code> — the Apache 2.4 <code>htpasswd -B</code> default) and <code>{SHA}</code> (base64 SHA-1), both in constant time. <code>apr1</code> MD5 and crypt() hashes are <em>unsupported — they verify false</em> and warn at parse time, so re-hash legacy files with <code>htpasswd -B</code>. Plaintext entries work but warn. An incomplete auth block (a directive missing its siblings) fails closed to deny, and auth directives without a <code>Require</code> stay inert.</p>
     </section>
 
     <section>
@@ -140,31 +156,45 @@
           <thead><tr><th>Directive</th><th>Support</th></tr></thead>
           <tbody>
             <tr><td><code>RewriteEngine</code> · <code>RewriteBase</code></td><td>Toggle and base-path resolution for the rule chain.</td></tr>
-            <tr><td><code>RewriteCond</code> · <code>RewriteRule</code></td><td>The core matcher with the common flags: <code>[L]</code>, <code>[R]</code>, <code>[F]</code>, <code>[G]</code>, <code>[P]</code>, <code>[E=…]</code>, <code>[N]</code>, <code>[NC]</code>, <code>[QSA]</code>, <code>[NE]</code>.</td></tr>
+            <tr><td><code>RewriteCond</code> · <code>RewriteRule</code></td><td>The core matcher with the flags real files use: <code>[L]</code>, <code>[END]</code>, <code>[R]</code>/<code>[R=code]</code>, <code>[F]</code>, <code>[G]</code>, <code>[P]</code>, <code>[PT]</code>, <code>[E=…]</code>, <code>[N]</code>, <code>[NC]</code>, <code>[QSA]</code>, <code>[QSD]</code>, <code>[NE]</code>, <code>[C]</code>, <code>[S=n]</code>, and <code>[OR]</code> on conditions. Unknown flags are silently ignored, as Apache leniently does.</td></tr>
             <tr><td><code>Header</code></td><td>Scoped response-header ops (set/add/append/unset), honoring the enclosing block.</td></tr>
             <tr><td><code>ErrorDocument</code></td><td>Path / inline / external forms, each classified — and an <code>ErrorDocument</code> must <em>not</em> clobber an application's own JSON error body.</td></tr>
             <tr><td><code>SetEnvIf</code> · <code>SetEnvIfNoCase</code></td><td>Lazy-header conditional env setting (see above).</td></tr>
+            <tr><td><code>Require</code> · <code>Order</code> / <code>Allow from</code> / <code>Deny from</code></td><td>Access control — <code>Require all granted</code> grants, everything else fails closed (see above).</td></tr>
+            <tr><td><code>AuthType</code> · <code>AuthName</code> · <code>AuthUserFile</code></td><td>The Basic-auth realm — see <a href="#basic-auth">HTTP Basic auth</a>.</td></tr>
+            <tr><td><code>DirectoryIndex</code></td><td>Per-directory index candidates (including the <code>Disabled</code> form).</td></tr>
+            <tr><td><code>SetHandler</code> · <code>AddHandler</code> · <code>AddType</code></td><td><code>application/x-httpd-php</code> mappings force PHP handling / record the extension mapping; other handlers record a non-PHP reset.</td></tr>
             <tr><td><code>CacheLookup</code> · <code>CacheEnable</code> · <code>CacheDisable</code> · <code>CacheKeyModify</code></td><td>The LSCache directives that drive the <a href="page-cache.html">page cache</a>.</td></tr>
             <tr><td><code>php_value</code> · <code>php_admin_value</code> · <code>php_flag</code> · <code>php_admin_flag</code></td><td>Per-request PHP ini overrides carried through to the <a href="lsapi.html">LSAPI</a> env.</td></tr>
           </tbody>
         </table>
       </div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Ground truth</span><p>The GPL OpenLiteSpeed source was the reference for the exact flag and dispatch semantics — behavior was extracted and reimplemented cleanly. httpjet is MIT/Apache and never copies GPL code.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Recognized no-ops and config-only directives</span><p><code>FileETag</code>, <code>H2EarlyHints</code>, <code>esi</code>, <code>AddOutputFilterByType</code>, and <code>AllowOverride</code> are recognized and dropped as no-ops. <code>ExpiresActive</code>/<code>ExpiresByType</code> are <strong>not</strong> supported in <code>.htaccess</code> — expires comes only from the XML config. Everything unrecognized is ignored leniently.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="context-overrides">Per-context overrides &amp; sub_filter</h2>
+      <p>Alongside the per-directory <code>.htaccess</code> chain, httpjet's XML contexts can rewrite <em>responses</em> and override per-request limits for a URI prefix. The full directive semantics live in <a href="configuration.html#vhosts">Configuration</a>; the behavioral points worth knowing here:</p>
+      <ul>
+        <li><strong><code>subFilter</code></strong> performs literal response-body substitution (nginx-shaped <code>SEARCH =&gt; REPLACEMENT</code>) between the expires and compression stages — 200 responses only, on bodies without a content encoding, for matching Content-Types. A buffered body is filtered in place; a stream past <code>subFilterMaxBody</code> (4 MiB default) passes through <em>raw</em> — never half-filtered. <code>Content-Length</code> is recomputed, the ETag is always dropped, and sub_filter paths are ineligible for the fast-path memo and bypass the page cache.</li>
+        <li><strong><code>maxReqBodySize</code></strong> overrides the server-wide body cap for the context — enforced at dispatch for <em>all</em> terminals (static, LSAPI, proxy), 413 when exceeded.</li>
+        <li><strong><code>responseTimeout</code></strong> (proxy contexts) and <strong><code>bandwidthLimit</code></strong> override the backend deadline and the server-wide egress throttle for the context's requests.</li>
+      </ul>
     </section>
 
     <section>
       <h2 id="performance">Performance &amp; honesty</h2>
-      <p>The engine's hot path is at its allocation floor: the cacheless dense-DFA prefilter, the per-thread regex caches, and stack-allocated capture arrays leave little left to shave. The remaining gap on one synthetic workload is structural, not an allocation problem.</p>
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>On the heavy-<code>.htaccess</code> synthetic workload, LiteSpeed was historically far ahead — because httpjet runs the <strong>full uncacheable <code>.htaccess</code> pipeline on every request, including static files</strong>, where LiteSpeed short-circuits. Micro-optimizing the engine doesn't close it; the real lever for that workload is the <a href="page-cache.html">page cache</a>, which removes the pipeline from the hot path entirely.</p><span class="regime">synthetic heavy-.htaccess loopback</span></div></div>
+      <p>The engine's hot path is at its allocation floor: the cacheless dense-DFA prefilter, the per-thread regex caches, and stack-allocated capture arrays leave little left to shave per evaluation. The structural disadvantage — paying the full pipeline on every static request — is instead removed <em>above</em> the engine, by the fast-path memo skipping repeat evaluations entirely.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>On the forum's real heavy-<code>.htaccess</code> vhost (an 806-line docroot chain), the historical gap is closed: httpjet runs the <strong>full <code>.htaccess</code> pipeline on every request, including static files</strong>, where LiteSpeed short-circuits — but the default-on fast-path memo now skips that pipeline for repeated cookieless GETs. The August 2026 PGO three-way on <code>/robots.txt</code>: h1 <strong>168.7k vs OpenLiteSpeed's 169.1k</strong> (a tie; nginx 145.6k), h2 <strong>298.0k vs 283.3k</strong> (a lead; nginx 125.4k). Memo on/off A/B: <strong>+81% h2, +43% h1</strong>.</p><span class="regime">PGO three-way + same-binary A/B · 2026-08-28</span></div></div>
     </section>
 
     <nav class="pager" aria-label="Pagination">
       <a class="prev" href="lsapi.html"><div class="dir">← Prev</div><div class="ttl">LSAPI &amp; PHP</div></a>
-      <a class="next" href="page-cache.html"><div class="dir">Next →</div><div class="ttl">Page cache</div></a>
+      <a class="next" href="security.html"><div class="dir">Next →</div><div class="ttl">Security &amp; access control</div></a>
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The engine lives in <code>hj-rewrite</code>.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>

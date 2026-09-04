@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/protocols.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -61,6 +61,14 @@
     </section>
 
     <section>
+      <h2 id="frontdoors">Connection front doors</h2>
+      <p>Two per-listener features sit before protocol detection. Both are configured per listener in the XML (see <a href="configuration.html">Configuration</a>) and are httpjet-native — LiteSpeed has no equivalent on the listener.</p>
+      <p><strong>PROXY protocol v2/v1.</strong> A listener with <code>proxyProtocol</code> enabled requires every connection to open with a PROXY header (fail-closed — no header, no connection). The header is consumed and the real client address installed <em>before</em> the TLS handshake on secure listeners and before the H1/h2c discriminator on plain ones, so downstream stages see the proxied client as if it connected directly. The per-listener opt-in <em>is</em> the trust decision — there is no separate peer-ACL allowlist as in OpenLiteSpeed, so never enable it on an internet-facing bind. <code>check</code> warns when a PROXY-protocol listener binds a wildcard or public address.</p>
+      <p><strong>HTTP over unix sockets.</strong> A listener whose address is <code>unix:/path/sock</code> (or <code>uds:</code>) serves plain HTTP over a unix-domain socket — H1 and h2c prior knowledge, one accept core (SO_REUSEPORT does not apply on AF_UNIX), mode <code>0600</code> group-writable, with socket-activated fds adopted by path. A stale socket file is unlinked only after a <code>connect(2)</code> proves it dead. TLS over UDS is rejected at check time. UDS peers have no address: ACLs, the per-IP throttle, and <code>REMOTE_ADDR</code> see a fabricated loopback value, and the access log renders the literal host <code>unix:</code>.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Trust boundary</span><p>Both front doors change who httpjet thinks the client is. PROXY protocol replaces the peer address; a UDS listener erases it. Combine them only behind an equally trusted local hop.</p></div></div>
+    </section>
+
+    <section>
       <h2 id="http1">HTTP/1.1 &amp; h2c detection</h2>
       <p>HTTP/1.1 is served by a custom monoio codec in the io_uring transport. It parses with <code>httparse</code>, enforces strict request framing, supports keep-alive and pipelining, honors LiteSpeed's <code>maxKeepAliveReq</code> cap (<code>0</code> = unlimited), decodes chunked bodies, and streams large or long-lived responses back from the shared pipeline without buffering the whole body.</p>
       <p>Cleartext HTTP/2 (<code>h2c</code>) by prior knowledge has no upgrade handshake — the client just sends the connection preface. httpjet detects it <em>non-destructively</em> while the bytes remain available to the selected stack. If the preface matches, those leading bytes are handed to the native h2 path; if not, the same unread bytes flow into the HTTP/1.1 parser. No replay buffer, no lost bytes.</p>
@@ -81,6 +89,13 @@
 </code></pre>
       </div>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Why the prefix matters</span><p>The h2c detector must not consume bytes invisibly. The selected stack receives exactly the prefix already observed plus the rest of the stream, so h1 and h2 both parse the connection as if no router sat in front of them.</p></div></div>
+      <p>Beyond basic framing, the h1 path implements the newer HTTP semantics end to end:</p>
+      <ul>
+        <li><strong>103 Early Hints.</strong> The same preload/preconnect <code>Link</code> matcher the h2 stack uses also emits an interim <code>HTTP/1.1 103 Early Hints</code> response, so browsers start fetching assets even on h1 connections. <code>101</code> upgrades bypass it; canonical/alternate links are excluded.</li>
+        <li><strong>Ranges, single and multipart.</strong> RFC 9110 multi-Range requests are parsed, clamped, sorted, coalesced, and answered with <code>multipart/byteranges</code> — capped at 8 ranges / 8 MiB of part bytes, falling back to a full <code>200</code> beyond that. An invalid component poisons the whole header (→ 200); an unsatisfiable request is a <code>416</code>.</li>
+        <li><strong>Gzip request bodies.</strong> A request body carrying <code>Content-Encoding: gzip</code> is decompressed before the pipeline, with <code>Content-Length</code> corrected. Decode failure is non-fatal: the body is forwarded as-is.</li>
+        <li><strong>Explicit CONNECT rejection.</strong> <code>CONNECT</code> is answered with <code>405 Method Not Allowed</code> rather than being implicitly mishandled.</li>
+      </ul>
     </section>
 
     <section>
@@ -112,7 +127,8 @@
         <li><strong>Send-side flow control.</strong> The server honors per-stream and connection windows on egress, pacing body writes to the peer's advertised capacity.</li>
         <li><strong>Streaming bodies.</strong> PHP/LSAPI, reverse-proxy, and SSE responses stream through without buffering, alongside async file streaming for static content.</li>
         <li><strong>One vectored write per wake.</strong> The task coalesces ready frames into a single vectored write each time it wakes; large bodies are <strong>zero-copy</strong> straight from page-cache <code>Bytes</code>.</li>
-        <li><strong>Inbound RFC 9113 validation.</strong> Frames are validated on the way in, with a graceful <code>GOAWAY</code> drain on shutdown so in-flight streams finish.</li>
+        <li><strong>Inbound RFC 9113 validation.</strong> Frames are validated on the way in, with a graceful <code>GOAWAY</code> drain on shutdown so in-flight streams finish. Two hardening cases are connection errors, not stream errors: a <code>CONTINUATION</code> frame with no open header block (§6.10 — previously absorbed as a phantom trailer, letting every stream pin a 64 KiB block), and reuse of a stream id (§5.1.1).</li>
+        <li><strong>Egress pacing.</strong> When a server-wide or per-context bandwidth limit is configured, h2 paces per <em>connection</em> at the OutQueue flush using the server-wide rate (a per-response override is ill-defined under multiplexing). HTTP/3 is not paced.</li>
         <li><strong>Shared pipeline bridge.</strong> Stream dispatch uses the same bridge as h1 and h3, so rewrite, LSAPI, proxying, cache lookup, metrics, and reload state are identical across protocols.</li>
       </ul>
       <p>Because handlers behind every protocol are the same closure, HTTP/2 does not have a separate backend path: a busy h2 connection exercises the same request pipeline as HTTP/1.1 and HTTP/3, then returns framed bytes to the monoio writer.</p>
@@ -129,7 +145,7 @@
 
     <section>
       <h2 id="http3">HTTP/3 &amp; QUIC</h2>
-      <p>HTTP/3 is implemented in <code>crates/httpjet/src/uring/h3.rs</code>. It uses <strong>quinn-proto</strong> for QUIC state, <strong>quinn-udp</strong> for UDP socket metadata/GSO/GRO handling, drives UDP from monoio/io_uring, decodes and encodes QPACK, and dispatches requests through the same bridge used by H1 and H2. The H3 path currently collects the response body before encoding it; H1 and H2 stream large and SSE bodies incrementally.</p>
+      <p>HTTP/3 is implemented in <code>crates/httpjet/src/uring/h3.rs</code>. It uses <strong>quinn-proto</strong> for QUIC state, <strong>quinn-udp</strong> for UDP socket metadata/GSO/GRO handling, drives UDP from monoio/io_uring, decodes and encodes QPACK, and dispatches requests through the same bridge used by H1 and H2. Small, cached, and sub-threshold dynamic bodies are buffered and sent whole; large, SSE, and proxy bodies stream — the HEADERS frame goes out immediately and DATA frames follow as the backend produces them.</p>
       <p>Discovery is via <strong>Alt-Svc</strong>: TLS responses advertise the HTTP/3 endpoint, so an HTTP/2 client that connected over TCP learns it can upgrade to QUIC for subsequent requests. The advertisement is emitted on TLS responses as the last response transform, after the body is finalized.</p>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">One TLS config, two transports</span><p>TCP and QUIC do not maintain separate certificate stores or verifiers. <code>build_server_config_alpn</code> produces the rustls config used by the TCP path and by the QUIC crypto setup. A cert rotation or mTLS change lands in both at once.</p></div></div>
     </section>
@@ -138,7 +154,13 @@
       <h2 id="tls">TLS &amp; mutual TLS</h2>
       <p><code>hj-tls</code> builds <strong>one</strong> <code>rustls::ServerConfig</code> for TCP <em>and</em> QUIC via <code>build_server_config_alpn(cfg, listener, alpn)</code>. The installed crypto provider is <strong>aws-lc-rs</strong>, and key parsing, TCP TLS, and QUIC setup all use that provider. Two pieces make up the config: how a certificate is selected per connection, and how (and whether) the client is verified.</p>
       <p>Certificate selection is a custom <code>SniCertMap</code> resolver with <strong>no cert-name-match</strong>, mirroring OpenLiteSpeed: the SNI hostname maps directly to configured certificate material without re-validating that the chosen leaf's subject/SAN matches the SNI. The resolver is shared by both transports through the single config.</p>
-      <p>Client verification is optional <strong>mutual TLS</strong>. A <code>WebPkiClientVerifier</code> is attached to the <em>listener CA</em> when the native listener requests it; configured exempt IPs are a separate policy. A proxy-specific profile may supply trusted ranges and request metadata, but TLS verification itself is not tied to a provider.</p>
+      <p>Client verification is optional <strong>mutual TLS</strong>. A <code>WebPkiClientVerifier</code> is attached to the <em>listener CA</em> when the native listener requests it (<code>clientVerify</code> 1–3); configured exempt IPs are a separate policy. A <code>crlFile</code> adds PEM certificate-revocation-list enforcement to the verifier (absent = no revocation checking; rotating the CRL means a restart).</p>
+      <p>Three recent hardening changes shape the current posture:</p>
+      <ul>
+        <li><strong>TLS 1.3 offers exactly one suite</strong> — <code>TLS_AES_128_GCM_SHA256</code>, the RFC 8446 mandatory suite. CHACHA20 and AES-256-GCM-SHA384 were dropped on 1.3 (TLS 1.2 keeps its full set): rustls negotiates by <em>client</em> order, and without this pin OpenSSL-family clients pick slower suites first. The transcript moves to hardware SHA-NI; handshake cost is +3.5%.</li>
+        <li><strong>Session resumption works on client-cert-verifying listeners.</strong> Single-use TLS 1.3 tickets with 0-RTT off preserve the security posture while restoring resumption that an earlier blanket <code>NoServerSessions</code> posture disabled; positive client-cert chain verdicts are memoized to keep the verify cost off the hot path.</li>
+        <li><strong>Dual ECDSA+RSA chains per hostname.</strong> The <code>SniCertMap</code> holds a list of chains per SNI name: ECDSA is chosen when the client offers ECDSA signature algorithms, with RSA as the fallback. Configure both pairs for the same domain to serve modern clients the smaller chain.</li>
+      </ul>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>hj-tls</b> · one config, SNI + mTLS</span></div>
         <pre><code><span class="t-k">fn</span> <span class="t-f">build_server_config_alpn</span>(cfg, listener, alpn) -&gt; rustls::ServerConfig {
@@ -164,7 +186,7 @@
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The transport paths live in the binary's <code>uring/</code> module, with <code>hj-h2</code> (native HTTP/2 + HPACK), <code>hj-http</code> (<code>ServeConfig</code> tuning), and <code>hj-tls</code> (unified rustls configuration and mTLS).</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>

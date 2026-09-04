@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/conformance.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -42,19 +42,19 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>Conformance</p>
     <p class="eyebrow">Running it</p>
     <h1>Conformance &amp; standards</h1>
-    <p class="lede">httpjet preserves LiteSpeed compatibility where an explicit migration profile requires it and targets standards conformance on the wire everywhere else. Prior differential testing reached <strong>11/11 parity</strong> on the retained compatibility matrix; the native HTTP/2 stack passes <strong>146 of 146 h2spec</strong> cases; and the protocol stacks track the current RFCs for HTTP/1.1, HTTP/2, HTTP/3, and TLS.</p>
+    <p class="lede">httpjet is a LiteSpeed <em>drop-in</em> — its compatibility target is LSWS 6.3.5 behavior on the same configuration tree — and targets standards conformance on the wire everywhere else. Retained compatibility behaviors hold an <strong>11/11 parity</strong> matrix from differential testing; the native HTTP/2 stack passes <strong>146 of 146 h2spec</strong> cases; and the protocol stacks track the current RFCs for HTTP/1.1, HTTP/2, HTTP/3, and TLS.</p>
 
     <section>
       <h2 id="overview">Overview</h2>
-      <p>Two axes define httpjet's conformance posture. The first is <em>LiteSpeed compatibility</em>: XML migration, LSAPI, legacy ETags, cache aliases, and <code>.htaccess</code> behavior are retained where a selected compatibility profile needs them. The second is <em>standards conformance</em>: on the wire, httpjet must be a correct HTTP/1.1, HTTP/2, and HTTP/3 server for compliant clients and proxies.</p>
+      <p>Two axes define httpjet's conformance posture. The first is <em>LiteSpeed compatibility</em>: the XML config model, LSAPI, the legacy ETag format, the LSCache header protocol, and <code>.htaccess</code> behavior match the drop-in target (LSWS 6.3.5), with httpjet-native extensions layered on top as opt-ins LiteSpeed ignores. The second is <em>standards conformance</em>: on the wire, httpjet must be a correct HTTP/1.1, HTTP/2, and HTTP/3 server for compliant clients and proxies.</p>
       <p>Where the two agree, there is one right answer. Where LiteSpeed's behavior is a deliberate choice that a strict reading of the spec would call optional, httpjet matches LiteSpeed — the <code>fileETag=28</code> format and the <code>.html</code>→PHP dispatch ordering are the clearest examples.</p>
       <div class="chips">
-        <span class="chip"><span class="dot"></span>11/11 LiteSpeed parity (retired)</span>
+        <span class="chip"><span class="dot"></span>11/11 retained LiteSpeed parity matrix</span>
         <span class="chip"><span class="dot"></span>HTTP/2 · 146/146 h2spec</span>
         <span class="chip"><span class="dot"></span>HPACK · RFC 7541</span>
         <span class="chip"><span class="dot"></span>HTTP/3 · RFC 9114 over QUIC</span>
         <span class="chip"><span class="dot"></span>TLS + mTLS · rustls / aws-lc-rs</span>
-        <span class="chip"><span class="dot"></span>&gt;1,300 test functions across 15 crates</span>
+        <span class="chip"><span class="dot"></span>≈1,500 tests across 16 crates</span>
       </div>
     </section>
 
@@ -65,7 +65,9 @@
         <table>
           <thead><tr><th>Area</th><th>Standard / reference</th><th>Status</th></tr></thead>
           <tbody>
-            <tr><td>HTTP/1.1</td><td>RFC 9110 (semantics) · RFC 9111 (caching)</td><td>Strict framing, conditional requests, ranges, <code>Vary</code></td></tr>
+            <tr><td>HTTP/1.1</td><td>RFC 9110 (semantics) · RFC 9111 (caching)</td><td>Strict framing, conditional requests, single + multipart ranges, <code>Vary</code></td></tr>
+            <tr><td>Early Hints</td><td>RFC 8297 (<code>103</code>)</td><td>h1 and h2 from one preload/preconnect matcher</td></tr>
+            <tr><td>PROXY protocol</td><td>v2 (binary) + v1 (text)</td><td>Per-listener, fail-closed, pre-TLS/pre-sniff</td></tr>
             <tr><td>HTTP/2</td><td>RFC 9113 (native <code>hj-h2</code>)</td><td>146 / 146 h2spec</td></tr>
             <tr><td>HTTP/3</td><td>RFC 9114 over RFC 9000 (QUIC), via <code>quinn-proto</code> + <code>quinn-udp</code> in the io_uring H3 driver</td><td>Conformant</td></tr>
             <tr><td>HPACK / QPACK</td><td>RFC 7541 (HPACK) · QPACK for HTTP/3</td><td>Zero-allocation HPACK codec</td></tr>
@@ -73,7 +75,7 @@
             <tr><td>LSAPI</td><td>Native wire codec (vendored <code>lsapidef.h</code>)</td><td>Parity with <code>lsphp</code></td></tr>
             <tr><td>ETag</td><td>LiteSpeed <code>fileETag=28</code></td><td><code>"&lt;size&gt;-&lt;mtime&gt;-&lt;inode&gt;;;;"</code></td></tr>
             <tr><td><code>.htaccess</code></td><td>Apache mod_rewrite + access control</td><td>Directive + flag parity</td></tr>
-            <tr><td>LiteSpeed parity</td><td>Differential conformance (retired)</td><td>11 / 11</td></tr>
+            <tr><td>LiteSpeed parity</td><td>LSWS 6.3.5 drop-in target · retained differential matrix (retired)</td><td>11 / 11</td></tr>
           </tbody>
         </table>
       </div>
@@ -81,21 +83,21 @@
 
     <section>
       <h2 id="parity">LiteSpeed parity</h2>
-      <p>Prior differential conformance testing reached <strong>11/11 parity</strong> against LiteSpeed on retained migration behaviors — ETag format, <code>.html</code>→PHP dispatch, LSAPI encoding, and rewrite flags. The differential apparatus is historical; new features belong in native TOML first and should be tested against their documented contract.</p>
+      <p>Prior differential conformance testing reached <strong>11/11 parity</strong> against LiteSpeed on the retained behaviors — ETag format, <code>.html</code>→PHP dispatch, LSAPI encoding, and rewrite flags. The differential apparatus itself has been retired: httpjet now <em>is</em> the same-config drop-in, so compatibility is exercised continuously by production serving the live LiteSpeed-shaped tree, and new httpjet-native features are tested against their documented contracts.</p>
       <p>The authoritative reference for LiteSpeed's <em>exact</em> behavior was the GPL OpenLiteSpeed source. Behavior was extracted and reimplemented cleanly — httpjet is MIT/Apache and never copies GPL code.</p>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Clean-room, not a fork</span><p>OpenLiteSpeed (GPL) was read only to learn the <em>behavior</em> — ETag formatting, the <code>.html</code>→PHP dispatch decision, LSAPI framing, rewrite flag semantics — which was then reimplemented from scratch. No GPL code lives in httpjet's MIT/Apache tree. The license boundary is deliberate and load-bearing.</p></div></div>
     </section>
 
     <section>
       <h2 id="http1">HTTP/1.1</h2>
-      <p>The HTTP/1.1 transport tracks <strong>RFC 9110</strong> (HTTP semantics) and <strong>RFC 9111</strong> (HTTP caching). That covers strict request framing, conditional requests (<code>If-Modified-Since</code> / <code>If-None-Match</code>), byte-range requests, and correct <code>Vary</code> handling so that cached and negotiated responses don't leak across representations.</p>
+      <p>The HTTP/1.1 transport tracks <strong>RFC 9110</strong> (HTTP semantics) and <strong>RFC 9111</strong> (HTTP caching). That covers strict request framing, conditional requests (<code>If-Modified-Since</code> / <code>If-None-Match</code>), byte-range requests including <code>multipart/byteranges</code> (RFC 9110 range semantics, capped at 8 ranges / 8 MiB of parts), <code>103 Early Hints</code> (RFC 8297), explicit <code>405</code> for <code>CONNECT</code>, and correct <code>Vary</code> handling so that cached and negotiated responses don't leak across representations.</p>
       <p>These semantics are not just transport plumbing — they are what lets the static handler emit correct <code>304 Not Modified</code> responses and what lets the page cache vary safely on the request's encoding and cookie set without serving the wrong representation.</p>
     </section>
 
     <section>
       <h2 id="http2">HTTP/2 &amp; HPACK</h2>
       <p>All HTTP/2 — both ALPN <code>h2</code> over TLS and cleartext <code>h2c</code> — runs through httpjet's native <code>hj-h2</code> stack. Inbound <strong>RFC 9113</strong> validation is enforced on every frame, and the header codec is a from-scratch, zero-allocation <strong>RFC 7541</strong> HPACK implementation.</p>
-      <p>The stack passes <strong>146 of 146</strong> h2spec conformance cases. Current hardening also covers no-forward-progress protections, strict connection and stream limits, and graceful <code>GOAWAY</code> drain behavior so bad clients fail closed without taking healthy streams with them.</p>
+      <p>The stack passes <strong>146 of 146</strong> h2spec conformance cases. Current hardening also covers no-forward-progress protections (including the HTTP/2 Bomb pattern, CVE-2026-49975), strict connection and stream limits, <code>CONTINUATION</code>-without-headers and stream-id-reuse as connection errors (RFC 9113 §6.10 / §5.1.1), and graceful <code>GOAWAY</code> drain behavior so bad clients fail closed without taking healthy streams with them.</p>
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>The native h2 stack passes <strong>146 of 146</strong> h2spec conformance cases while preserving graceful shutdown, HPACK correctness, flow control, and the Cloudflare-origin request shape.</p><span class="regime">h2spec conformance suite</span></div></div>
     </section>
 
@@ -108,7 +110,7 @@
     <section>
       <h2 id="tls">TLS &amp; mTLS</h2>
       <p>The TLS layer is <strong>rustls</strong> with the <strong>aws-lc-rs</strong> crypto backend. In front of the origin, Cloudflare presents a client certificate that httpjet verifies with a <code>WebPkiClientVerifier</code> — the mutual-TLS trust boundary that fails closed for any peer that isn't Cloudflare (loopback is exempt, and the check can be relaxed for local TLS testing).</p>
-      <p>SNI resolution mirrors OpenLiteSpeed: the resolver maps the SNI name to a vhost certificate with <strong>no cert-name-match</strong> requirement, exactly as OLS does. A per-vhost <code>&lt;vhssl&gt;&lt;CACertFile&gt;</code> is server <em>chain</em> material, not a client-verify root — only the listener CA is the client verifier, and those two roles are kept strictly distinct.</p>
+      <p>TLS 1.3 offers exactly <code>TLS_AES_128_GCM_SHA256</code> (TLS 1.2 keeps its full set), session resumption runs on single-use tickets with 0-RTT off — including on client-cert-verifying listeners — and a listener <code>crlFile</code> adds PEM CRL enforcement to the client verifier. Dual ECDSA+RSA chains per SNI name serve modern clients the smaller chain. SNI resolution mirrors OpenLiteSpeed: the resolver maps the SNI name to a vhost certificate with <strong>no cert-name-match</strong> requirement, exactly as OLS does. A per-vhost <code>&lt;vhssl&gt;&lt;CACertFile&gt;</code> is server <em>chain</em> material, not a client-verify root — only the listener CA is the client verifier, and those two roles are kept strictly distinct.</p>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Distinct trust roots</span><p>Do not conflate the per-vhost <code>CACertFile</code> (server chain material sent to clients) with the listener CA (the root that verifies Cloudflare's client certificate). Treating the vhost chain CA as a client-verify root would silently widen the mTLS trust boundary.</p></div></div>
     </section>
 
@@ -136,7 +138,7 @@ ETag: <span class="t-s">"4096-1718800000-1572934;;;"</span></code></pre>
 
     <section>
       <h2 id="testing">How it's tested</h2>
-      <p>Conformance is held in place by roughly <strong>1,050 tests across the 15 crates</strong>. They span three layers:</p>
+      <p>Conformance is held in place by roughly <strong>1,500 tests across the 16 crates</strong> — the most recent recorded full run was <strong>1,457 passed / 0 failed</strong> (August 2026), alongside <code>h2spec</code> at 146/146 and a 192-cell fast-memo parity gate. They span three layers:</p>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Layer</th><th>What it covers</th></tr></thead>
@@ -154,6 +156,7 @@ ETag: <span class="t-s">"4096-1718800000-1572934;;;"</span></code></pre>
         <span class="chip"><span class="dot"></span>cross-scheme redirect gate</span>
         <span class="chip"><span class="dot"></span>foreign-host isolation gate</span>
         <span class="chip"><span class="dot"></span>private-tier session gate</span>
+        <span class="chip"><span class="dot"></span>fast-memo parity gate (192 cells)</span>
       </div>
     </section>
 
@@ -163,7 +166,7 @@ ETag: <span class="t-s">"4096-1718800000-1572934;;;"</span></code></pre>
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The conformance matrix and remediation history live in <code>RESULTS.md</code> and <code>REMEDIATION.md</code> in the repo.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>

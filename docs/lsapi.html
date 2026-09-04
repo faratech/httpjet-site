@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/lsapi.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -103,29 +103,34 @@
     <section>
       <h2 id="pool">The UDS connection pool</h2>
       <p>Requests reach <code>lsphp</code> over a Unix-domain socket. The pool that fronts it carries a <strong>generation-epoch</strong> plus an idempotent retry: when a worker is recycled out from under an in-flight request, the stale connection is detected and the request is retried on a fresh one rather than served a poisoned response. The epoch is what lets the pool tell "this socket belongs to the worker generation I dialed" from "this socket outlived a recycle."</p>
+      <p>Two failure modes are handled explicitly. A bodyless idempotent request whose pooled connection dies <em>before the send</em> gets one transparent retry on a fresh connection, bounded by the processor's <code>retryTimeout</code>; the retry dials fresh rather than reusing another pooled entry. And accepted connections keep TCP keepalive — a vanished WebSocket or proxy client no longer pins fds and pool permits indefinitely.</p>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Why a generation epoch</span><p>An opcache recycle or a child churn tears down sockets mid-flight. Without the epoch, a retry could land back on the same dying connection. The epoch tags each pooled connection with the generation it was opened against; a recycle bumps the epoch, and the idempotent retry only re-dials a connection from the current generation.</p></div></div>
     </section>
 
     <section>
       <h2 id="supervisor">The lsphp supervisor</h2>
       <p>In its self-managing mode, <code>hj-lsapi</code> spawns and supervises <code>lsphp</code> itself. The supervisor passes the listen socket to the child on <strong>fd 0</strong> (where <code>lsphp</code> expects its LSAPI listener), sets <code>PR_SET_PDEATHSIG</code> so a worker dies with its parent rather than orphaning, and caps the child count. The <code>pre_exec</code> closure that runs between <code>fork</code> and <code>exec</code> calls only async-signal-safe syscalls — the one regime where almost everything else is undefined behavior.</p>
-      <p>Native mode sizes an owned pool from <code>runtime.php.children</code>; its configuration is reviewable alongside the PHP socket and request deadline. Treat that count as a memory-capacity decision for the deployment, not a throughput target to maximize blindly.</p>
+      <p>Pool sizing comes from the config's <code>maxConns</code> (or the <code>PHP_LSAPI_CHILDREN</code> env the worker sees) and can be overridden with <code>--php-children</code>; values below 2 normalize to 2. Treat that count as a memory-capacity decision for the deployment, not a throughput target to maximize blindly.</p>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Packaging boundary</span><p>httpjet does not ship a PHP runtime. The PHP executable, its extensions, <code>php.ini</code>, and writable application paths are explicit operator-managed dependencies.</p></div></div>
     </section>
 
     <section>
       <h2 id="zero-downtime">Zero-downtime deploys (the external pool)</h2>
-      <p>The supervisor mode above couples PHP's lifetime to httpjet's: restarting the server cold-starts workers. A <code>httpjet lsphp</code> subcommand can instead run a <strong>persistent <code>lsphp</code> pool</strong> as its own systemd unit (<code>httpjet-lsphp</code>); the serving process then dials that pool through the native <code>runtime.php.external_socket</code> setting.</p>
-      <p>The payoff is a zero-downtime binary deploy: the web tier can <code>systemctl restart httpjet</code> for a fresh build <em>without</em> cold-starting PHP, because the worker pool is a separate, untouched unit. When you do want an opcache recycle, you restart the <code>httpjet-lsphp</code> unit on its own.</p>
+      <p>The supervisor mode above couples PHP's lifetime to httpjet's: restarting the server cold-starts workers. The <code>httpjet lsphp</code> subcommand instead runs a <strong>persistent <code>lsphp</code> pool</strong> as its own systemd unit (<code>httpjet-lsphp.service</code>, <code>Type=notify</code>); the web tier then dials that pool with <code>serve --lsphp-external &lt;socket&gt;</code> and never spawns workers itself.</p>
+      <p>The payoff is a zero-downtime deploy on both halves: the web tier can <code>systemctl restart httpjet</code> for a fresh build <em>without</em> cold-starting PHP, and an opcache recycle replaces the pool's worker <em>generation</em> — via <code>httpjet lsphp-reload</code> or a pool-unit restart — without closing the systemd-owned LSAPI listener, so the web tier's pooled connections drain onto the new generation instead of erroring.</p>
       <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">serve · dial the persistent pool</span></div>
-        <pre><code><span class="t-c"># the PHP half: a persistent external-app pool (its own systemd unit)</span>
-httpjet <span class="t-s">--config</span> /etc/httpjet/lsphp.toml lsphp
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">production · external pool wiring</span></div>
+        <pre><code><span class="t-c"># the PHP half: a persistent pool under its own identity (its own unit)</span>
+httpjet lsphp <span class="t-k">--php-socket</span> /run/httpjet/php.sock \
+  <span class="t-k">--control-socket</span> /run/httpjet/lsphp-control.sock \
+  <span class="t-k">--generation-file</span> /run/httpjet/lsphp.generation
 
 <span class="t-c"># the serving half: dial that pool, never spawn — restart freely</span>
-httpjet <span class="t-s">--config</span> /etc/httpjet/httpjet.toml serve</code></pre>
+httpjet serve <span class="t-k">--lsphp-external</span> /run/httpjet/php.sock \
+  <span class="t-k">--lsphp-generation-file</span> /run/httpjet/lsphp.generation</code></pre>
       </div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Separate trust domain</span><p>The supplied pool unit uses a distinct <code>httpjet-php</code> identity and pool-only TOML. Do not grant it access to web-tier TLS or cluster-secret files.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">The generation file is the trust anchor</span><p>The 16-byte generation epoch is how a web tier tells <em>its</em> pool from a foreign one — advancing the wrong marker would drop the live web tier's pooled connections and retire its workers against a file it never wrote. The generation file's parent directory must not be group- or other-writable, and an external pool requires the flag to be present-and-openable. Test pools default their control and generation sockets <em>beside the test pool socket</em> so they can never touch the production epoch.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Separate trust domain</span><p>The supplied pool unit uses a distinct <code>httpjet-php</code> identity. Do not grant it access to web-tier TLS keys or purge secrets.</p></div></div>
     </section>
 
     <section>
@@ -167,7 +172,7 @@ httpjet <span class="t-s">--config</span> /etc/httpjet/httpjet.toml serve</code>
     }
 }</code></pre>
       </div>
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Over HTTP/1.1 the PHP/LSAPI path runs at <strong>~44.7k requests/s vs LiteSpeed's ~41.2k</strong> on the same hardware. See <a href="performance.html">Performance</a> for the full picture across protocols and the cache.</p><span class="regime">loopback benchmark · PGO build</span></div></div>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Over HTTP/1.1 the PHP/LSAPI path runs at <strong>~44.8k requests/s vs LiteSpeed's ~38.5k at c=40</strong> on the same hardware (LiteSpeed's best, ~41.2k, needed c=60). See <a href="performance.html">Performance</a> for the full picture across protocols and the cache.</p><span class="regime">loopback benchmark · PGO build</span></div></div>
     </section>
 
     <nav class="pager" aria-label="Pagination">
@@ -176,7 +181,7 @@ httpjet <span class="t-s">--config</span> /etc/httpjet/httpjet.toml serve</code>
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · See the <code>hj-lsapi</code> crate in the repo.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>

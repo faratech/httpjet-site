@@ -5,9 +5,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Page cache — httpjet docs</title>
-<meta name="description" content="httpjet's opt-in origin page cache: native X-HttpJet headers, compatibility aliases when selected, original-URI keying, private variants, tag purge, file storage, and optional dictionaries.">
+<meta name="description" content="httpjet's opt-in origin page cache: the LSCache-compatible X-LiteSpeed-* protocol, original-URI keying, private variants, tag purge, file storage, and optional dictionaries.">
 <meta property="og:title" content="httpjet — Page cache">
-<meta property="og:description" content="An opt-in origin page cache: native headers, original-URI keying, identity guards, tag purge, private variants, file storage, and dictionaries.">
+<meta property="og:description" content="An opt-in origin page cache: LSCache-compatible headers, original-URI keying, identity guards, tag purge, private variants, file storage, and dictionaries.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -18,13 +18,13 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="httpjet — Page cache">
-<meta name="twitter:description" content="An opt-in origin page cache: native headers, original-URI keying, identity guards, tag purge, private variants, file storage, and dictionaries.">
+<meta name="twitter:description" content="An opt-in origin page cache: LSCache-compatible headers, original-URI keying, identity guards, tag purge, private variants, file storage, and dictionaries.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/docs/page-cache.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -42,54 +42,60 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>Page cache</p>
     <p class="eyebrow">Internals</p>
     <h1>The origin page cache</h1>
-    <p class="lede">An opt-in full-response origin cache. A cache <strong>hit</strong> returns the application-marked response without touching its backend. Native applications use <code>X-HttpJet-*</code> headers; a LiteSpeed compatibility profile can enable legacy aliases during a migration.</p>
+    <p class="lede">An opt-in full-response origin cache. A cache <strong>hit</strong> returns the application-marked response without touching its backend. Applications opt in with the LiteSpeed cache protocol — <code>X-LiteSpeed-Cache-Control</code>, <code>X-LiteSpeed-Tag</code>, <code>X-LiteSpeed-Vary</code> — the same headers LSCache already speaks, so a site tuned for LiteSpeed's cache needs no application changes.</p>
 
     <div class="rail locator" role="img" aria-label="This page covers the cache lookup and store stages of the request pipeline."><div class="rail__track"><span class="stage"><span class="k">resolve</span></span><span class="stage"><span class="k">acl</span></span><span class="stage"><span class="k">rewrite</span></span><span class="stage on"><span class="k">cache</span></span><span class="stage"><span class="k">dispatch</span></span><span class="stage"><span class="k">finalize</span></span><span class="stage on"><span class="k">store</span></span></div></div>
 
     <section>
       <h2 id="overview">Overview</h2>
       <p>For cacheable application responses, the cache replaces an expensive render or upstream round trip with a memory or file-tier serve. It is disabled by default and should be enabled only after application-specific correctness checks.</p>
-      <p>Two crates split the work. The transport-agnostic store is <code>hj-pagecache</code> — a sharded page store with byte-weighted LRU eviction, tag/vary indexes, TTLs, and native cache protocol support. Store admission is separate: the binary's <code>lscache</code> glue records cacheable lookups in a fixed-memory frequency sketch and only stores keys that show reuse. <code>cache_lookup</code> runs <em>before</em> any backend; <code>cache_store</code> runs after terminal responses. The apparatus is inert when <code>runtime.page_cache.enabled</code> is false. See <a href="architecture.html#pipeline">the request pipeline</a> for the seams.</p>
+      <p>Two crates split the work. The transport-agnostic store is <code>hj-pagecache</code> — a sharded page store with byte-weighted LRU eviction, tag/vary indexes, TTLs, and the LSCache cache-protocol classifier. Store admission is separate: the binary's <code>lscache</code> glue records cacheable lookups in a fixed-memory frequency sketch and only stores keys that show reuse. <code>cache_lookup</code> runs <em>before</em> any backend; <code>cache_store</code> runs after terminal responses. The apparatus is inert unless <code>serve</code> runs with <code>--page-cache</code>. See <a href="architecture.html#pipeline">the request pipeline</a> for the seams.</p>
       <div class="chips">
-        <span class="chip"><span class="dot"></span>Native <code>X-HttpJet-*</code> protocol</span>
+        <span class="chip"><span class="dot"></span><code>X-LiteSpeed-*</code> protocol</span>
         <span class="chip"><span class="dot"></span>Sharded page store · frequency admission</span>
         <span class="chip"><span class="dot"></span>Keyed by the original URI</span>
         <span class="chip"><span class="dot"></span>Identity-guarded · never wrong content</span>
-        <span class="chip"><span class="dot"></span>Tag purge · cross-node fan-out</span>
+        <span class="chip"><span class="dot"></span>Tag purge · loopback endpoint</span>
         <span class="chip"><span class="dot"></span>Optional file tier · per-vhost dictionaries</span>
       </div>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Correctness first</span><p>Benchmark figures are workload-specific. Before tuning memory budgets or compression, verify that distinct URLs, hosts, schemes, sessions, and purge tags cannot cross-contaminate.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Not to be confused with the fast-path memo</span><p>Static files have a separate, default-on per-worker <em>finished-response memo</em> (1&nbsp;s TTL, 64&nbsp;MiB/worker) that sits even further up the pipeline — see <a href="performance.html#framing">Performance</a>. It serves only cookieless GETs of unmodified static bodies, never page-cache entries, and is disabled with <code>--no-fast-memo</code>.</p></div></div>
     </section>
 
     <section>
       <h2 id="opt-in">Opt-in by the app</h2>
-      <p>The cache never guesses. A response is cached <em>only</em> when the application explicitly opts it in with <code>X-HttpJet-Cache-Control</code>. With no accepted cache-control header, the response is not cached. A page goes public with <code>public,max-age=N</code>; a configured session-keyed tier can accept <code>private,max-age=N</code>.</p>
+      <p>The cache never guesses. A response is cached <em>only</em> when the application explicitly opts it in with <code>X-LiteSpeed-Cache-Control</code>. With no accepted cache-control header, the response is not cached. A page goes public with <code>public,max-age=N</code>; a configured session-keyed tier can accept <code>private,max-age=N</code>. Per-request cache policy can also be tightened from the XML by a context <code>cachePolicy</code> (the six LSWS gates plus <code>microCache5xx</code>), which httpjet enforces on both the public and private tiers.</p>
       <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>app → httpjet</b> · the cache control header</span></div>
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>app → httpjet</b> · the cache protocol headers</span></div>
         <pre><code><span class="t-c">// public page, cacheable for an hour</span>
-X-HttpJet-Cache-Control: <span class="t-s">public,max-age=3600</span>
+X-LiteSpeed-Cache-Control: <span class="t-s">public,max-age=3600</span>
 
 <span class="t-c">// per-session page (private tier)</span>
-X-HttpJet-Cache-Control: <span class="t-s">private,max-age=120</span>
+X-LiteSpeed-Cache-Control: <span class="t-s">private,max-age=120</span>
+
+<span class="t-c">// vary the public entry on a cookie value</span>
+X-LiteSpeed-Vary: <span class="t-s">cookie=xf_style_variation</span>
 
 <span class="t-c">// drop every entry carrying this tag</span>
-X-HttpJet-Purge: <span class="t-s">tag=article-1234</span></code></pre>
+X-LiteSpeed-Purge: <span class="t-s">article-1234</span></code></pre>
       </div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Default is off</span><p>The cache is opt-in twice over: <code>runtime.page_cache.enabled</code> must be true and the application must emit an accepted cache-control header. There is no implicit caching or heuristic freshness.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Backends can't self-purge</span><p>A reverse-proxied upstream may no longer assert <code>X-LiteSpeed-Purge</code>, <code>-Cache-Control</code>, or <code>-Vary</code> — those headers are stripped from proxied responses, so a remote backend cannot inject cache policy or invalidate entries. Only the application behind LSAPI/PHP (and trusted local callers of the purge endpoint) shape cache behavior.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Default is off</span><p>The cache is opt-in twice over: <code>serve --page-cache</code> must be set and the application must emit an accepted cache-control header. There is no implicit caching or heuristic freshness. A small set of vhosts can alternatively be opted in through standard <code>Cache-Control: public, max-age=N</code> with <code>--page-cache-standard-vhosts</code>.</p></div></div>
     </section>
 
     <section>
       <h2 id="index">The in-RAM index &amp; admission</h2>
-      <p>The index is a sharded in-RAM page store bounded by <code>runtime.page_cache.memory_bytes</code> (default 128&nbsp;MiB). Entries are charged for resident metadata, standard variants, and any body bytes still in RAM; with a file tier on, file-backed bodies are charged metadata-only against this budget. Eviction is byte-weighted LRU inside the store's shards, so large resident entries cost proportionally more of the budget.</p>
-      <p>Admission uses a fixed-memory frequency sketch governed by <code>runtime.page_cache.admission_threshold</code> (default <code>2</code>). An entry must clear a reuse bar before it is allowed to occupy the store — at the default, a URL is stored on its second sighting, so the third request is the first possible hit. Size-weighting raises the bar further for large bodies. A flood of unique URLs cannot evict the working set, because none earns admission in the first place.</p>
+      <p>The index is a sharded in-RAM page store bounded by <code>--page-cache-mem</code> (default 128&nbsp;MiB). Entries are charged for resident metadata, standard variants, and any body bytes still in RAM; with a file tier on, file-backed bodies are charged metadata-only against this budget. Eviction is byte-weighted LRU inside the store's shards, so large resident entries cost proportionally more of the budget.</p>
+      <p>Admission uses a fixed-memory frequency sketch governed by <code>--page-cache-admit-threshold</code> (default <code>2</code>). An entry must clear a reuse bar before it is allowed to occupy the store — at the default, a URL is stored on its second sighting, so the third request is the first possible hit. Size-weighting raises the bar further for large bodies. A flood of unique URLs cannot evict the working set, because none earns admission in the first place.</p>
       <div class="tablewrap">
         <table>
-          <thead><tr><th>Knob</th><th>Default</th><th>What it bounds</th></tr></thead>
+          <thead><tr><th>Flag</th><th>Default</th><th>What it bounds</th></tr></thead>
           <tbody>
-            <tr><td><code>memory_bytes</code></td><td>128&nbsp;MiB</td><td>The page-store RAM budget: metadata, variants, and in-RAM bodies.</td></tr>
-            <tr><td><code>admission_threshold</code></td><td>2</td><td>Frequency-sketch store-admission bar; <code>1</code> = store on first sight.</td></tr>
-            <tr><td><code>disk_memory_bytes</code></td><td>2&nbsp;GiB</td><td>File-tier footprint budget (file tier only); a disk-weight LRU budget. A tmpfs path consumes RAM.</td></tr>
-            <tr><td><code>hot_memory_bytes</code></td><td>192&nbsp;MiB</td><td>In-RAM hot tier fronting the file store.</td></tr>
+            <tr><td><code>--page-cache-mem</code></td><td>128&nbsp;MiB</td><td>The page-store RAM budget: metadata, variants, and in-RAM bodies.</td></tr>
+            <tr><td><code>--page-cache-admit-threshold</code></td><td>2</td><td>Frequency-sketch store-admission bar; <code>1</code> = store on first sight.</td></tr>
+            <tr><td><code>--page-cache-disk-mem</code></td><td>2&nbsp;GiB</td><td>File-tier footprint budget (file tier only); a disk-weight LRU budget. A tmpfs path consumes RAM.</td></tr>
+            <tr><td><code>--page-cache-hot-mem</code></td><td>192&nbsp;MiB</td><td>In-RAM hot tier fronting the file store.</td></tr>
+            <tr><td><code>--page-cache-store-path</code></td><td><em>none</em></td><td>Enables the file tier at this directory (tmpfs recommended). The XML <code>cacheStorePath</code> is deliberately unused.</td></tr>
           </tbody>
         </table>
       </div>
@@ -105,7 +111,7 @@ X-HttpJet-Purge: <span class="t-s">tag=article-1234</span></code></pre>
     <section>
       <h2 id="vary">Vary, cookies &amp; the private tier</h2>
       <p>Public entries may vary on explicitly configured cookie values. Before a public response is stored, <code>Set-Cookie</code> and both cache-header families are <strong>stripped</strong> from the stored copy — a public entry must never replay another visitor's session state. Applications should mark personalized routes uncacheable unless they deliberately use the private tier.</p>
-      <p>The <strong>private (per-session) tier</strong> is explicit policy, not authentication. A request carrying the configured logged-in marker cookie routes to a session-keyed private entry and never reads public entries; the application remains the authentication authority. The app opts the response in with <code>X-HttpJet-Cache-Control: private,max-age=N</code>.</p>
+      <p>The <strong>private (per-session) tier</strong> is explicit policy, not authentication. A request carrying the configured logged-in marker cookie routes to a session-keyed private entry and never reads public entries; the application remains the authentication authority. The app opts the response in with <code>X-LiteSpeed-Cache-Control: private,max-age=N</code>. Vary cookie names and the private marker cookies ship with XenForo-shaped defaults (<code>--page-cache-vary-cookies</code>, <code>--page-cache-private-cookies</code>) and are configurable.</p>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Tier</th><th>Opted in by</th><th>Keyed by</th><th>Cookie posture</th></tr></thead>
@@ -119,18 +125,17 @@ X-HttpJet-Purge: <span class="t-s">tag=article-1234</span></code></pre>
     </section>
 
     <section>
-      <h2 id="purge">Tag purge &amp; cross-node coherence</h2>
-      <p>Invalidation is tag-based rather than per-URL. When the app mutates content it emits <code>X-HttpJet-Purge: tag=name</code>, and every entry carrying that tag is dropped. A wildcard (<code>*</code>) purges everything. The compatibility profile can enable the legacy LiteSpeed alias.</p>
-      <p>In a cluster, purges fan out to configured peers. Required peer mode uses two independent controls: the raw source IP must be configured and the request must carry a fresh HMAC-SHA256 signature. File-tier purges unlink body files eagerly and retain a purge-all stamp so old data cannot be resurrected on a service restart.</p>
+      <h2 id="purge">Tag purge &amp; the loopback endpoint</h2>
+      <p>Invalidation is tag-based rather than per-URL. When the app mutates content it emits <code>X-LiteSpeed-Purge: tag-name</code>, and every entry carrying that tag is dropped; a wildcard (<code>*</code>) purges everything. A purge may also be driven externally by <code>POST</code>ing to the reserved loopback endpoint — useful from deploy scripts and admin tooling:</p>
       <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>purge</b> · loopback / peer-gated endpoint</span></div>
-        <pre><code><span class="t-c"># tag purge (also fans out when cluster peers are configured)</span>
-curl -s -X POST -H <span class="t-s">'x-httpjet-purge: tag=article-1234'</span> http://127.0.0.1/__hj_cache_purge
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>purge</b> · loopback-only endpoint</span></div>
+        <pre><code><span class="t-c"># tag purge</span>
+curl -s -X POST -H <span class="t-s">'x-litespeed-purge: article-1234'</span> http://127.0.0.1/__hj_cache_purge
 
 <span class="t-c"># purge everything</span>
-curl -s -X POST -H <span class="t-s">'x-httpjet-purge: *'</span> http://127.0.0.1/__hj_cache_purge</code></pre>
+curl -s -X POST -H <span class="t-s">'x-litespeed-purge: *'</span> http://127.0.0.1/__hj_cache_purge</code></pre>
       </div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Peer authentication</span><p>Loopback operations are local. Non-loopback peer purges in required mode must satisfy both the configured source-IP allow-list and HMAC authentication; peer authorization never creates a TLS client-auth exemption.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Single-node by design</span><p>The reserved endpoints (<code>/__hj_cache_purge</code>, <code>-_get</code>, <code>-_ready</code>) are loopback-scoped; the experimental cross-node peer fan-out machinery was removed in August 2026 after proving unnecessary for a single-node deployment. Run purge from the node itself (or through a local admin hop). File-tier purges unlink body files eagerly and retain a purge-all stamp so old data cannot be resurrected on a service restart.</p></div></div>
     </section>
 
     <section>
@@ -142,33 +147,33 @@ curl -s -X POST -H <span class="t-s">'x-httpjet-purge: *'</span> http://127.0.0.
 
     <section>
       <h2 id="compression">Internal compression</h2>
-      <p>Stored bodies can be dict-compressed against a zstd dictionary. Configure a global fallback with <code>runtime.page_cache.dictionary</code> or a dedicated file per vhost with <code>vhost_dictionaries</code>; the latter is usually more effective because each site has different common markup. Compression is scheduled after store, outside the client response path. This is purely an internal storage optimization — served bytes stay standard zstd/br/gzip or identity. A <code>dict_gen</code> field ties each stored body to the dictionary generation that decodes it, so a mismatch degrades to a miss rather than risk serving undecodable bytes.</p>
+      <p>Stored bodies can be dict-compressed against a zstd dictionary. Configure a global fallback with <code>--page-cache-dict</code> or a dedicated file per vhost with <code>--page-cache-dict-vhost vhost=path</code>; the latter is usually more effective because each site has different common markup. Compression is scheduled after store, outside the client response path. This is purely an internal storage optimization — served bytes stay standard zstd/br/gzip or identity. A <code>dict_gen</code> field ties each stored body to the dictionary generation that decodes it, so a mismatch degrades to a miss rather than risk serving undecodable bytes.</p>
       <p>To avoid storing one copy per encoding, the cache keeps <strong>one best variant</strong> chosen by the request's <code>Accept-Encoding</code>, using server priority <code>zstd&nbsp;&gt;&nbsp;br&nbsp;&gt;&nbsp;gzip</code>. A client whose accepted set doesn't match the stored variant falls back to a per-serve compress of the identity form. The mechanics of the negotiation itself live in <a href="compression.html">Compression</a>.</p>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Dictionary lifecycle</span><p>Dictionaries are optional and must be trained from representative public, logged-out content for one vhost. They can retain source fragments, so never train from private pages. Rotation requires a full service restart; SIGHUP retains the loaded dictionary registry.</p></div></div>
     </section>
 
     <section>
       <h2 id="file-tier">The file tier</h2>
-      <p>By default the cache is in-RAM only and flushes on restart. Set <code>runtime.page_cache.store_path</code> to a directory to offload bodies into self-describing files at birth, off the process heap. The directory may be tmpfs or durable storage. A background boot scan rebuilds the index after a service restart; a host reboot clears a tmpfs tier but not a durable filesystem.</p>
+      <p>By default the cache is in-RAM only and flushes on restart. Set <code>--page-cache-store-path</code> to a directory to offload bodies into self-describing files at birth, off the process heap. The directory may be tmpfs or durable storage. A background boot scan rebuilds the index after a service restart; a host reboot clears a tmpfs tier but not a durable filesystem.</p>
       <figure class="figure">
   <svg viewBox="0 0 880 384" role="img" aria-label="Page-cache tiers: a request hits the in-RAM page-store index; on a hit the body resolves from the hot RAM tier then the configured file tier.">
     <defs><linearGradient id="brandgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".5" stop-color="#818cf8"/><stop offset="1" stop-color="#e879f9"/></linearGradient><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2c3856"/></marker></defs>
     <g><rect class="node-box" x="330" y="16" width="220" height="36" rx="9"/><text class="node-t" x="440" y="38" text-anchor="middle">GET /thread/…</text></g>
     <path class="edge" d="M440,52 L440,84" marker-end="url(#ar)"/>
     <g><rect class="node-core" x="150" y="86" width="580" height="52" rx="10"/><text class="node-t" x="440" y="107" text-anchor="middle" fill="#fff">page store — in-RAM</text><text class="node-d" x="440" y="123" text-anchor="middle">key = ORIGINAL URI + identity guard · public ∥ private keyspaces</text></g>
-    <text class="node-d" x="150" y="78" font-size="9.5">cap: memory_bytes</text>
+    <text class="node-d" x="150" y="78" font-size="9.5">cap: --page-cache-mem</text>
     <path class="edge-b" d="M440,138 L440,176"/><text class="node-d" x="448" y="162">hit</text>
     <g><rect class="node-box" x="150" y="178" width="580" height="44" rx="10"/><text class="node-t" x="440" y="197" text-anchor="middle">hot RAM tier</text><text class="node-d" x="440" y="211" text-anchor="middle">hottest bodies serve zero-syscall, zero-copy</text></g>
-    <text class="node-d" x="150" y="170" font-size="9.5">cap: hot_memory_bytes</text>
+    <text class="node-d" x="150" y="170" font-size="9.5">cap: --page-cache-hot-mem</text>
     <path class="edge" d="M440,222 L440,256" marker-end="url(#ar)"/><text class="node-d" x="448" y="242">cold</text>
     <g><rect class="node-box" x="150" y="258" width="580" height="52" rx="10"/><text class="node-t" x="440" y="278" text-anchor="middle">file tier</text><text class="node-d" x="440" y="293" text-anchor="middle">body off-heap · optional dict compression · survives service restart</text></g>
-    <text class="node-d" x="150" y="250" font-size="9.5">cap: disk_memory_bytes</text>
+    <text class="node-d" x="150" y="250" font-size="9.5">cap: --page-cache-disk-mem</text>
     <path class="edge" d="M440,310 L440,344" marker-end="url(#ar)"/>
     <g><rect x="320" y="344" width="240" height="34" rx="9" fill="#13203a" stroke="url(#brandgrad)" stroke-width="1.6"/><text class="node-t" x="440" y="365" text-anchor="middle" fill="#fff">serve hit — microseconds</text></g>
   </svg>
-  <figcaption>The dual-cap tier model: the in-RAM page-store index (bounded by <code>memory_bytes</code>) keys by the original URI; a hit resolves the body from the hot RAM tier, then the file tier (bounded by <code>disk_memory_bytes</code>).</figcaption>
+  <figcaption>The dual-cap tier model: the in-RAM page-store index (bounded by <code>--page-cache-mem</code>) keys by the original URI; a hit resolves the body from the hot RAM tier, then the file tier (bounded by <code>--page-cache-disk-mem</code>).</figcaption>
 </figure>
-      <p>The file tier runs a <strong>dual-cap</strong> budget. <code>memory_bytes</code> bounds the in-RAM index (file-backed bodies charge metadata-only there), while <code>disk_memory_bytes</code> bounds file footprint through a disk-weight LRU. A served hit bumps file recency; eviction tears the whole entry down through one path. <code>hot_memory_bytes</code> fronts the store so the hottest bodies serve zero-syscall while a cold hit reads the file.</p>
+      <p>The file tier runs a <strong>dual-cap</strong> budget. <code>--page-cache-mem</code> bounds the in-RAM index (file-backed bodies charge metadata-only there), while <code>--page-cache-disk-mem</code> bounds file footprint through a disk-weight LRU. A served hit bumps file recency; eviction tears the whole entry down through one path. <code>--page-cache-hot-mem</code> fronts the store so the hottest bodies serve zero-syscall while a cold hit reads the file.</p>
       <div class="chips">
         <span class="chip"><span class="dot"></span>optional file storage · bodies off the heap</span>
         <span class="chip"><span class="dot"></span>Survives restarts (boot scan)</span>
@@ -180,31 +185,30 @@ curl -s -X POST -H <span class="t-s">'x-httpjet-purge: *'</span> http://127.0.0.
     <section>
       <h2 id="resilience">Stale-if-error &amp; single-flight</h2>
       <p>Two mechanisms keep the cache useful under load and under failure.</p>
-      <p><strong>Stale-if-error.</strong> When the backend returns a <code>5xx</code> for a cacheable public GET, the cache can serve a retained stale entry instead of the error page. App-declared windows are bounded by native stale-if-error policy, which can also provide a fallback window. The response is marked <code>X-HttpJet-Cache: hit,stale-if-error</code> and <code>Cache-Status</code>; compatibility aliases are optional.</p>
-      <p><strong>Stale-while-revalidate.</strong> App-declared stale windows are bounded by native stale policy. Standard <code>Cache-Control</code> can opt explicitly selected vhosts into origin caching through <code>runtime.page_cache.standard_vhosts</code>.</p>
+      <p><strong>Stale-if-error.</strong> When the backend returns a <code>5xx</code> for a cacheable public GET, the cache can serve a retained stale entry instead of the error page. App-declared windows are bounded by the <code>--page-cache-stale-if-error-*</code> policy flags, which can also provide a fallback window when the app declares none. The served header is marked <code>x-litespeed-cache: hit</code> with the stale provenance noted in the metrics.</p>
+      <p><strong>Stale-while-revalidate.</strong> App-declared stale windows are bounded by the <code>--page-cache-stale-*</code> flags. Standard <code>Cache-Control</code> can opt explicitly selected vhosts into origin caching through <code>--page-cache-standard-vhosts</code>.</p>
       <p><strong>Single-flight.</strong> Concurrent misses of the same key collapse onto a single leader via a <code>Notify</code>. A stampede of requests for an uncacheable-or-slow page therefore hits the backend <em>once</em> rather than all at once — the followers wait on the leader's result instead of each launching their own render. (Registering on the leader's <code>Notify</code> before the pre-wait lookup is what closed a lost-wakeup collapse that had serialized misses one-at-a-time under concurrency.)</p>
     </section>
 
     <section>
       <h2 id="observing">Observing the cache</h2>
-      <p>Native cache responses carry <code>X-HttpJet-Cache</code> and standard <code>Cache-Status</code>. Two <code>curl</code>s against a loopback instance make the lifecycle visible — the first stores, the second hits:</p>
+      <p>Cache-egress responses carry the <code>x-litespeed-cache</code> status header. Two <code>curl</code>s against a loopback instance make the lifecycle visible — the first stores, the second hits:</p>
       <div class="codeframe">
-        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>observe</b> · native cache headers</span></div>
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>observe</b> · cache status header</span></div>
         <pre><code><span class="t-c"># first request: ran the backend, stored the result</span>
-$ curl -I -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/ | grep -Ei 'x-httpjet-cache|cache-status'
-X-HttpJet-Cache: <span class="t-f">miss</span>
+$ curl -I -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/ | grep -i x-litespeed-cache
+x-litespeed-cache: <span class="t-f">miss</span>
 
 <span class="t-c"># second request: served from cache, no PHP touched</span>
-$ curl -I -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/ | grep -Ei 'x-httpjet-cache|cache-status'
-X-HttpJet-Cache: <span class="t-f">hit</span></code></pre>
+$ curl -I -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/ | grep -i x-litespeed-cache
+x-litespeed-cache: <span class="t-f">hit</span></code></pre>
       </div>
       <div class="tablewrap">
         <table>
-          <thead><tr><th><code>X-HttpJet-Cache</code></th><th>Meaning</th></tr></thead>
+          <thead><tr><th><code>x-litespeed-cache</code></th><th>Meaning</th></tr></thead>
           <tbody>
             <tr><td><code>hit</code></td><td>Served from cache — the backend was not touched.</td></tr>
             <tr><td><code>miss</code></td><td>The cache ran but didn't have the entry; the response was just stored.</td></tr>
-            <tr><td><code>hit,stale-if-error</code></td><td>Backend 5xx; the retained stale entry was served (no-store egress).</td></tr>
             <tr><td><em>(absent)</em></td><td>Not cached — the app didn't opt the page in.</td></tr>
           </tbody>
         </table>
@@ -220,12 +224,12 @@ X-HttpJet-Cache: <span class="t-f">hit</span></code></pre>
     </section>
 
     <nav class="pager" aria-label="Pagination">
-      <a class="prev" href="rewrite.html"><div class="dir">← Prev</div><div class="ttl">Rewrite engine</div></a>
+      <a class="prev" href="security.html"><div class="dir">← Prev</div><div class="ttl">Security &amp; access control</div></a>
       <a class="next" href="compression.html"><div class="dir">Next →</div><div class="ttl">Compression</div></a>
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · The store lives in <code>hj-pagecache</code>; the <code>ReqCtx</code> seams (<code>cache_lookup</code> / <code>cache_store</code>) are the binary's <code>lscache</code> module.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>

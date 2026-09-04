@@ -5,9 +5,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Architecture — httpjet docs</title>
-<meta name="description" content="httpjet's workspace: one binary over fourteen hj-* library crates, the frozen hj-core contract, pure io_uring transport paths, and the request pipeline that mirrors OpenLiteSpeed's dispatch order.">
+<meta name="description" content="httpjet's workspace: one binary over fifteen hj-* library crates, the frozen hj-core contract, pure io_uring transport paths, and the request pipeline that mirrors OpenLiteSpeed's dispatch order.">
 <meta property="og:title" content="httpjet — Architecture">
-<meta property="og:description" content="15 crates, the frozen hj-core contract, and the request pipeline.">
+<meta property="og:description" content="16 crates, the frozen hj-core contract, and the request pipeline.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -18,13 +18,13 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="httpjet — Architecture">
-<meta name="twitter:description" content="15 crates, the frozen hj-core contract, and the request pipeline.">
+<meta name="twitter:description" content="16 crates, the frozen hj-core contract, and the request pipeline.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/docs/architecture.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -42,22 +42,22 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>Architecture</p>
     <p class="eyebrow">Guide</p>
     <h1>Architecture</h1>
-    <p class="lede">httpjet is a Cargo workspace: <strong>one binary crate</strong> (<code>httpjet</code>) over <strong>fourteen <code>hj-*</code> library crates</strong>. The graph is acyclic, with <code>hj-config</code> at the root and <code>hj-core</code> as the seam every handler programs against. More than 1,300 test functions span the 15 crates.</p>
+    <p class="lede">httpjet is a Cargo workspace: <strong>one binary crate</strong> (<code>httpjet</code>) over <strong>fifteen <code>hj-*</code> library crates</strong>. The graph is acyclic, with <code>hj-config</code> at the root and <code>hj-core</code> as the seam every handler programs against. Roughly 1,500 test functions span the 16 crates.</p>
 
     <section>
       <h2 id="workspace">Workspace shape</h2>
-      <p>Responsibilities are split so the contract a handler depends on (<code>hj-core</code>) is small and frozen, while transports, protocols, and the cache evolve independently behind it. Three libraries are deliberately isolated from the rest — they take no <code>hj-*</code> dependencies so their logic stays portable.</p>
+      <p>Responsibilities are split so the contract a handler depends on (<code>hj-core</code>) is small and frozen, while transports, protocols, and the cache evolve independently behind it. Four libraries are deliberately isolated from the rest — <code>hj-pagecache</code>, <code>hj-rewrite</code>, <code>hj-log</code>, and <code>hj-geo</code> take no <code>hj-*</code> dependencies so their logic stays portable.</p>
       <div class="chips">
-        <span class="chip"><span class="dot"></span>1 binary + 14 libraries</span>
-        <span class="chip"><span class="dot"></span>Rust 1.96 · edition 2021</span>
+        <span class="chip"><span class="dot"></span>1 binary + 15 libraries</span>
+        <span class="chip"><span class="dot"></span>Rust 1.97+ MSRV · edition 2024</span>
         <span class="chip"><span class="dot"></span>Acyclic dependency graph</span>
-        <span class="chip"><span class="dot"></span>&gt;1,300 test functions across 15 crates</span>
+        <span class="chip"><span class="dot"></span>≈1,500 test functions across 16 crates</span>
       </div>
     </section>
 
     <section>
       <h2 id="dag">Crate dependency graph</h2>
-      <p><code>hj-config</code> resolves strict native TOML or LiteSpeed XML compatibility input into one normalized model; <code>hj-core</code> re-exports it so every downstream crate imports the configuration model <em>through</em> core. The binary is the only crate that sees everything.</p>
+      <p><code>hj-config</code> parses the LiteSpeed-compatible XML tree into one normalized model; <code>hj-core</code> re-exports it so every downstream crate imports the configuration model <em>through</em> core. The binary is the only crate that sees everything.</p>
       <figure class="figure">
         <svg viewBox="0 0 880 520" role="img" aria-label="Crate dependency graph: hj-config feeds hj-core, which feeds the handler and transport crates and the isolated libraries, all converging on the httpjet binary.">
           <defs>
@@ -78,7 +78,7 @@
           <!-- hj-config -->
           <g><rect class="node-box" x="360" y="34" width="160" height="38" rx="9"/>
             <text class="node-t" x="440" y="51" text-anchor="middle">hj-config</text>
-            <text class="node-d" x="440" y="64" text-anchor="middle">TOML / XML → model</text></g>
+            <text class="node-d" x="440" y="64" text-anchor="middle">XML tree → model</text></g>
 
           <!-- hj-core seam -->
           <g><rect class="node-core" x="300" y="110" width="280" height="40" rx="9"/>
@@ -98,24 +98,28 @@
             <text x="596" y="240">hj-acl</text>
           </g>
 
-          <!-- hj-http shared config -->
+          <!-- hj-http shared config + hj-cache -->
           <g><rect class="node-box" x="60" y="300" width="130" height="38" rx="9"/>
             <text class="node-t" x="125" y="317" text-anchor="middle">hj-http</text>
             <text class="node-d" x="125" y="330" text-anchor="middle">ServeConfig</text></g>
+          <g><rect class="node-box" x="240" y="300" width="130" height="38" rx="9"/>
+            <text class="node-t" x="305" y="317" text-anchor="middle">hj-cache</text>
+            <text class="node-d" x="305" y="330" text-anchor="middle">sharded LRU</text></g>
 
           <!-- isolated -->
-          <g><rect class="node-box" x="700" y="200" width="150" height="100" rx="10"/>
-            <text class="node-d" x="775" y="222" text-anchor="middle" fill="#8b95ad">isolated (no hj-* deps)</text>
-            <text class="node-t" x="775" y="246" text-anchor="middle" font-size="11.5">hj-pagecache</text>
-            <text class="node-t" x="775" y="266" text-anchor="middle" font-size="11.5">hj-rewrite</text>
-            <text class="node-t" x="775" y="286" text-anchor="middle" font-size="11.5">hj-log</text></g>
+          <g><rect class="node-box" x="700" y="192" width="150" height="128" rx="10"/>
+            <text class="node-d" x="775" y="212" text-anchor="middle" fill="#8b95ad">isolated (no hj-* deps)</text>
+            <text class="node-t" x="775" y="234" text-anchor="middle" font-size="11.5">hj-pagecache</text>
+            <text class="node-t" x="775" y="254" text-anchor="middle" font-size="11.5">hj-rewrite</text>
+            <text class="node-t" x="775" y="274" text-anchor="middle" font-size="11.5">hj-log</text>
+            <text class="node-t" x="775" y="294" text-anchor="middle" font-size="11.5">hj-geo</text></g>
 
           <!-- httpjet binary -->
           <g><rect x="300" y="432" width="280" height="48" rx="10" fill="#13203a" stroke="url(#brandgrad)" stroke-width="1.6"/>
             <text class="node-t" x="440" y="452" text-anchor="middle" fill="#fff" font-size="13">httpjet</text>
             <text class="node-d" x="440" y="467" text-anchor="middle">binding · accept loops · request pipeline</text></g>
         </svg>
-        <figcaption>hj-config → hj-core → handlers/transports → the httpjet binary. The isolated trio (page cache, rewrite, log) stays dependency-free and converges at the binary. <code>hj-cache</code> (static-file I/O accel) sits beside core.</figcaption>
+        <figcaption>hj-config → hj-core → handlers/transports → the httpjet binary. The isolated crates (page cache, rewrite, log, geo) stay dependency-free and converge at the binary; <code>hj-cache</code> (sharded LRU primitive) and <code>hj-http</code> (ServeConfig) sit beside core.</figcaption>
       </figure>
     </section>
 
@@ -125,20 +129,21 @@
         <table>
           <thead><tr><th>Crate</th><th>Role</th></tr></thead>
           <tbody>
-            <tr><td><span class="crate">hj-core</span></td><td>Protocol-agnostic request/response types, <code>ReqCtx</code>, the vhost router, shared helpers — the seam every handler programs against.</td></tr>
-            <tr><td><span class="crate">hj-config</span></td><td>Strict native TOML plus LiteSpeed XML compatibility, resolved into one normalized model.</td></tr>
+            <tr><td><span class="crate">hj-core</span></td><td>Protocol-agnostic request/response types, <code>ReqCtx</code>, the vhost router, and shared budgets (<code>BodyBufferBudget</code>, <code>BandwidthThrottle</code>) — the seam every handler programs against.</td></tr>
+            <tr><td><span class="crate">hj-config</span></td><td>The LiteSpeed-compatible XML parser, resolved into one normalized model with OLS-faithful value semantics and fail-closed defaults.</td></tr>
             <tr><td><span class="crate">hj-tls</span></td><td>One unified rustls <code>ServerConfig</code> for TCP + QUIC; SNI resolver and optional mTLS verifier.</td></tr>
             <tr><td><span class="crate">hj-http</span></td><td>Protocol-agnostic <code>ServeConfig</code> connection tuning shared by the io_uring transports; the old hyper-H1 and quinn-H3 adapters are gone.</td></tr>
             <tr><td><span class="crate">hj-h2</span></td><td>httpjet's <strong>native HTTP/2 server</strong> — single-task multiplexing, send flow control, streaming bodies, vectored writes, with a zero-allocation HPACK codec.</td></tr>
-            <tr><td><span class="crate">hj-lsapi</span></td><td>Native LSAPI wire codec + <code>lsphp</code> process supervisor + CGI env builder.</td></tr>
-            <tr><td><span class="crate">hj-static</span></td><td>Static file serving — ranges, conditional requests, traversal-safe resolution.</td></tr>
-            <tr><td><span class="crate">hj-cache</span></td><td>Two-tier file cache (memory + mmap) for <em>static</em> responses.</td></tr>
+            <tr><td><span class="crate">hj-lsapi</span></td><td>Native LSAPI wire codec + <code>lsphp</code> process supervisor + CGI env builder, with generation-aware external pools and stale-worker retirement.</td></tr>
+            <tr><td><span class="crate">hj-static</span></td><td>Static file serving — <code>openat2(RESOLVE_BENEATH)</code> traversal-safe resolution, ETag from <code>fileETag</code> bits, ranged + multipart responses, precompressed <code>.br</code>/<code>.gz</code> siblings.</td></tr>
+            <tr><td><span class="crate">hj-cache</span></td><td>The shared <code>ShardedCache</code> byte-weighted LRU primitive and <code>CacheCaps</code> sizing (the old mmap file cache was removed).</td></tr>
             <tr><td><span class="crate">hj-pagecache</span></td><td>The <strong>origin full-page cache</strong> (LSCache equivalent): bespoke sharded page store, byte-weighted LRU eviction, frequency-sketch admission, key + vary + tag-purge + the <code>X-LiteSpeed-*</code> protocol.</td></tr>
             <tr><td><span class="crate">hj-compress</span></td><td>Response compression (gzip + brotli + zstd) with server-priority negotiation bounded by the client's <code>Accept-Encoding</code>.</td></tr>
             <tr><td><span class="crate">hj-rewrite</span></td><td>Apache mod_rewrite / <code>.htaccess</code> engine. Uses <code>fancy-regex</code> (lookahead support).</td></tr>
-            <tr><td><span class="crate">hj-proxy</span></td><td>Reverse proxy, WebSocket relay, SSE streaming (no buffering).</td></tr>
-            <tr><td><span class="crate">hj-acl</span></td><td>Access control (allow/deny) + trusted-proxy / real-IP resolution.</td></tr>
-            <tr><td><span class="crate">hj-log</span></td><td>Non-blocking access + error logging.</td></tr>
+            <tr><td><span class="crate">hj-proxy</span></td><td>Reverse proxy, WebSocket relay, SSE streaming (no buffering), keep-alive pools, ordered multi-peer failover, h1/h2/h2s upstreams, upstream mTLS.</td></tr>
+            <tr><td><span class="crate">hj-acl</span></td><td>Access control (allow/deny + trusted-<code>T</code>), trusted-proxy / real-IP resolution and anti-spoofing, the per-client-IP throttle, and <code>GeoRules</code> (geo/ASN, fed by <code>hj-geo</code>).</td></tr>
+            <tr><td><span class="crate">hj-geo</span></td><td>Offline geo/ASN membership: CidrList text source and binary-search interval sets — no runtime fetches, operator-refreshed.</td></tr>
+            <tr><td><span class="crate">hj-log</span></td><td>Non-blocking access + error logging: common, combined, and JSON formats, size-rolling with day pruning, and an optional RFC 5424/3164 syslog tap.</td></tr>
             <tr><td><span class="crate">httpjet</span></td><td>The binary: listener binding, accept loops, request-pipeline orchestration.</td></tr>
           </tbody>
         </table>
@@ -173,7 +178,7 @@
 <span class="t-c">// every post-handler munger implements this</span>
 <span class="t-k">trait</span> <span class="t-f">ResponseTransform</span> { <span class="t-k">async fn</span> transform(&amp;<span class="t-k">self</span>, &amp;ReqCtx, &amp;<span class="t-k">mut</span> Response); }</code></pre>
       </div>
-      <p><code>ReqCtx</code> carries the per-request state: the <code>server</code>/<code>vhost</code> config (as <code>Arc</code>s), <code>peer_ip</code>/<code>client_ip</code> (post-XFF), <code>is_tls</code>, <code>protocol</code>, <code>trusted_proxy</code>, and an <code>env</code> vec (rewrite <code>[E=]</code> sets <em>and</em> CGI overrides). <code>Router::resolve(listener, key)</code> maps SNI/Host to a vhost.</p>
+      <p><code>ReqCtx</code> carries the per-request state: the <code>server</code>/<code>vhost</code> config (as <code>Arc</code>s), <code>peer_ip</code>/<code>client_ip</code> (post-XFF, or <code>peer_unix</code> for UDS listeners), <code>is_tls</code>, <code>protocol</code>, <code>trusted_proxy</code>, and an <code>env</code> vec (rewrite <code>[E=]</code> sets <em>and</em> CGI overrides). <code>Router::resolve(listener, key)</code> maps SNI/Host to a vhost.</p>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Why it's frozen</span><p>New terminal handlers <code>impl Handler</code> and register in the pipeline's <code>dispatch()</code>; new response munging <code>impl ResponseTransform</code> and is pushed into the transform list. Neither requires touching <code>handle()</code> — that's the whole point of keeping the seam small.</p></div></div>
     </section>
 
@@ -183,7 +188,7 @@
       <div class="rail" role="img" aria-label="Dispatch order: htaccess and rewrite, access enforcement, page-cache lookup, WebSocket, proxy, suffix routing, finalize, cache store.">
         <div class="rail__track">
           <span class="stage"><span class="k">resolve</span><span class="d">SNI/Host → vhost</span></span>
-          <span class="stage"><span class="k">acl</span><span class="d">mTLS · real-IP · deny</span></span>
+          <span class="stage"><span class="k">acl</span><span class="d">mTLS · real-IP · throttle · deny</span></span>
           <span class="stage"><span class="k">rewrite</span><span class="d">inline + .htaccess</span></span>
           <span class="stage on"><span class="k">cache</span><span class="d">lookup (short-circuits)</span></span>
           <span class="stage"><span class="k">dispatch</span><span class="d">ws · proxy · php · static</span></span>
@@ -193,7 +198,7 @@
       </div>
       <p>The terminals are intentionally <em>not</em> a uniform matcher registry: their predicates (request headers vs path vs script-path split), fall-through rules, and post-processing all differ, so an explicit <code>if/return</code> chain keeps the security-relevant ordering legible. Two fall-throughs matter: a proxy context that can't resolve its ext-processor falls through to static, while a script with no PHP pool hard-fails <code>503</code> and must <em>never</em> fall through — a source-disclosure guard.</p>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Load-bearing detail</span><p>A rewrite to <code>index.php</code> keeps the <strong>original</strong> <code>REQUEST_URI</code> (the resolved <code>SCRIPT_FILENAME</code> is pinned separately, with <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> pushed into <code>ctx.env</code>). That is what makes XenForo-style front-controller routing correct — and it is also why the page cache must key by the <em>original</em> URI, never the rewrite-resolved path.</p></div></div>
-      <p>The page-cache seams are inert unless <code>runtime.page_cache.enabled</code> is true (or the XML compatibility flag enables them): the lookup runs after rewrite/ACL resolve the path and env but <em>before</em> any backend, and the store runs after each terminal return. See the <a href="page-cache.html">page cache</a> for the full picture.</p>
+      <p>The page-cache seams are inert unless <code>serve</code> runs with <code>--page-cache</code>: the lookup runs after rewrite/ACL resolve the path and env but <em>before</em> any backend, and the store runs after each terminal return. See the <a href="page-cache.html">page cache</a> for the full picture.</p>
     </section>
 
     <nav class="pager" aria-label="Pagination">
@@ -202,7 +207,7 @@
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · See also <code>ARCHITECTURE.md</code> in the repo.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>

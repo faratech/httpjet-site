@@ -7,7 +7,7 @@
 <title>Operations — httpjet docs</title>
 <meta name="description" content="Operating httpjet safely: source installation, generic systemd units, strict configuration checks, optional LSAPI pooling, cache validation, and upgrade discipline.">
 <meta property="og:title" content="httpjet — Operations">
-<meta property="og:description" content="Generic systemd installation, strict TOML checks, optional PHP pooling, cache validation, and safe upgrades.">
+<meta property="og:description" content="Generic systemd installation with socket activation, PHP pooling, observability, and safe upgrades.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -18,13 +18,13 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="httpjet — Operations">
-<meta name="twitter:description" content="Generic systemd installation, strict TOML checks, optional PHP pooling, cache validation, and safe upgrades.">
+<meta name="twitter:description" content="Generic systemd installation with socket activation, PHP pooling, observability, and safe upgrades.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/docs/operations.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -41,77 +41,91 @@
     <p class="crumbs"><a href="./">Docs</a><span>/</span>Operations</p>
     <p class="eyebrow">Running it</p>
     <h1>Operations &amp; deployment</h1>
-    <p class="lede">httpjet is designed for a conventional Linux service deployment: a dedicated account, strict native TOML, systemd hardening, and an explicit separation between the web tier, an optional PHP pool, and application-specific integrations. The checked-in units are generic references, not a copy of any live environment.</p>
+    <p class="lede">httpjet is designed for a conventional Linux service deployment: a dedicated account, the LiteSpeed-compatible configuration tree, systemd socket activation, and an explicit separation between the web tier and a persistent PHP pool. The checked-in units are generic references, not a copy of any live environment.</p>
 
     <section>
       <h2 id="install">Installation status</h2>
       <p>Public signed binary packages and an installer are not published yet. Today, build from source and follow the included systemd reference. Do not treat internal build, benchmark, or deployment scripts as a public installation path.</p>
-      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">source install · native static site</span></div><pre><code>cargo build --release -p httpjet
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">source install · a configuration tree</span></div><pre><code>cargo build --release -p httpjet
 sudo useradd --system --home-dir /var/lib/httpjet --no-create-home \
   --shell /usr/sbin/nologin httpjet
-sudo install -m0755 target/release/httpjet /usr/bin/httpjet
-sudo install -d -o root -g httpjet -m0750 /etc/httpjet /etc/httpjet/vhosts
-sudo install -o root -g httpjet -m0640 examples/httpjet.toml /etc/httpjet/httpjet.toml
-sudo install -o root -g httpjet -m0640 examples/vhosts/example.toml /etc/httpjet/vhosts/example.toml
-sudo install -m0644 systemd/httpjet.service /etc/systemd/system/httpjet.service
-sudo /usr/bin/httpjet --config /etc/httpjet/httpjet.toml check --strict
+sudo install -m0755 target/release/httpjet /usr/local/httpjet/bin/httpjet
+
+<span class="t-c"># the server root: an existing LiteSpeed tree works as-is</span>
+sudo /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
+
+sudo cp packaging/systemd/httpjet-example.service /etc/systemd/system/httpjet.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now httpjet</code></pre></div>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Review before start</span><p>The example binds loopback <code>:8080</code> and uses an example document root. Set the listener, domains, document roots, TLS material, and writable application paths deliberately before enabling a public service.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Review before start</span><p>The example units and example configuration bind loopback and use example document roots. Set the listener, domains, document roots, TLS material, and writable application paths deliberately before enabling a public service.</p></div></div>
     </section>
 
     <section>
       <h2 id="systemd">Systemd model</h2>
-      <p>The reference <code>httpjet.service</code> runs <code>/usr/bin/httpjet --config /etc/httpjet/httpjet.toml serve</code> as the dedicated <code>httpjet</code> account. It grants only <code>CAP_NET_BIND_SERVICE</code>, makes the filesystem read-only except for systemd-managed runtime/state/cache/log directories, and keeps policy in TOML instead of <code>ExecStart</code> flags.</p>
-      <p>Socket activation is optional. The base service self-binds native listeners; install <code>httpjet.socket</code> only after making every socket address match TOML. Use the service manager for lifecycle operations—never broad process-kill patterns.</p>
+      <p>The reference deployment splits into four units:</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Unit</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td><code>httpjet.socket</code></td><td>Owns the listening sockets: <code>ReusePort=yes</code> TCP :80 / :443 (and :443 UDP for HTTP/3), backlog 8192. The fd count must match <code>serve --workers</code>.</td></tr>
+            <tr><td><code>httpjet-boot-ready.service</code></td><td>A boot gate that blocks the web tier until the configuration and backends are actually available (availability-first, bounded timeout).</td></tr>
+            <tr><td><code>httpjet.service</code></td><td>The web tier: <code>httpjet --root /usr/local/lsws serve --lsphp-external …</code> under a dedicated account, <code>OOMScoreAdjust=-500</code>, <code>LimitNOFILE=1048576</code>.</td></tr>
+            <tr><td><code>httpjet-lsphp.socket</code> + <code>httpjet-lsphp.service</code></td><td>The persistent LSAPI pool under its own identity, <code>Type=notify</code>; reload replaces the worker generation without closing the systemd-owned listener.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Socket activation is a deploy property, not an optimization: because the manager owns the listening sockets, a binary deploy never refuses new or queued connections — new sockets accept immediately while old workers drain under <code>TimeoutStopSec</code>. The reference drop-ins also run a root <code>ExecStartPre</code> permission script and then drop to the unprivileged service account; conflicts are declared against <code>lshttpd.service</code>, so a LiteSpeed and httpjet cannot run simultaneously.</p>
     </section>
 
     <section>
       <h2 id="changes">Safe change workflow</h2>
       <ol>
-        <li>Edit selected TOML or application content in a reviewable change.</li>
-        <li>Run <code>httpjet --config … check --strict</code> as the eventual service identity.</li>
-        <li>Test with isolated listeners, a separate PHP socket, and a separate cache root.</li>
-        <li>Restart through systemd for listener, TLS-binding, PHP-pool, cache-runtime, or binary changes. Use reload only for documented soft configuration changes.</li>
+        <li>Edit the configuration tree or application content in a reviewable change.</li>
+        <li>Run <code>httpjet --root … check --strict</code> — the deploy gate: topology lint, docroot checks, and inert-config warnings (geo lists without a db, auth without <code>Require</code>, wildcard PROXY-protocol binds). <code>SIGHUP</code> with a broken config keeps the old generation, but the check should catch it first.</li>
+        <li>Test with isolated listeners, a separate PHP socket, and a separate page-cache store path.</li>
+        <li>Restart through systemd for listener, TLS-binding, PHP-pool, or binary changes; <code>systemctl reload</code> replaces configuration in-place where safe.</li>
         <li>Probe the origin directly and check service logs; purge any outer cache if an incorrect cacheable response reached it.</li>
       </ol>
       <p>Keep installed binaries outside Cargo's <code>target/</code> directory. A source build or <code>cargo clean</code> must never remove the binary a running unit depends on.</p>
     </section>
 
     <section>
-      <h2 id="php">Optional persistent PHP pool</h2>
-      <p>Static and reverse-proxy deployments need no PHP. For LSAPI, the supplied <code>httpjet-lsphp.socket</code> and <code>httpjet-lsphp.service</code> units run a separate pool under the <code>httpjet-php</code> account. Set the web configuration's <code>runtime.php.external_socket</code> and the pool configuration's <code>runtime.php.socket</code> to the same Unix socket.</p>
-      <p>This lets the web service restart without cold-starting PHP while keeping PHP configuration and application secrets separate from TLS and cluster secrets. The operator still supplies the LSAPI-capable <code>lsphp</code> executable; httpjet does not install LiteSpeed or PHP packages.</p>
+      <h2 id="php">The persistent PHP pool</h2>
+      <p>Static and reverse-proxy deployments need no PHP. For LSAPI, the supplied <code>httpjet-lsphp.socket</code> and <code>httpjet-lsphp.service</code> units run a persistent pool (<code>httpjet lsphp</code>) under the <code>httpjet-php</code> account; the web tier dials it with <code>serve --lsphp-external &lt;socket&gt;</code> plus the shared <code>--lsphp-generation-file</code>. This lets the web service restart without cold-starting PHP, and an opcache recycle (<code>httpjet lsphp-reload</code> or a pool restart) replaces worker generations without dropping the listener. See <a href="lsapi.html#zero-downtime">LSAPI &amp; PHP</a> for the wiring and the generation-file trust rules.</p>
     </section>
 
     <section>
       <h2 id="cache-gates">Cache safety and observability</h2>
-      <p>The page cache is off by default. Before enabling it, prove the application has explicit cache headers and exercise URL, host, scheme, cookie/private-tier, purge, persistence, and peer-auth behavior that applies to that application. A cache bug may be retained by an outer CDN after the origin is repaired.</p>
-      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">inspect a configured cache</span></div><pre><code># metrics remain on the configured, normally loopback-only address
+      <p>The page cache is off by default. Before enabling it, prove the application has explicit cache headers and exercise URL, host, scheme, cookie/private-tier, and purge behavior for that application. A cache bug may be retained by an outer CDN after the origin is repaired.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">observability · metrics, headers, purge</span></div><pre><code><span class="t-c"># Prometheus metrics on the configured, normally loopback-only address</span>
+curl -s http://127.0.0.1:9090/metrics | grep <span class="t-s">'^httpjet_'</span>
+
+<span class="t-c"># cache state and budgets (locally throttled debug render)</span>
 curl -s http://127.0.0.1:9090/cache-entries
 
-# native applications expose X-HttpJet-Cache and standard Cache-Status
-curl -I -H 'Host: example.test' http://127.0.0.1:8080/ | grep -Ei 'x-httpjet-cache|cache-status'
+<span class="t-c"># the cache status header</span>
+curl -I -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/ | grep -i x-litespeed-cache
 
-# loopback tag purge; configured peers also need HMAC authentication
-curl -s -X POST -H 'x-httpjet-purge: tag=example' \
-  -o /dev/null -w '%{http_code}\n' http://127.0.0.1/__hj_cache_purge</code></pre></div>
-      <p><code>/cache-entries</code> reports hits, misses, stores, purges, file-tier errors, and byte budgets. Judge cache health by those counters and direct content checks, not a transient raw file count.</p>
+<span class="t-c"># loopback tag purge</span>
+curl -s -X POST -H <span class="t-s">'x-litespeed-purge: example'</span> \
+  -o /dev/null -w <span class="t-s">'%{http_code}\n'</span> http://127.0.0.1/__hj_cache_purge</code></pre></div>
+      <p><code>/cache-entries</code> reports hits, misses, stores, purges, file-tier errors, and byte budgets; the Prometheus <code>httpjet_*</code> family covers requests, phases (including proxy upstream latency), throttle and failover counters, TLS handshakes (full vs resumed), fast-memo hits, and cache activity. A telemetry TSV, a PHP slow-log, and an opt-in pprof endpoint (<code>--profile-token</code>, <code>--features profiling</code>) round out the tooling. Judge cache health by the counters and direct content checks, not a transient raw file count.</p>
+      <p>Logging defaults: access and error logs roll at <strong>50&nbsp;MB with 30-day pruning</strong>, per-vhost logs are configurable in the XML, the access log can emit JSON (<code>HTTPJET_ACCESS_LOG_FORMAT=json</code>), and every rendered line can mirror to syslog (<code>HTTPJET_SYSLOG_TARGET</code>) without touching the request path.</p>
     </section>
 
     <section>
       <h2 id="release">Release and upgrade discipline</h2>
-      <p>A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, a license, and a documented Linux/kernel/libc support floor. Existing architecture-tuned PGO and cross-build helpers are deployment-specific and must not be uploaded as generic binaries.</p>
-      <p>Package upgrades should preserve <code>/etc/httpjet</code>, dictionaries, and state; stage and validate a new binary before restart; and retain a known-good binary for rollback. Dictionary rotation is deliberate: write the new file atomically, validate its configuration, restart the service, and expect old dictionary-generation cache entries to become safe misses.</p>
+      <p>A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, a license, and a documented Linux/kernel/libc support floor. Existing architecture-tuned PGO helpers are deployment-specific and must not be uploaded as generic binaries.</p>
+      <p>Package upgrades should preserve the configuration tree, dictionaries, and state; stage and validate a new binary before restart; and retain a known-good binary for rollback. Dictionary rotation is deliberate: write the new file atomically, validate its configuration, restart the service, and expect old dictionary-generation cache entries to become safe misses.</p>
     </section>
 
-    <nav class="pager" aria-label="Pagination">
+<nav class="pager" aria-label="Pagination">
       <a class="prev" href="conformance.html"><div class="dir">← Prev</div><div class="ttl">Conformance</div></a>
       <a class="next" href="configuration.html"><div class="dir">Next →</div><div class="ttl">Configuration</div></a>
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · See the generic systemd units and the native cutover guide in the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>

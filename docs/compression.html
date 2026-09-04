@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/compression.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -68,17 +68,18 @@
 
     <section>
       <h2 id="codecs">Codecs</h2>
-      <p>Three codecs ship in <code>hj-compress</code>, each behind its own backend:</p>
+      <p>Three codecs ship in <code>hj-compress</code>, each behind its own backend. Levels and the small-body floor come from the XML tuning block (<a href="configuration.html#server">Configuration</a>):</p>
       <div class="tablewrap">
         <table>
-          <thead><tr><th>Codec</th><th>Backend</th><th>Notes</th></tr></thead>
+          <thead><tr><th>Codec</th><th>Backend</th><th>Default level</th><th>Notes</th></tr></thead>
           <tbody>
-            <tr><td><span class="crate">gzip</span></td><td><code>flate2</code></td><td>The universal fallback — every client accepts it.</td></tr>
-            <tr><td><span class="crate">brotli</span></td><td><code>brotli</code></td><td>Dense text encoding; broadly accepted by browsers.</td></tr>
-            <tr><td><span class="crate">zstd</span></td><td><code>zstd</code></td><td>Cheapest to produce at comparable ratios; preferred when the client accepts it.</td></tr>
+            <tr><td><span class="crate">gzip</span></td><td><code>flate2</code></td><td>6</td><td>The universal fallback — every client accepts it.</td></tr>
+            <tr><td><span class="crate">brotli</span></td><td><code>brotli</code></td><td>5 (0–11)</td><td>Dense text encoding; broadly accepted by browsers.</td></tr>
+            <tr><td><span class="crate">zstd</span></td><td><code>zstd</code></td><td>3 (1–22)</td><td>Cheapest to produce at comparable ratios; preferred when the client accepts it.</td></tr>
           </tbody>
         </table>
       </div>
+      <p>Bodies of <strong>201 bytes or less</strong> are never compressed (OpenLiteSpeed's <code>&gt;&nbsp;200</code> parity) — below that floor the framing overhead exceeds the savings. The compressible-type set matches LiteSpeed's <code>compressibleTypes</code> default, and every encoded response carries <code>Vary: Accept-Encoding</code>.</p>
     </section>
 
     <section>
@@ -123,14 +124,19 @@ Accept-Encoding: <span class="t-s">gzip</span>             <span class="t-c">// 
 
     <section>
       <h2 id="cf-zstd">Trusted-proxy zstd egress</h2>
-      <p>When httpjet sits behind a configured Cloudflare origin proxy, <code>integrations.cloudflare.send_zstd = true</code> can force zstd egress for that trusted peer, <strong>ignoring the forwarded <code>Accept-Encoding</code></strong>. The proxy decodes that response and re-encodes for browsers. This integration is off by default and never applies to untrusted or direct clients.</p>
+      <p>When httpjet sits behind a configured Cloudflare origin proxy, <code>serve --cf-send-zstd</code> can force zstd egress for that trusted peer, <strong>ignoring the forwarded <code>Accept-Encoding</code></strong>. The proxy decodes that response and re-encodes for browsers. This integration is off by default and never applies to untrusted or direct clients.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">forced zstd egress to a trusted proxy</span></div>
-        <pre><code><span class="t-c"># native TOML — only after trusted proxy ranges are configured</span>
-[integrations.cloudflare]
-send_zstd = <span class="t-s">true</span></code></pre>
+        <pre><code><span class="t-c"># only meaningful once trusted-proxy ranges are configured</span>
+httpjet serve <span class="t-k">--cf-send-zstd</span></code></pre>
       </div>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Trusted peers only</span><p>CF-zstd <strong>never</strong> affects untrusted or direct clients. A browser hitting the origin directly still gets only what its own <code>Accept-Encoding</code> asked for — the forced-zstd override applies strictly to the configured trusted-proxy peer.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="precompressed">Precompressed siblings</h2>
+      <p>For static files, the cheap win is not compressing at request time at all. If a <code>.br</code> or <code>.gz</code> sibling of the requested file exists in the same directory (e.g. <code>app.js.br</code> next to <code>app.js</code>), httpjet serves the sibling directly with the matching <code>Content-Encoding</code> and <code>Vary: Accept-Encoding</code> — the <code>gzip_static</code>/<code>brotli_static</code> behavior, with <strong>brotli preferred</strong> when the client accepts both. A ranged request skips the swap and serves the original file, so byte ranges stay exact. Because the siblings live in the same directory, <code>accessDenyDir</code> verdicts and symlink policy are unchanged.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Publish both siblings</span><p>Generate the siblings at deploy time (<code>zstd --rm</code>-style tooling, <code>brotli -f</code>, <code>gzip -k</code>) and keep them in the artifact. A missing sibling simply falls back to on-the-fly compression — the lookup is one stat.</p></div></div>
     </section>
 
     <section>
@@ -151,7 +157,7 @@ send_zstd = <span class="t-s">true</span></code></pre>
     </nav>
     <p class="docfoot">Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Compression lives in the <code>hj-compress</code> crate.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>

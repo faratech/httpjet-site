@@ -5,9 +5,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>httpjet — documentation</title>
-<meta name="description" content="httpjet is a from-scratch async Rust web server with strict native TOML, native HTTP/2 and HTTP/3, optional LSAPI, rewrite rules, and an opt-in origin page cache.">
+<meta name="description" content="httpjet is a from-scratch async Rust web server and drop-in LiteSpeed replacement: the same XML configuration, native HTTP/2 and HTTP/3, optional LSAPI PHP, rewrite rules, and an opt-in origin page cache.">
 <meta property="og:title" content="httpjet — documentation">
-<meta property="og:description" content="A Rust web server with strict native TOML, native HTTP/2 and HTTP/3, optional LSAPI, rewrite rules, and an opt-in origin page cache.">
+<meta property="og:description" content="A Rust web server and drop-in LiteSpeed replacement: the same XML configuration, native HTTP/2/3, LSAPI PHP, .htaccess rewriting, and an opt-in origin page cache.">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -18,13 +18,13 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="httpjet — documentation">
-<meta name="twitter:description" content="A Rust web server with strict native TOML, native HTTP/2 and HTTP/3, optional LSAPI, rewrite rules, and an opt-in origin page cache.">
+<meta name="twitter:description" content="A Rust web server and drop-in LiteSpeed replacement: the same XML configuration, native HTTP/2/3, LSAPI PHP, .htaccess rewriting, and an opt-in origin page cache.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/docs/">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260621n">
-<script defer src="assets/docs-head.min.js?v=20260713a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20260831a">
+<script defer src="assets/docs-head.min.js?v=20260831a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -42,13 +42,13 @@
     <section id="top">
       <p class="eyebrow reveal d1">httpjet · documentation</p>
       <h1 class="reveal d1" style="font-size:clamp(40px,8vw,76px);line-height:1"><span style="background:var(--brand);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent">httpjet</span></h1>
-      <p class="lede reveal d2">A from-scratch async <strong>Rust web server</strong> with strict native <strong>TOML</strong>, native HTTP/2 and HTTP/3, optional <strong>LSAPI</strong>, Apache-style <code>.htaccess</code> support, and an opt-in origin page cache. LiteSpeed XML is retained as a staged migration input, not the long-term configuration authority.</p>
+      <p class="lede reveal d2">A from-scratch async <strong>Rust web server</strong> and <strong>drop-in LiteSpeed replacement</strong> — it reads the same <code>conf/httpd_config.xml</code> tree — with native HTTP/2 and HTTP/3, optional <strong>LSAPI</strong> PHP, Apache-style <code>.htaccess</code> support, an opt-in origin page cache, and hardened access controls.</p>
 
       <!-- SIGNATURE: the request-pipeline rail -->
       <div class="rail reveal d3" role="img" aria-label="Request pipeline: resolve, access control, rewrite, page-cache lookup, dispatch, finalize, cache store">
         <div class="rail__track">
           <a class="stage" href="architecture.html#pipeline"><span class="k">resolve</span><span class="d">SNI / Host → vhost</span></a>
-          <a class="stage" href="architecture.html#pipeline"><span class="k">acl</span><span class="d">real-IP / deny</span></a>
+          <a class="stage" href="security.html"><span class="k">acl</span><span class="d">throttle · geo · deny</span></a>
           <a class="stage" href="rewrite.html"><span class="k">rewrite</span><span class="d">.htaccess</span></a>
           <a class="stage on" href="page-cache.html"><span class="k">cache</span><span class="d">lookup → hit?</span></a>
           <a class="stage" href="protocols.html"><span class="k">dispatch</span><span class="d">ws · proxy · php · static</span></a>
@@ -59,32 +59,46 @@
       <span class="rail__cap reveal d3">one pipeline per request — every page documents where it lives on this rail</span>
 
       <div class="chips reveal d4">
-        <span class="chip"><span class="dot"></span>Strict native TOML</span>
+        <span class="chip ok"><span class="dot"></span>Drop-in LiteSpeed config</span>
         <span class="chip"><span class="dot"></span>HTTP/1.1 · native HTTP/2 · HTTP/3</span>
         <span class="chip"><span class="dot"></span>Optional native LSAPI → lsphp</span>
-        <span class="chip"><span class="dot"></span>Apache .htaccess rewrite</span>
-        <span class="chip"><span class="dot"></span>Opt-in origin page cache</span>
-        <span class="chip ok"><span class="dot"></span>LiteSpeed migration tooling</span>
+        <span class="chip"><span class="dot"></span>Apache .htaccess rewrite + Basic auth</span>
+        <span class="chip"><span class="dot"></span>Opt-in origin page cache (LSCache protocol)</span>
+        <span class="chip"><span class="dot"></span>Throttle · geo/ASN · mTLS access control</span>
       </div>
     </section>
 
     <section>
       <h2 id="what">What httpjet is</h2>
-      <p>httpjet is a full origin server on a memory-safe, observable Rust core. Its public model is provider-neutral: native TOML describes the deployment, while optional profiles add application, proxy, or LiteSpeed-compatibility behavior only where required.</p>
+      <p>httpjet is a full origin server on a memory-safe, observable Rust core, built to replace LiteSpeed Web Server (LSWS 6.3.5 compatibility target) without a configuration migration: point <code>--root</code> at the existing tree and go.</p>
       <ul>
-        <li>Loads strict native TOML with versioning, per-vhost files, validation, redacted effective output, and deterministic merges.</li>
-        <li>Imports and compares LiteSpeed XML when migrating an existing installation.</li>
-        <li>Speaks the <strong>native LSAPI wire protocol</strong> to a configured <code>lsphp</code> executable (no FastCGI shim in the version-1 contract).</li>
-        <li>Evaluates the same <code>.htaccess</code> rewrite rules, access control, and header directives.</li>
+        <li>Reads the <strong>LiteSpeed-compatible XML tree</strong> — <code>conf/httpd_config.xml</code>, per-vhost files, <code>mime.properties</code> — with faithful value semantics, plus opt-in httpjet-native extensions (throttling, geo/ASN ACLs, PROXY protocol, sub_filter, context overrides).</li>
+        <li>Speaks the <strong>native LSAPI wire protocol</strong> to a configured <code>lsphp</code> executable (no FastCGI shim), with a zero-downtime external pool and a fail-closed jail.</li>
+        <li>Evaluates the same <code>.htaccess</code> rewrite rules, access control, Basic auth, and header directives.</li>
         <li>Serves HTTP/1.1, a <strong>from-scratch HTTP/2 stack</strong>, and HTTP/3 over QUIC, with optional client-certificate verification.</li>
-        <li>Provides an <strong>opt-in origin page cache</strong> driven by native <code>X-HttpJet-*</code> headers, with optional LiteSpeed aliases.</li>
+        <li>Provides an <strong>opt-in origin page cache</strong> speaking the LSCache protocol (<code>X-LiteSpeed-*</code> headers), so tuned applications need no changes.</li>
+        <li>Enforces hardened access control: trusted-proxy client-IP resolution, per-client-IP throttling, offline GeoIP/ASN rules, PROXY protocol, and revocation-aware mTLS.</li>
       </ul>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Public beta preparation</span><p>The source tree includes neutral examples and generic systemd units. Signed public binary packages, installer UX, and a supported-platform matrix are the next release work; see <a href="operations.html">Operations</a>.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Public beta preparation</span><p>The source tree includes a working example configuration and generic systemd units. Signed public binary packages, installer UX, and a supported-platform matrix are the next release work; see <a href="operations.html">Operations</a>.</p></div></div>
     </section>
 
     <section>
       <h2 id="why">Why it exists</h2>
-      <p>Migration compatibility remains useful for existing LiteSpeed installations, but it should not leak into a new deployment's design. Native TOML keeps runtime policy reviewable, makes optional integrations explicit, and removes the need to encode application behavior in command-line flags or legacy configuration files.</p>
+      <p>LiteSpeed is fast, but it is closed source. httpjet exists to put the same deployment model — the same XML, the same <code>.htaccess</code> semantics, the same LSCache protocol — on a memory-safe core the operator can read, extend, and instrument. Compatibility is the feature: an existing LiteSpeed tree is a working httpjet configuration on day one, and the opt-in httpjet-native extensions layer new capabilities on top without forking the format.</p>
+    </section>
+
+    <section>
+      <h2 id="numbers">By the numbers</h2>
+      <p>Headline figures from the checked-in benchmark record — every number names its regime (see <a href="performance.html">Performance</a> for the full picture and methodology).</p>
+      <div class="stats">
+        <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static, dedicated-host loopback — vs OpenLiteSpeed's ~793k (2026-08-27)</div></div>
+        <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI over h1, PGO loopback — vs LiteSpeed's ~38.5k (2026-06)</div></div>
+        <div class="stat accent"><div class="v">101<span class="u">×</span></div><div class="l">cache hit vs full PHP render of the same page (19,912 vs 196 rps)</div></div>
+        <div class="stat"><div class="v">298<span class="u">k rps</span></div><div class="l">heavy .htaccess h2 vs OLS's 283k — the historic gap closed by the fast-path memo (+81% A/B)</div></div>
+        <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's share of production request latency — ~138 µs/req, PHP owns the rest</div></div>
+        <div class="stat"><div class="v">146<span class="u">/146</span></div><div class="l">h2spec conformance cases on the native HTTP/2 stack</div></div>
+      </div>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Where these live</span><p>Datasets ship in the repo under <code>scripts/bench-results/</code> (the dedicated-host three-way: <code>versus5-dedicated-final-20260827.csv</code>) and the per-change record is <code>RESULTS.md</code>. Loopback figures isolate the server; production telemetry is the honest end-user picture.</p><span class="regime">see performance.html for regimes · raw CSVs in the source repo</span></div></div>
     </section>
 
     <section>
@@ -93,11 +107,11 @@
         <table>
           <thead><tr><th>Aspect</th><th>State</th></tr></thead>
           <tbody>
-            <tr><td>Configuration</td><td>Native TOML is the public default; LiteSpeed XML is retained through 1.x as an import and compatibility path.</td></tr>
-            <tr><td>Process model</td><td>Generic hardened systemd units and a dedicated <code>httpjet</code> service identity are included.</td></tr>
+            <tr><td>Configuration</td><td>LiteSpeed-compatible XML is the configuration authority; httpjet-native directives are opt-in add-ons LiteSpeed ignores.</td></tr>
+            <tr><td>Process model</td><td>Generic hardened systemd units (socket activation, boot gate, dedicated pool unit) and a dedicated service identity are included.</td></tr>
             <tr><td>PHP</td><td>Optional native LSAPI pool; the operator supplies an LSAPI-capable PHP executable.</td></tr>
-            <tr><td>Page cache</td><td>Disabled by default; native application opt-in, optional private tier, file storage, and dictionary compression.</td></tr>
-            <tr><td>Release</td><td>Source builds are available; public signed packages, installer, and support matrix remain release work.</td></tr>
+            <tr><td>Page cache</td><td>Disabled by default; LSCache-protocol opt-in, optional private tier, file storage, and dictionary compression.</td></tr>
+            <tr><td>Release</td><td>Source builds are available (Rust 1.97+ MSRV); public signed packages, installer, and support matrix remain release work.</td></tr>
           </tbody>
         </table>
       </div>
@@ -105,13 +119,14 @@
 
     <section>
       <h2 id="next">Read next</h2>
-      <p>The docs follow the request: how the server is structured, the protocols it speaks, how it runs PHP and rewrites, the page cache, and how it's measured and operated.</p>
+      <p>The docs follow the request: how the server is structured, the protocols it speaks, how it runs PHP and rewrites, who gets in, the page cache, and how it's measured and operated.</p>
       <div class="stats">
-        <a class="stat" href="quickstart.html" style="text-decoration:none"><div class="v" style="font-size:18px">Quickstart →</div><div class="l">Build it, validate native TOML, and run a development origin.</div></a>
-        <a class="stat" href="architecture.html" style="text-decoration:none"><div class="v" style="font-size:18px">Architecture →</div><div class="l">15 crates, the frozen <code>hj-core</code> contract, and the request pipeline.</div></a>
-        <a class="stat" href="page-cache.html" style="text-decoration:none"><div class="v" style="font-size:18px">Page cache →</div><div class="l">Native cache protocol, optional compatibility aliases, tiers, and dictionaries.</div></a>
+        <a class="stat" href="quickstart.html" style="text-decoration:none"><div class="v" style="font-size:18px">Quickstart →</div><div class="l">Build it, validate a configuration tree, and run a development origin.</div></a>
+        <a class="stat" href="architecture.html" style="text-decoration:none"><div class="v" style="font-size:18px">Architecture →</div><div class="l">16 crates, the frozen <code>hj-core</code> contract, and the request pipeline.</div></a>
+        <a class="stat" href="page-cache.html" style="text-decoration:none"><div class="v" style="font-size:18px">Page cache →</div><div class="l">LSCache-protocol opt-in, tiers, dictionaries, and tag purge.</div></a>
+        <a class="stat" href="security.html" style="text-decoration:none"><div class="v" style="font-size:18px">Security →</div><div class="l">ACLs, throttling, geo/ASN rules, auth, TLS, and the fail-closed jail.</div></a>
         <a class="stat" href="performance.html" style="text-decoration:none"><div class="v" style="font-size:18px">Performance →</div><div class="l">Real numbers, the PGO/mimalloc story, and honest attribution.</div></a>
-        <a class="stat" href="operations.html" style="text-decoration:none"><div class="v" style="font-size:18px">Operations →</div><div class="l">Systemd installation, safe changes, cache gates, and release posture.</div></a>
+        <a class="stat" href="operations.html" style="text-decoration:none"><div class="v" style="font-size:18px">Operations →</div><div class="l">Systemd installation, safe changes, observability, and release posture.</div></a>
       </div>
     </section>
 
@@ -120,7 +135,7 @@
     </nav>
     <p class="docfoot">httpjet · documentation. Built from the project's own source &amp; design notes.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a></p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260713a"></script>
-<script defer src="assets/docs.min.js?v=20260621n"></script>
+<script defer src="assets/search-index.min.js?v=20260831a"></script>
+<script defer src="assets/docs.min.js?v=20260831a"></script>
 </body>
 </html>
