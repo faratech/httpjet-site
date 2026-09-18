@@ -1,0 +1,78 @@
+    <h1>Performance</h1>
+    <p class="lede">httpjet is fast — and these docs are strict about <em>where</em> the time goes. Every figure names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.</p>
+
+    <div class="stats">
+      <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static, c=50, dedicated-host loopback</div></div>
+      <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI over HTTP/1.1, PGO loopback</div></div>
+      <div class="stat accent"><div class="v">101<span class="u">×</span></div><div class="l">cache hit vs the same page through PHP</div></div>
+      <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's share of production request latency</div></div>
+      <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation (hardware counters)</div></div>
+      <div class="stat accent"><div class="v">4,852<span class="u">rps</span></div><div class="l">1 MiB plaintext sendfile, c=50</div></div>
+    </div>
+
+    <section>
+      <h2 id="framing">Read the regime, not just the number</h2>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span>loopback benchmark · synthetic, on-box, PGO</span>
+        <span class="chip"><span class="dot"></span>production telemetry · real CF-fronted traffic</span>
+        <span class="chip"><span class="dot"></span>hardware counters · perf at saturation</span>
+      </div>
+      <p>A loopback benchmark removes the network, real TLS handshakes and the CDN — it isolates the server's code path, which is exactly what you want to compare two servers and exactly what you must not generalize to end-user latency. Production telemetry measures what users feel, dominated by the backend and the edge. The same server shows ~908k req/s on loopback and ~0.2% of user-visible latency in production; those answer different questions.</p>
+    </section>
+
+    <section>
+      <h2 id="loopback">Loopback throughput</h2>
+      <p>The primary dataset is the August 2026 <strong>dedicated-host three-way</strong> (httpjet vs OpenLiteSpeed vs nginx on a quiet box, all release/PGO-equivalent builds). The June PGO campaign against a commercial-LiteSpeed baseline remains the PHP-path reference.</p>
+      <!--chart:h2-static-->
+      <p>One h2 connection is not a ceiling (~58k req/s at c=1), and throughput keeps rising with concurrency instead of collapsing; the earlier "h2 collapses past c=50" shape belonged to the June build and its measurement conditions, not the transport. HTTP/1.1 empty bodies at c=1000: ~202k vs OpenLiteSpeed's ~183k.</p>
+      <!--chart:heavy-rewrite-->
+      <!--chart:memo-ab-->
+      <!--chart:php-h1-->
+    </section>
+
+    <section>
+      <h2 id="cache-result">The origin cache result</h2>
+      <p>The single largest performance fact about the real workload is not a micro-optimization — it is the <a href="page-cache.html">origin page cache</a>. For the cacheable fraction of traffic, a hit replaces an entire PHP render with a memory (or tmpfs) copy.</p>
+      <!--chart:cache-vs-php-->
+      <p>A 2026-08-30 refresh under shared-box conditions (live production on the same host — directional only) put cache-hit serves at ~5.4k req/s h2 and ~6.7k h1 on real <code>/help/*</code> pages. The production hit ratio reads low for a structural reason: ~51% of origin GET-200s are one-shot bot crawls whose repeat interval exceeds any TTL, so no origin tier can absorb them — the lever there is edge TTL.</p>
+    </section>
+
+    <section>
+      <h2 id="attribution">Where the time actually goes</h2>
+      <!--chart:attribution-->
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Across millions of production requests, the <code>lsphp</code> render is <strong>86.5–98.8% of request wall time</strong>. httpjet's own CPU is about <strong>0.2%</strong> — roughly <strong>138 µs per request</strong>, ~38 µs per cache hit, and that includes TLS, HTTP/2, rewrite, cache lookup and access logging. The 2026-08-30 sample: mean request 9.99 ms, 8.96 ms of it LSAPI TTFB, rewrite 5.4 µs, cache lookup 3.2 µs; pool acquire p99.9 &lt; 1 ms.</p><span class="regime">production telemetry · --telemetry-file + --php-slow-log</span></div></div>
+      <p>If httpjet is 0.2% of latency, halving its CPU shaves ~0.1% off a page — imperceptible. Turning a PHP render into a cache hit removes the other ~99%. That asymmetry is why the project stopped shaving the serving path and invested in the cache, PHP/opcache tuning and raising the cacheable fraction.</p>
+    </section>
+
+    <section>
+      <h2 id="instruction-floor">At the instruction floor</h2>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>At saturation the h2 cache-hit path shows <strong>IPC 1.55</strong>, a <strong>0.31% branch-miss rate</strong> and <strong>1.6 L1d misses per 100 instructions</strong>: execution is efficient and the bottleneck is instructions retired per request, not locality. Futex traffic (~85% of syscall time) turned out to be idle parking and cross-thread waker churn — the box was ~50% idle at the apparent ceiling — not lock contention.</p><span class="regime">perf stat / strace · off-CPU analysis</span></div></div>
+      <p>Two structural moves followed: the global <strong>mimalloc</strong> allocator (fewer arena futexes across the per-core monoio workers plus the tokio side-runtime) and the <strong>on-core fast path</strong> with the finished-response memo, which removes pipeline work rather than speeding it up.</p>
+    </section>
+
+    <section>
+      <h2 id="egress">File egress: sendfile and kTLS</h2>
+      <!--chart:sendfile-->
+      <p>Plain-TCP H1 file bodies leave through bounded nonblocking <code>sendfile(2)</code>; TLS 1.3 H1 can too under kernel TLS, but only when <code>--ktls=auto</code> finds a physical NIC with active <code>tls-hw-tx-offload</code>. The production host's virtual NIC reports <code>off [fixed]</code>, and forcing software kTLS there measured slightly <em>worse</em> — which is exactly why <code>auto</code> refuses it. Details: <a href="protocols.html#sendfile">Protocol stacks</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="codegen">The codegen tier — PGO + mimalloc</h2>
+      <p>Production binaries combine profile-guided optimization, the mimalloc allocator and <code>-C target-cpu=native</code>. The checked-in <code>scripts/build-pgo.sh</code> is the classic three-step — instrument, drive a representative loopback workload (h2 cache hits dominant, plus h2/h1 static and PHP), merge and rebuild — with frame pointers kept so the pprof endpoint can symbolize the live binary. Its workload and CPU tuning belong to one deployment; build a neutral release artifact separately.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">A non-PGO benchmark is not a benchmark</span><p>Debug builds are ~5× slower and meaningless. Even a plain release build differs from PGO by enough (~10% from binary layout alone) to fake a regression: build both sides the same way and interleave runs. The bench harness (<code>scripts/bench-suite.sh</code>, <code>scripts/bench-report.py</code>) records CSVs under <code>scripts/bench-results/</code>.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="knobs">Knobs that actually move production</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Lever</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Page-cache opt-in coverage and TTLs (app side)</td><td>The dominant lever: every hit removes a PHP render.</td></tr>
+          <tr><td><code>--page-cache-admit-threshold 1</code> with dictionaries</td><td>Cache on first sight when storage is cheap; watch <code>httpjet_cache_hit_ratio_real</code>.</td></tr>
+          <tr><td><code>--cf-send-zstd</code></td><td>Hands the CDN the cheapest encoding to produce; no browser-visible change.</td></tr>
+          <tr><td>Fast-memo eligibility of the docroot chain</td><td>An ineligible chain (see <code>httpjet check</code>) pays the full pipeline on every static request; fix the directive rather than disabling the memo.</td></tr>
+          <tr><td><code>--rewrite-ua-classify</code></td><td>Collapses UA diversity on UA-reading chains onto a handful of outcome-cache entries.</td></tr>
+          <tr><td>TLS resumption</td><td>Full handshakes dominate behind a CDN that does not re-offer tickets; ECDSA chains and the single AES-128-GCM suite keep them cheap.</td></tr>
+          <tr><td>PHP: opcache, worker count, slow endpoints</td><td>Use <code>--php-slow-log</code> attribution; the pool is rarely the bottleneck (acquire p99.9 &lt; 1 ms).</td></tr>
+        </tbody></table></div>
+    </section>

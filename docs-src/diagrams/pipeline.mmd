@@ -1,0 +1,33 @@
+flowchart TB
+  classDef on fill:#13203a,stroke:#818cf8,color:#fff
+  classDef term fill:#0e1424,stroke:#22d3ee,color:#e8ecf6
+  classDef gate fill:#1a1f33,stroke:#fbbf73,color:#e8ecf6
+  A["resolve<br/>SNI / Host → vhost"] --> B["trust & identity<br/>mTLS gate · client IP · ACL · geo · throttle"]
+  B --> W("WAF sidecar<br/>(opt-in)"):::gate
+  W --> X["extension pre-handlers<br/>(compile-time, optional)"]
+  X --> C[".htaccess chain<br/>SetEnvIf · pre-rewrite access"]
+  C --> D["rewrite<br/>inline rules, then .htaccess"]
+  D --> E["access enforcement<br/>Basic auth · PATH_INFO deny"]
+  E --> F("page-cache lookup<br/>(--page-cache)"):::on
+  F -- hit --> K
+  F -- miss / bypass --> G("dispatch")
+  G --> G1[WebSocket]:::term
+  G --> G2["proxy <context>"]:::term
+  G --> G3["LSAPI / FastCGI<br/>suffix routing"]:::term
+  G --> G4[static]:::term
+  G1 & G2 & G3 & G4 --> H["finalize<br/>Header ops · ErrorDocument"]
+  H --> I["cache store"]:::on
+  I --> K["response transforms<br/>promote small files · expires · sub_filter · compress · deny-CDN-cache · Alt-Svc"]
+  K --> L["access log · metrics · spans"]
+  click B "security.html"
+  click W "extensions.html#waf"
+  click X "extensions.html"
+  click C "rewrite.html"
+  click D "rewrite.html"
+  click E "rewrite.html#basic-auth"
+  click F "page-cache.html#lookup"
+  click I "page-cache.html#store"
+  click G2 "gateways.html"
+  click G3 "lsapi.html"
+  click K "compression.html"
+  click L "observability.html"

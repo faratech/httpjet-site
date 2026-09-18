@@ -1,0 +1,16 @@
+flowchart TB
+  classDef sock fill:#0e1424,stroke:#22d3ee,color:#e8ecf6
+  classDef svc fill:#13203a,stroke:#818cf8,color:#fff
+  classDef gate fill:#1a1f33,stroke:#fbbf73,color:#e8ecf6
+  BR["httpjet-boot-ready.service<br/>oneshot gate: waits for the LSAPI pool (hard), DB/Redis (soft, 300 s)"]:::gate
+  LS["httpjet-lsphp.socket<br/>owns the LSAPI unix listener · backlog 8192 · 0600"]:::sock
+  LSV["httpjet-lsphp.service<br/>httpjet lsphp · Type=notify · ExecReload = lsphp-reload"]:::svc
+  S["httpjet.socket<br/>N× :80 TCP · N× :443 TCP · N× :443 UDP · ReusePort"]:::sock
+  W["httpjet.service<br/>httpjet serve --lsphp-external … · User=nobody · Restart=always"]:::svc
+  LS --> LSV
+  LSV --> BR
+  BR --> S
+  S --> W
+  LSV -. "Wants / After" .-> W
+  W -- "systemctl restart: fds stay open, PHP stays warm" --> W
+  LSV -- "systemctl reload: candidate-first generation swap" --> LSV

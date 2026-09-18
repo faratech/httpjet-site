@@ -1,0 +1,102 @@
+    <h1>Quickstart</h1>
+    <p class="lede">From a source checkout to a running origin in a few minutes: build the binary, validate a LiteSpeed-compatible tree with <code>check --strict</code>, serve it on loopback, and verify. httpjet reads the same <code>conf/httpd_config.xml</code> layout LiteSpeed uses, so an existing tree needs no migration step — but validate it first.</p>
+
+    <section>
+      <h2 id="prereqs">Prerequisites</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Requirement</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Linux with <strong>io_uring</strong></td><td>The monoio/io_uring transport is the only transport. Container runtimes must allow <code>io_uring_setup</code>/<code>io_uring_enter</code>/<code>io_uring_register</code> (see <a href="operations.html#oci">OCI</a>).</td></tr>
+          <tr><td><strong>Rust 1.98+</strong>, edition 2024</td><td>The workspace MSRV. A C toolchain is needed for the aws-lc-rs crypto backend and mimalloc.</td></tr>
+          <tr><td>OpenSSL 3.x headers + pkg-config</td><td>Only for <code>--features ocsp</code>.</td></tr>
+          <tr><td>An LSAPI-capable <code>lsphp</code></td><td>Only for PHP. Static, proxy and FastCGI deployments need no PHP and no LiteSpeed installation.</td></tr>
+        </tbody></table></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Release status</span><p>No signed binary packages are published yet; the source build below is the install path. The repository's PGO and deploy scripts are tailored to one production deployment — do not treat them as a general installer.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="build">1 · Build the binary</h2>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>build</b> · cargo</span></div>
+        <pre><code>git clone https://github.com/faratech/httpjet.git
+cd httpjet
+
+<span class="t-c"># release build of just the binary crate (the workspace is large — always scope with -p)</span>
+cargo build <span class="t-k">--release</span> -p httpjet        <span class="t-c"># → target/release/httpjet</span>
+
+<span class="t-c"># optional build features (each still needs explicit runtime opt-in):</span>
+cargo build <span class="t-k">--release</span> -p httpjet <span class="t-k">--features</span> acme,ocsp,otel</code></pre>
+      </div>
+      <p>A debug build (<code>cargo build -p httpjet</code>) compiles faster but runs ~5× slower — fine for iteration, meaningless for any measurement. For reproducible results use <code>--locked</code>.</p>
+    </section>
+
+    <section>
+      <h2 id="check">2 · Validate a configuration tree</h2>
+      <p>httpjet is configured by a <em>server root</em> containing <code>conf/httpd_config.xml</code>, optional <code>conf/mime.properties</code>, and the per-vhost XML files it references. The checked-in <code>examples/litespeed/</code> tree is a minimal working example: one plain listener on <code>127.0.0.1:8080</code> and one static vhost (<code>example.test</code>) with scripting and symlinks off.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>check</b> · config lint</span></div>
+        <pre><code><span class="t-c"># parse the tree and print a summary (check is also the default subcommand)</span>
+target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" check
+
+<span class="t-c"># strict: lint topology and exit non-zero on findings — the deploy gate</span>
+target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" check <span class="t-k">--strict</span></code></pre>
+      </div>
+      <p><code>check --strict</code> hard-errors on a docroot shared by two vhosts, a vhost whose docroot is missing, and a vhost with no exact <code>vhostMap</code> domain; it warns on an apex mapped without its <code>www.</code> twin, TLS over a Unix socket, PROXY protocol on a public bind, geo rules without a database, ignored LiteSpeed anti-abuse elements, generic CGI contexts, and every other directive that would parse but do nothing. It also prints each vhost's fast-memo verdict (<code>fast_memo: eligible [vary: …]</code>) and a <code>vhost-map-fingerprint</code> for comparing check output over time. Always use an absolute <code>--root</code>.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Parsed ≠ equivalent</span><p>httpjet accepts LiteSpeed XML leniently so real trees load. A warning means the directive is <em>not</em> enforced — review every one before assuming parity. The <a href="capabilities.html">capability matrix</a> lists what is implemented.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="run">3 · Serve on loopback</h2>
+      <p>The XML holds persistent policy; <code>serve</code> flags hold operational overrides (addresses, workers, PHP wiring, cache budgets). The example is HTTP-only, PHP-off and cache-off, so it is safe next to an existing server.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · development</span></div>
+        <pre><code>target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" serve \
+  <span class="t-k">--http-addr</span> 127.0.0.1:8080 <span class="t-k">--https-addr</span> <span class="t-s">""</span> \
+  <span class="t-k">--workers</span> 1 <span class="t-k">--no-php</span></code></pre>
+      </div>
+      <p>To try TLS and HTTP/3, add a secure listener with <code>keyFile</code>/<code>certFile</code> to the XML, set <code>&lt;quic&gt;&lt;quicEnable&gt;1&lt;/quicEnable&gt;&lt;/quic&gt;</code>, and pass <code>--https-addr 127.0.0.1:8443</code>; the same port must be reachable over TCP (h1/h2) and UDP (h3). See <a href="certificates.html">TLS, ACME &amp; OCSP</a>.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Keep test state isolated</span><p>Use alternate HTTP/HTTPS/metrics/admin ports, a separate <code>--php-socket</code> if PHP is on, low <code>--php-children</code>, and a separate <code>--page-cache-store-path</code>. Never point a test instance at a production LSAPI socket — two supervisors on one socket corrupt each other's worker accounting. Test pools default their control and generation files <em>beside</em> their own socket for exactly this reason.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="verify">4 · Verify</h2>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>verify</b> · curl</span></div>
+        <pre><code>printf 'hello from httpjet\n' &gt; examples/litespeed/example/public/index.html
+curl -i -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/
+
+<span class="t-c"># h2c prior knowledge on the same plain port</span>
+curl -i --http2-prior-knowledge -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/
+
+<span class="t-c"># Prometheus metrics (loopback-only by design)</span>
+curl -s http://127.0.0.1:9090/metrics | grep -E '^httpjet_(requests_total|active_connections)'</code></pre>
+      </div>
+      <p>Expect a LiteSpeed-style ETag (<code>"size-mtime-inode;;;"</code>), <code>Vary: Accept-Encoding</code> on compressible bodies, and — once a listener is secure and QUIC is on — an <code>Alt-Svc</code> header advertising h3.</p>
+    </section>
+
+    <section>
+      <h2 id="php">5 · Add PHP (optional)</h2>
+      <p>With an LSAPI-capable <code>lsphp</code> configured in the XML (<code>&lt;phpConfig&gt;</code> or an <code>lsapi</code> <code>extProcessor</code> plus a <code>scriptHandler</code>), drop <code>--no-php</code> and let httpjet spawn its own pool on a private socket. For zero-downtime deploys, run the pool as a separate process instead:</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>two processes</b> · external pool</span></div>
+        <pre><code><span class="t-c"># terminal 1 — the persistent PHP pool</span>
+httpjet <span class="t-k">--root</span> /abs/root lsphp <span class="t-k">--php-socket</span> /run/httpjet-test/php.sock <span class="t-k">--php-children</span> 4
+
+<span class="t-c"># terminal 2 — the web tier dials it and never spawns lsphp itself</span>
+httpjet <span class="t-k">--root</span> /abs/root serve <span class="t-k">--http-addr</span> 127.0.0.1:8080 <span class="t-k">--https-addr</span> "" \
+  <span class="t-k">--lsphp-external</span> /run/httpjet-test/php.sock \
+  <span class="t-k">--lsphp-generation-file</span> /run/httpjet-test/php.sock.generation</code></pre>
+      </div>
+      <p>How the pool, the generation file and <code>lsphp-reload</code> fit together is on <a href="lsapi.html#zero-downtime">LSAPI &amp; PHP</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="next">Where to go next</h2>
+      <ul>
+        <li><a href="configuration.html">Configuration</a> — the XML reference, including the httpjet-native directives.</li>
+        <li><a href="cli.html">CLI reference</a> — every <code>serve</code> flag, grouped and filterable.</li>
+        <li><a href="operations.html">Operations</a> — systemd socket activation, the PHP pool, deploy gates and rollback.</li>
+        <li><a href="page-cache.html">Page cache</a> — enabling <code>--page-cache</code> safely.</li>
+        <li><a href="migration.html">Migrating from LiteSpeed</a> — the validation-first path for a real tree.</li>
+      </ul>
+    </section>

@@ -1,0 +1,15 @@
+flowchart TB
+  classDef bad fill:#2a1420,stroke:#e879f9,color:#fff
+  classDef ok fill:#0f2a24,stroke:#34d399,color:#fff
+  A["terminal response (LSAPI · proxy · static)"] --> B("app opted in?<br/>X-LiteSpeed-Cache-Control: public|private,max-age=N<br/>(or standard Cache-Control on a --page-cache-standard-vhosts vhost)")
+  B -- no --> N["not stored"]:::bad
+  B -- yes --> C("guards")
+  C -- "status not in cacheStatusCode · Set-Cookie of a private cookie<br/>· proxied response asserting X-LiteSpeed-* · self-redirect Location<br/>· purge received after render start · object > 100 MiB" --> N
+  C -- ok --> D("W-TinyLFU admission<br/>frequency ≥ --page-cache-admit-threshold (+1 per 256 KiB)")
+  D -- "not yet" --> N2["counted, not stored (miss-miss-hit)"]:::bad
+  D -- admitted --> E["strip Set-Cookie + X-LiteSpeed-* from the public copy<br/>record identity (host + raw path), tags, vary set, TTL, stale windows"]
+  E --> F("file tier on?")
+  F -- no --> G["in-RAM body (charged to --page-cache-mem)"]:::ok
+  F -- yes --> H["HJPC file at birth (identity form, tmpfs)<br/>metadata-only charge to RAM index; footprint to --page-cache-disk-mem"]:::ok
+  H -- "after first real hit" --> I["background dict recompress in place<br/>(per-vhost zstd dictionary, 3.5–9× smaller)"]:::ok
+  click D "page-cache.html#admission"

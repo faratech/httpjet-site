@@ -1,0 +1,101 @@
+    <section id="top">
+      <p class="eyebrow reveal d1">httpjet · documentation · v0.0.1</p>
+      <h1 class="reveal d1" style="font-size:clamp(40px,8vw,76px);line-height:1"><span style="background:var(--brand);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent">httpjet</span></h1>
+      <p class="lede reveal d2">A from-scratch <strong>Rust web server</strong> that is a <strong>drop-in LiteSpeed replacement</strong>: it reads the same <code>conf/httpd_config.xml</code> tree, speaks native LSAPI to <code>lsphp</code>, evaluates the same <code>.htaccess</code> files, and adds native HTTP/2 and HTTP/3, reverse-proxy and FastCGI gateways, an opt-in LSCache-protocol page cache, optional ACME and OCSP, and a loopback admin API — all on one io_uring transport.</p>
+
+      <!-- SIGNATURE: the request-pipeline rail -->
+      <div class="rail reveal d3" role="img" aria-label="Request pipeline: resolve, access control, rewrite, page-cache lookup, dispatch, finalize, cache store">
+        <div class="rail__track">
+          <a class="stage" href="architecture.html#pipeline"><span class="k">resolve</span><span class="d">SNI / Host → vhost</span></a>
+          <a class="stage" href="security.html"><span class="k">acl</span><span class="d">identity · throttle · geo · WAF</span></a>
+          <a class="stage" href="rewrite.html"><span class="k">rewrite</span><span class="d">.htaccess · auth</span></a>
+          <a class="stage on" href="page-cache.html"><span class="k">cache</span><span class="d">lookup → hit?</span></a>
+          <a class="stage" href="gateways.html"><span class="k">dispatch</span><span class="d">ws · proxy · php · fcgi · static</span></a>
+          <a class="stage" href="compression.html"><span class="k">finalize</span><span class="d">headers · compress</span></a>
+          <a class="stage" href="page-cache.html#store"><span class="k">store</span><span class="d">cache write</span></a>
+        </div>
+      </div>
+      <span class="rail__cap reveal d3">one pipeline per request, whatever the wire protocol — every page tells you where it sits on this rail</span>
+
+      <div class="chips reveal d4">
+        <span class="chip ok"><span class="dot"></span>Drop-in LiteSpeed XML config</span>
+        <span class="chip"><span class="dot"></span>HTTP/1.1 · native HTTP/2 · HTTP/3</span>
+        <span class="chip"><span class="dot"></span>Native LSAPI → lsphp · FastCGI</span>
+        <span class="chip"><span class="dot"></span>Apache .htaccess · Basic auth</span>
+        <span class="chip"><span class="dot"></span>Opt-in origin page cache</span>
+        <span class="chip"><span class="dot"></span>ACME · OCSP · OTel (build features)</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="what">What httpjet is</h2>
+      <p>httpjet is a complete origin server on a memory-safe Rust core, built so that an existing LiteSpeed Web Server (LSWS 6.3.5 compatibility target) or OpenLiteSpeed deployment becomes an httpjet deployment by pointing <code>--root</code> at the tree it already has. Compatibility is the feature; everything httpjet adds on top is an explicit opt-in that LiteSpeed simply ignores.</p>
+      <div class="two">
+        <div><h4>Compatible surface</h4><ul>
+          <li>LiteSpeed XML: server, tuning, listeners, vhosts, contexts, <code>mime.properties</code></li>
+          <li>Native <a href="lsapi.html">LSAPI</a> wire protocol to any LSAPI-capable <code>lsphp</code></li>
+          <li><a href="rewrite.html">mod_rewrite</a>, access control, Basic auth, <code>Header</code>, <code>ErrorDocument</code>, LSCache directives</li>
+          <li>LSCache protocol (<code>X-LiteSpeed-Cache-Control</code> / <code>-Tag</code> / <code>-Vary</code> / <code>-Purge</code>)</li>
+          <li>LiteSpeed <code>fileETag=28</code> ETags, <code>.html</code>→PHP dispatch order</li>
+        </ul></div>
+        <div><h4>httpjet-native (opt-in)</h4><ul>
+          <li>Per-client throttle, <a href="security.html#geo">GeoIP/ASN</a> rules, <a href="protocols.html#frontdoors">PROXY protocol</a>, Unix-socket listeners</li>
+          <li><a href="gateways.html#groups">Weighted upstream groups</a> with active health checks; <code>h2://</code> / <code>h2s://</code> upstreams; <a href="gateways.html#fastcgi">FastCGI</a></li>
+          <li>Per-context body/timeout/bandwidth overrides, <code>sub_filter</code>, request decompression</li>
+          <li><a href="certificates.html#acme">ACME</a> HTTP-01/DNS-01, <a href="certificates.html#ocsp">OCSP stapling</a>, kTLS/sendfile, <a href="observability.html#otel">OpenTelemetry</a></li>
+          <li><a href="admin-api.html">Loopback status + transactional config API</a>, <a href="extensions.html#waf">WAF sidecar</a>, compile-time extensions</li>
+        </ul></div>
+      </div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Where it runs</span><p>httpjet serves <a href="https://windowsforum.com">WindowsForum.com</a> in production on a single x86_64 node behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version <strong>0.0.1</strong>, Rust 1.98+, edition 2024, GPL-3.0-only) built around one production configuration — test on alternate ports before trusting it elsewhere. See <a href="capabilities.html">Capabilities &amp; limits</a> for the honest matrix.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="map">How the pieces fit</h2>
+      <p>Every wire protocol lands in the same request pipeline. Click a node to jump to its page.</p>
+      <!--diagram:pipeline|<strong>The request pipeline.</strong> <code>pipeline::handle()</code> resolves the vhost and the client's identity, then <code>dispatch()</code> mirrors OpenLiteSpeed's ordering with the WAF, extension, page-cache lookup and store seams inserted at fixed points. Each terminal finishes through <code>finalize_response</code> before the transforms run.-->
+    </section>
+
+    <section>
+      <h2 id="numbers">By the numbers</h2>
+      <p>Headline figures from the checked-in benchmark record — every number names its regime (see <a href="performance.html">Performance</a> for methodology and the raw CSVs).</p>
+      <div class="stats">
+        <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static, dedicated-host loopback — vs OpenLiteSpeed's ~793k (2026-08-27)</div></div>
+        <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI over h1, PGO loopback — vs LiteSpeed's ~38.5k (2026-06)</div></div>
+        <div class="stat accent"><div class="v">101<span class="u">×</span></div><div class="l">cache hit vs full PHP render of the same page (19,912 vs 196 rps)</div></div>
+        <div class="stat"><div class="v">146<span class="u">/146</span></div><div class="l">h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs</div></div>
+        <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's share of production request latency — ~138 µs/req; PHP owns the rest</div></div>
+        <div class="stat accent"><div class="v">1,900<span class="u">+</span></div><div class="l">test functions across 20 crates; full workspace suite green at v0.0.1</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="status">Project status</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Aspect</th><th>State (2026-09-17)</th></tr></thead>
+          <tbody>
+            <tr><td>Version</td><td><strong>0.0.1</strong> — semantic versioning adopted 2026-09-17; MSRV Rust 1.98, edition 2024; dependencies current (monoio fork ported to io-uring 0.7).</td></tr>
+            <tr><td>Configuration</td><td>LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. <code>check --strict</code> is the deploy gate.</td></tr>
+            <tr><td>Transport</td><td>Pure io_uring (monoio) for H1/H2/H3 — the <em>only</em> transport; there is no epoll fallback and no Windows/macOS port.</td></tr>
+            <tr><td>PHP</td><td>Native LSAPI; the operator supplies <code>lsphp</code>. Production runs the persistent external pool with zero-downtime generation reloads.</td></tr>
+            <tr><td>Page cache</td><td>Off by default; LSCache-protocol opt-in, private tier, tmpfs file tier, per-vhost dictionaries, generation-scoped namespaces. Live in production.</td></tr>
+            <tr><td>Optional features</td><td><code>acme</code>, <code>ocsp</code>, <code>otel</code>, <code>ktls</code>, <code>profiling</code> — build features that still need explicit runtime opt-in.</td></tr>
+            <tr><td>Security posture</td><td>Whole-codebase review rounds 2026-08-30, 09-06 and 09-16 landed (see <a href="security.html#audit">audit posture</a>); fail-closed defaults throughout.</td></tr>
+            <tr><td>Release</td><td>Source builds, generic systemd units, and a hardened OCI example. Signed public packages and a supported-platform matrix are still release work.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="next">Read next</h2>
+      <p>The docs follow the request: how the server is structured, the protocols it speaks, how it runs PHP and proxies, who gets in, the page cache, and how it is configured, operated and measured.</p>
+      <div class="stats">
+        <a class="stat" href="quickstart.html" style="text-decoration:none"><div class="v" style="font-size:18px">Quickstart →</div><div class="l">Build, validate a tree with <code>check --strict</code>, serve on loopback.</div></a>
+        <a class="stat" href="architecture.html" style="text-decoration:none"><div class="v" style="font-size:18px">Architecture →</div><div class="l">20 crates, the frozen <code>hj-core</code> seam, the io_uring bridge, generations.</div></a>
+        <a class="stat" href="capabilities.html" style="text-decoration:none"><div class="v" style="font-size:18px">Capabilities →</div><div class="l">Supported, optional, partial, unsupported — and the fixed bounds.</div></a>
+        <a class="stat" href="page-cache.html" style="text-decoration:none"><div class="v" style="font-size:18px">Page cache →</div><div class="l">Keys, tiers, admission, purge, the file tier, capsules.</div></a>
+        <a class="stat" href="cli.html" style="text-decoration:none"><div class="v" style="font-size:18px">CLI reference →</div><div class="l">Every subcommand and flag, filterable.</div></a>
+        <a class="stat" href="migration.html" style="text-decoration:none"><div class="v" style="font-size:18px">Migrating →</div><div class="l">The validation-first path off LiteSpeed.</div></a>
+      </div>
+    </section>

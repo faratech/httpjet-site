@@ -1,0 +1,9 @@
+flowchart TB
+  classDef gate fill:#1a1f33,stroke:#fbbf73,color:#e8ecf6
+  A["1 · inventory<br/>XML, docroots, .htaccess, TLS, LSAPI, proxies, cache headers"] --> B["2 · check --strict<br/>on a copy, as the service user"]:::gate
+  B --> C["3 · minimal build<br/>cargo build --locked --release"]
+  C --> D["4 · isolated candidate<br/>alt ports · own PHP socket · own cache path"]
+  D --> E["5 · prove behavior<br/>every protocol, vhost, auth, PHP, proxy, logs"]:::gate
+  E --> F["6 · caching separately<br/>keys, privacy, purge, stale, restart"]:::gate
+  F --> G["7 · stage traffic<br/>canary via LB/CDN · rollback written and drilled"]
+  G --> H["8 · reload only what is reloadable<br/>restart_required is a boundary"]

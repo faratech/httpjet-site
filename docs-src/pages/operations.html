@@ -1,0 +1,109 @@
+    <h1>Operations &amp; deployment</h1>
+    <p class="lede">httpjet is designed for a conventional Linux service: a dedicated account, the LiteSpeed-compatible tree, <strong>systemd socket activation</strong> so a binary deploy never refuses a connection, and a <strong>separate persistent PHP pool</strong> so a web-tier restart never cold-starts opcache. The checked-in units are generic references; a hardened OCI example covers container adoption.</p>
+
+    <section>
+      <h2 id="install">Installation</h2>
+      <p>No signed packages are published yet; build from source and install the binary at a stable path <em>outside</em> Cargo's <code>target/</code> so a later <code>cargo clean</code> cannot delete what a running unit depends on.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">source install</span></div><pre><code>cargo build --locked --release -p httpjet
+sudo useradd --system --home-dir /var/lib/httpjet --no-create-home --shell /usr/sbin/nologin httpjet
+sudo install -d /usr/local/httpjet/bin /usr/local/httpjet/conf /usr/local/httpjet/logs
+sudo install -m0755 target/release/httpjet /usr/local/httpjet/bin/httpjet
+
+<span class="t-c"># an existing LiteSpeed tree works as-is — validate it first, as root AND as the service user</span>
+sudo /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
+sudo -u httpjet /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
+
+<span class="t-c"># minimal loopback example unit (no TLS, no PHP, no cache)</span>
+sudo install -m0644 packaging/systemd/httpjet-example.service /etc/systemd/system/
+sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now httpjet-example</code></pre></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Review before start</span><p>The example units bind loopback and use example document roots. Set listeners, domains, docroots, TLS material, writable paths and the service identity deliberately before enabling a public service. A permission-preparing <code>ExecStartPre</code> that runs as root and then drops to the unprivileged account is the reference shape.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="systemd">The systemd model</h2>
+      <!--diagram:systemd-units|<strong>Five units.</strong> The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.-->
+      <div class="tablewrap"><table>
+        <thead><tr><th>Unit</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code>httpjet.socket</code></td><td>N× <code>:80</code> TCP, N× <code>:443</code> TCP, N× <code>:443</code> UDP with <code>ReusePort=yes</code>, <code>Backlog=8192</code>. The multiplicity reproduces the per-worker SO_REUSEPORT fan-out, so N must equal <code>serve --workers</code>. Static (not enabled under <code>sockets.target</code>); pulled in by the service after the gate to avoid a cold-boot ordering cycle.</td></tr>
+          <tr><td><code>httpjet-boot-ready.service</code></td><td>Boot-only oneshot gate, availability-first: the <code>Type=notify</code> LSAPI pool is the one hard dependency; databases/caches are ordered but not required — it waits up to 300 s, then proceeds with a loud warning so a cold boot with a slow database still serves static + warm cache + stale-if-error. Later backend maintenance cannot tear down the sockets.</td></tr>
+          <tr><td><code>httpjet.service</code></td><td>The web tier: <code>httpjet --root … serve --lsphp-external … --lsphp-generation-file …</code> under a dedicated user, <code>Restart=always</code>, <code>OOMScoreAdjust=-500</code>, <code>LimitNOFILE=1048576</code>, <code>TimeoutStopSec=20</code>, <code>Conflicts=lshttpd.service</code>. Effective flags come from drop-ins in <code>httpjet.service.d/</code> — check <code>systemctl show -p ExecStart --value httpjet.service</code> before reasoning about them.</td></tr>
+          <tr><td><code>httpjet-lsphp.socket</code></td><td>Owns the LSAPI Unix listener (mode 0600, backlog 8192, <code>RemoveOnStop</code>). Never restart it during a reload or supervisor deploy.</td></tr>
+          <tr><td><code>httpjet-lsphp.service</code></td><td><code>httpjet lsphp …</code>, <code>Type=notify</code> (active only after a marker-attributed LSAPI response), <code>ExecReload=httpjet lsphp-reload …</code>, its own identity, <code>RuntimeDirectory=httpjet</code> for the control socket and generation file.</td></tr>
+        </tbody></table></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Scope of the zero-loss guarantee</span><p>Socket activation eliminates RSTs of <em>new and queued</em> connections across a deploy. Requests the old process has already accepted — h1/h2 mid-serve and especially h3/QUIC streams — still drain under <code>TimeoutStopSec</code>. "Never drops a connection" means never RSTs a new or queued one.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="php">The persistent PHP pool</h2>
+      <p>Static and proxy deployments need no PHP. For LSAPI, run the pool as its own unit and point the web tier at it; the units above wire the socket, the root-only control socket and the 16-byte generation file. Routine opcache recycle is <code>systemctl reload httpjet-lsphp.service</code> — synchronous and candidate-first. Reserve a hard restart of the pool <em>service</em> for supervisor binary/unit changes; verify the listener inode is unchanged before and after. Reference: <a href="lsapi.html#zero-downtime">LSAPI &amp; PHP</a>.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">replace the supervisor without closing the listener</span></div><pre><code>before=$(stat -Lc '%d:%i' /run/httpjet/php.sock)
+systemctl daemon-reload
+systemctl restart httpjet-lsphp.service                 <span class="t-c"># the SERVICE only — never the .socket</span>
+test "$(stat -Lc '%d:%i' /run/httpjet/php.sock)" = "$before"
+test "$(stat -Lc %s /run/httpjet/lsphp.generation)" = 16
+ss -xlnH | awk '$5 == "/run/httpjet/php.sock" {print $4}'    <span class="t-c"># Send-Q should equal the XML backlog</span></code></pre></div>
+    </section>
+
+    <section>
+      <h2 id="changes">Safe change workflow</h2>
+      <ol class="steps">
+        <li><b>Edit in a reviewable change</b><p>Configuration tree or application content.</p></li>
+        <li><b><code>check --strict</code></b><p>The deploy gate. SIGHUP with a broken config keeps the old generation, but the check should catch it first.</p></li>
+        <li><b>Test in isolation</b><p>Alternate ports, a separate PHP socket, a separate cache store path, low worker/child counts. Kill test instances by exact PID; a leaked SO_REUSEPORT instance silently shares the port with independent cache and htaccess state.</p></li>
+        <li><b>Apply</b><p><code>systemctl reload httpjet</code> (SIGHUP) for vhost/rewrite/access/expires/tuning/certificate changes; <code>systemctl restart httpjet</code> for the binary or boot-owned resources; the <a href="admin-api.html#write">write API</a> for validated in-memory replacement.</p></li>
+        <li><b>Verify on loopback, then watch</b><p><code>curl -sk -H 'Host: …' https://127.0.0.1/…</code>, the journal, <code>httpjet_requests_total</code> and 5xx counters. Purge any outer cache if an incorrect cacheable response reached it.</p></li>
+      </ol>
+    </section>
+
+    <section>
+      <h2 id="deploy">Binary deploy and rollback</h2>
+      <!--diagram:deploy-flow|<strong>The deploy gate chain.</strong> The repository's <code>scripts/deploy-lscache.sh</code> automates this for one deployment (strict check, co-listener guard, external-lsphp recurrence guard, health probe with automatic revert to the previous binary, capsule purge gate); the shape is what matters for any deployment.-->
+      <div class="kv">
+        <dt>Kill switch: cache</dt><dd>Drop <code>--page-cache</code> from the unit (a drop-in override) and restart; the cache code is inert without the flag.</dd>
+        <dt>Kill switch: capsules</dt><dd>Drop the <code>--xf-capsule*</code> flags and restart.</dd>
+        <dt>Kill switch: fast memo</dt><dd><code>--no-fast-memo</code> or <code>HJ_FAST_MEMO=0</code>.</dd>
+        <dt>Kill switch: WAF</dt><dd>Remove <code>--waf-sidecar-addr</code> (the seam is completely inert without it).</dd>
+        <dt>Rollback</dt><dd>Keep the previous binary beside the current one (<code>bin/httpjet.prev</code>); restore and restart. A rollback does not remove bad objects already stored in the origin cache (purge) or at the CDN edge (purge the zone).</dd>
+        <dt>Start limits</dt><dd><code>StartLimitBurst=5</code> per 60 s: more than five restarts a minute trips systemd and takes the service down until <code>systemctl reset-failed</code>. The persistence gate restarts the service — run it once.</dd>
+      </div>
+      <p>The production build uses profile-guided optimization (<code>scripts/build-pgo.sh</code>: instrument → drive a representative loopback workload → rebuild). PGO scratch data is kept off tmpfs. Never benchmark a non-PGO binary against a PGO one.</p>
+    </section>
+
+    <section>
+      <h2 id="reload">What SIGHUP reloads</h2>
+      <p>Vhost maps, rewrites, document roots, contexts, access/expires/tuning settings, cache policy gates, and TLS certificates on an unchanged listener topology. A change that needs a restart (listener addresses, QUIC enablement, PHP topology, cache-store identity, privileges, log paths) is logged as "requires a restart — keeping current config" and nothing changes. A reload that would 404 a mapped vhost because its per-vhost file failed to load is refused. The dictionary registry is retained across SIGHUP (rotation needs a restart). Full semantics: <a href="admin-api.html#reload">Admin API &amp; reload</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="observability">Observability checklist</h2>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">the loopback-only surfaces</span></div><pre><code>curl -s http://127.0.0.1:9090/metrics | grep '^httpjet_'          <span class="t-c"># Prometheus text</span>
+curl -s http://127.0.0.1:9090/cache-entries                        <span class="t-c"># cache totals, budgets, health line</span>
+curl -s http://127.0.0.1:9091/v1/status | jq .                     <span class="t-c"># with --admin-addr: generation, fingerprint, upstream health</span>
+curl -sk https://127.0.0.1/__hj_cache_ready -o /dev/null -w '%{http_code}\n'
+journalctl -u httpjet -n 100</code></pre></div>
+      <p>Metric families, log formats, the request-id header, telemetry TSV, PHP slow log, OpenTelemetry and profiling are all on <a href="observability.html">Observability</a>. Pair the counters with a process monitor (the tree ships a <code>monit</code> check whose start timeout stays above the boot gate's worst case).</p>
+    </section>
+
+    <section>
+      <h2 id="oci">Hardened OCI example</h2>
+      <p><code>packaging/oci/</code> is an adoption example, not a prescription. The image runs as numeric UID/GID <code>10001:10001</code>, binds unprivileged ports, needs no capabilities; the compose file adds a read-only root filesystem, drops every capability, sets <code>no-new-privileges</code>, and mounts a small <code>noexec,nosuid,nodev</code> <code>/tmp</code>. Because Moby's default seccomp allowlist omits io_uring, <code>seccomp-httpjet.json</code> is the pinned Moby default plus only <code>io_uring_setup</code>, <code>io_uring_enter</code> and <code>io_uring_register</code> (ptrace/<code>process_vm_*</code> gated on <code>CAP_SYS_PTRACE</code>).</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Path</th><th>Access</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>/run/httpjet-certs</code></td><td>read-only</td><td>TLS certificate + key (no key ships in the image; generate one for <code>example.test</code>).</td></tr>
+          <tr><td><code>/var/lib/httpjet</code></td><td>read-write</td><td>Page-cache files and the integrity key.</td></tr>
+          <tr><td><code>/etc/httpjet/litespeed/logs</code></td><td>read-write</td><td>Access/error logs.</td></tr>
+          <tr><td><code>/etc/httpjet/litespeed/{conf,example}</code></td><td>image read-only</td><td>LiteSpeed XML and static content.</td></tr>
+          <tr><td><code>/tmp</code></td><td>bounded tmpfs</td><td>Temporary runtime files.</td></tr>
+        </tbody></table></div>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">build, run, smoke</span></div><pre><code>docker compose -f packaging/oci/compose.yaml up --build     <span class="t-c"># publishes 8080/tcp, 8443/tcp AND 8443/udp</span>
+docker run … --security-opt seccomp=/abs/path/seccomp-httpjet.json …   <span class="t-c"># a hand-written run must pass the profile explicitly</span>
+bash scripts/oci-smoke.sh                                    <span class="t-c"># read-only root, UID 10001, caps dropped, real HTTP/3 through the UDP port</span></code></pre></div>
+      <p>A seccomp denial is a startup/test failure — do not work around it with <code>--privileged</code>, <code>--cap-add</code> or <code>seccomp=unconfined</code>; narrow the runtime policy or pick a supported host. Rootless engines may add memlock, UDP or io_uring restrictions of their own. The image health check calls <code>/__hj_cache_ready</code>, so readiness means the cache boot scan finished, not that a user URL was warmed.</p>
+    </section>
+
+    <section>
+      <h2 id="release">Release and upgrade discipline</h2>
+      <p>A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries. Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through <code>scripts/update-deps.sh</code> and the full suite (the last sweep, 2026-09-17, moved the vendored monoio fork to io-uring 0.7).</p>
+    </section>

@@ -1,0 +1,14 @@
+flowchart TB
+  classDef bad fill:#2a1420,stroke:#e879f9,color:#fff
+  A["framed request body<br/>(H1 · H2 · h2c · H3)"] --> B("exactly one Content-Encoding field<br/>with exactly one coding?")
+  B -- "no (list, repeated)" --> F["forward unchanged"]
+  B -- gzip --> D
+  B -- "br / zstd" --> C("listed in --request-decompression-extra?")
+  C -- no --> F
+  C -- yes --> R("reserve 17 MiB codec workspace<br/>+ encoded + decoded bytes in the body budget")
+  R -- "cannot" --> E503[503]:::bad
+  R -- ok --> D["decode (buffered)<br/>zstd window ≤ 2^24 · no brotli large-window"]
+  D -- "malformed" --> F
+  D -- "> maxReqBodySize" --> E413[413]:::bad
+  D -- "hits 16 MiB output ceiling" --> F
+  D -- ok --> G["drop Content-Encoding, set decoded Content-Length<br/>→ rewrite · WAF · cache · backend"]

@@ -1,0 +1,9 @@
+flowchart TB
+  classDef ext fill:#2a2314,stroke:#fbbf73,color:#fff
+  classDef host fill:#13203a,stroke:#818cf8,color:#fff
+  A["parse · vhost · mTLS gate · client IP · ACL · geo · throttle"] --> P["extension PreHandlers<br/>(read-only RequestView; Continue · Respond · Err)"]:::ext
+  P --> B[".htaccess · rewrite · cache lookup · dispatch"]:::host
+  B --> S["page-cache store (inside dispatch)"]:::host
+  S --> T["extension ResponseTransforms<br/>(egress only; re-applied on cache hits)"]:::ext
+  T --> H["host transforms: promote · expires · sub_filter · compress · deny-CDN-cache · Alt-Svc"]:::host
+  P -. "any registered pre-handler disables the on-core fast path" .-> B

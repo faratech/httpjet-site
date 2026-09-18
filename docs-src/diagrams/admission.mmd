@@ -1,0 +1,6 @@
+flowchart LR
+  A["cacheable miss for key K"] --> B["count K in the frequency sketch<br/>(fixed memory, W-TinyLFU)"]
+  B --> C("freq(K) ≥ threshold + size bonus?<br/>threshold default 2 · +1 per 256 KiB")
+  C -- "no" --> D["render, serve, do not store"]
+  C -- "yes" --> E["render, serve, STORE"]
+  D -- "next request" --> A

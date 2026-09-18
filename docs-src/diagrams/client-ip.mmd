@@ -1,0 +1,14 @@
+flowchart TB
+  classDef id fill:#13203a,stroke:#818cf8,color:#fff
+  classDef chk fill:#1a1f33,stroke:#fbbf73,color:#e8ecf6
+  A["socket peer"] --> B("PROXY protocol listener?")
+  B -- yes --> C["peer := header source<br/>(loopback / unspecified claims refused)"]
+  B -- no --> D["peer := TCP address<br/>(UDS: fabricated loopback)"]
+  C & D --> E("peer in an allow rule marked T?<br/>(useIpInProxyHeader 0–4)")
+  E -- "trusted proxy" --> F["client := CF-Connecting-IP / X-Forwarded-For<br/>(rightmost untrusted hop)"]:::id
+  E -- "not trusted" --> G["client := peer<br/>(forwarded headers ignored)"]:::id
+  F & G --> H["accessControl allow/deny<br/>most-specific wins"]:::chk
+  H --> I["geoAllow/Deny · asnAllow/Deny<br/>deny-first, allow-only = whitelist"]:::chk
+  I --> J["perIpRate throttle → 429<br/>(fail-open under state pressure)"]:::chk
+  J --> K["mTLS trust boundary<br/>plaintext on an mTLS vhost is refused unless loopback"]:::chk
+  K --> L["ReqCtx.client_ip → REMOTE_ADDR · logs · cache key"]

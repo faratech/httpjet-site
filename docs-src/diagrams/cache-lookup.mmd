@@ -1,0 +1,22 @@
+flowchart TB
+  classDef hit fill:#0f2a24,stroke:#34d399,color:#fff
+  classDef miss fill:#2a2314,stroke:#fbbf73,color:#fff
+  classDef key fill:#13203a,stroke:#818cf8,color:#fff
+  A["request after rewrite + ACL<br/>(--page-cache on)"] --> B("GET/HEAD?<br/>vhost enableCache · .htaccess CacheLookup<br/>no [E=no-cache] env")
+  B -- no --> BY["bypass → backend"]:::miss
+  B -- yes --> C("member cookie present<br/>(xf_user)?")
+  C -- "yes, and --page-cache-private" --> P["PRIVATE tier<br/>key += session cookie value"]:::key
+  C -- "yes, path in --page-cache-shared-paths" --> S["PUBLIC tier (visitor-invariant endpoint)<br/>sticky canary %"]:::key
+  C -- no --> S2["PUBLIC tier"]:::key
+  C -- "yes, no private tier" --> BY
+  P & S & S2 --> K["key = epoch·generation · vhost · scheme · host · ORIGINAL path?query<br/>· declared vary-cookie values · Origin (if the chain reads it)"]:::key
+  K --> L("entry found and identity guard matches<br/>(host + raw path stored with the entry)?")
+  L -- "no / collision" --> M("single-flight: another render in progress?")
+  M -- yes --> W["wait on leader"] --> H
+  M -- no --> R["render backend (leader)"] --> ST["cache store gates"]
+  L -- "fresh" --> H["HIT<br/>X-LiteSpeed-Cache: hit"]:::hit
+  L -- "stale, within stale-while-revalidate" --> SW["serve stale + background refresh"]:::hit
+  L -- "expired" --> M
+  R -- "5xx and stale-if-error window" --> SIE["serve retained stale<br/>hit,stale-if-error · max-age=30 egress"]:::hit
+  click ST "page-cache.html#store"
+  click K "page-cache.html#keys"

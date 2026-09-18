@@ -1,0 +1,13 @@
+flowchart TB
+  classDef root fill:#13203a,stroke:#818cf8,color:#fff
+  classDef c fill:#0e1424,stroke:#22d3ee,color:#e8ecf6
+  R["httpjet.request<br/>root · H1/H2 dispatch boundary or H3 entry<br/>attrs: status, httpjet.execution.path = on-core | bridge, httpjet.body.outcome"]:::root
+  R --> RW["httpjet.rewrite (internal, sampled)"]:::c
+  R --> CL["httpjet.cache.lookup (internal)"]:::c
+  R --> T("terminal")
+  T --> P["httpjet.proxy (client)<br/>traceparent → named upstreams"]:::c
+  T --> L["httpjet.lsapi (client)<br/>HTTP_TRACEPARENT in the LSAPI env"]:::c
+  T --> WS["httpjet.websocket (client)<br/>handshake only, not the relay"]:::c
+  T --> S["httpjet.static (internal)"]:::c
+  R --> CS["httpjet.cache.store (internal)"]:::c
+  R -- "ends when the transport finishes the write<br/>(H2 flow control, H3 FIN accepted, streams to EOF)" --> X["OTLP HTTP/protobuf exporter<br/>2048-span queue · 256/batch · 1 s · drops on saturation"]

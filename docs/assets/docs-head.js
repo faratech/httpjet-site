@@ -27,6 +27,7 @@
     <a href="quickstart.html" class="hide-sm">Quickstart</a>
     <a href="architecture.html" class="hide-sm">Architecture</a>
     <a href="page-cache.html" class="hide-sm">Page cache</a>
+    <a href="cli.html" class="hide-sm">CLI</a>
     <a href="performance.html" class="hide-sm">Performance</a>
     <a href="https://httpjet.net/" class="ext repo">httpjet.net</a>
   </nav>
@@ -38,9 +39,9 @@
 
   const sidebar = (() => {
     const groups = [
-      ['Guide', [['Overview', './'], ['Quickstart', 'quickstart.html'], ['Architecture', 'architecture.html']]],
-      ['Internals', [['Protocol stacks', 'protocols.html'], ['LSAPI &amp; PHP', 'lsapi.html'], ['Rewrite engine', 'rewrite.html'], ['Security &amp; access control', 'security.html'], ['Page cache', 'page-cache.html'], ['Compression', 'compression.html']]],
-      ['Running it', [['Performance', 'performance.html'], ['Conformance', 'conformance.html'], ['Operations', 'operations.html'], ['Configuration', 'configuration.html']]],
+      ["Guide", [['Overview', './'], ['Quickstart', 'quickstart.html'], ['Architecture', 'architecture.html'], ['Capabilities &amp; limits', 'capabilities.html']]],
+      ["Internals", [['Protocol stacks', 'protocols.html'], ['TLS, ACME &amp; OCSP', 'certificates.html'], ['LSAPI &amp; PHP', 'lsapi.html'], ['Proxy &amp; gateways', 'gateways.html'], ['Rewrite &amp; .htaccess', 'rewrite.html'], ['Security &amp; access control', 'security.html'], ['Page cache', 'page-cache.html'], ['Compression', 'compression.html']]],
+      ["Running it", [['Configuration', 'configuration.html'], ['CLI reference', 'cli.html'], ['Operations', 'operations.html'], ['Observability', 'observability.html'], ['Admin API &amp; reload', 'admin-api.html'], ['Extending httpjet', 'extensions.html'], ['Performance', 'performance.html'], ['Conformance &amp; testing', 'conformance.html'], ['Migrating from LiteSpeed', 'migration.html']]],
     ];
 
     let html = '<nav class="sidebar" aria-label="Documentation sections">';
@@ -82,7 +83,7 @@
   const top = document.createDocumentFragment();
   appendNodes(top, toNodes(header));
   body.insertBefore(top, shell);
-  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20260831a"]') || body.querySelector('script[src="assets/docs.min.js?v=20260831a"]');
+  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20260917b"]') || body.querySelector('script[src="assets/docs.min.js?v=20260917b"]');
   if (searchSlot) {
     const fragment = document.createDocumentFragment();
     appendNodes(fragment, toNodes(searchOverlay));

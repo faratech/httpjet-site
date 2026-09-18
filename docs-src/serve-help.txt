@@ -1,0 +1,145 @@
+Serve the configured vhosts
+
+Usage: httpjet serve [OPTIONS]
+
+Options:
+      --http-addr <HTTP_ADDR>
+          Address for the plain-HTTP listener [default: 127.0.0.1:8080]
+      --https-addr <HTTPS_ADDR>
+          Address for the TLS listener. Empty to disable [default: 127.0.0.1:4443]
+      --workers <WORKERS>
+          Number of accept-loop workers (SO_REUSEPORT sockets). Defaults to CPUs
+      --no-mtls
+          Local testing / explicit rollback only: drop the mandatory Cloudflare client-cert requirement so TLS content can be tested locally without a Cloudflare-issued client cert. Without this flag, clientVerify=2 is enforced (handshakes without a valid client cert are rejected — the production fail-closed behavior)
+      --no-core-pinning
+          (#296) Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the machine's CPU count; this flag is the kill switch if pinned placement worsens tail latency
+      --uring-ring <URING_RING>
+          (#330) io_uring ring setup for the per-core transport runtimes. `legacy` (default) = flagless rings — the A/B measured `coop` (COOP_TASKRUN + SUBMIT_ALL) as noise and `defer` (+SINGLE_ISSUER + DEFER_TASKRUN) as a consistent ~-2% on this virtualized guest; both stay available for other hardware. Ring size always stays default — ring memory is memlock-charged and bigger rings under the prod unit's LimitMEMLOCK bankrupt late runtimes (2026-08-27 crash-loop). Unsupported flags fall back to plain rings per-thread with a warning [default: legacy] [possible values: legacy, coop, defer]
+      --no-multishot-accept
+          (#334) Disable multishot accept: submit one accept SQE per connection (the pre-multishot behavior) instead of one armed SQE per listener
+      --no-fast-memo
+          (#349) Disable the finished-response memo on the on-core static fast path (default ON; per-thread, 1 s TTL, byte-identity-gated — see `pipeline::fast_memo`). Env `HJ_FAST_MEMO=0` is equivalent
+      --per-ip-rate <PER_IP_RATE>
+          (Tier 1.1) Per-client-IP request throttle: max requests per client IP per second. 0 (default) = disabled — overrides the `<perIpRate>` tuning field when set. Protects the origin from single-source floods; a shared NAT egress aggregates many visitors, so size accordingly
+      --http-uds <HTTP_UDS>
+          (Tier 2) Additionally serve plain HTTP on this unix domain socket (H1 + h2c prior knowledge, one accept core). Peers have no address: ACLs and logs see fabricated loopback and the access log renders `unix:` — the socket file's mode/owner is the real access boundary. A socket-activated fd at the same path (socket unit) is adopted for zero-downtime restarts
+      --no-php
+          Do not spawn lsphp; PHP requests fall back to static serving
+      --php-children <PHP_CHILDREN>
+          LSAPI worker children for the lsphp pool. 0 (default) = honor the lsws config's `PHP_LSAPI_CHILDREN` / `maxConns` (true drop-in). A value > 0 is an explicit override (e.g. to cap concurrency on a shared box); values below 2 are normalized to 2 for persistent supervision [default: 0]
+      --php-socket <PHP_SOCKET>
+          Socket path for httpjet's OWN lsphp pool — deliberately separate from the production php8.sock so the two never contend [default: /tmp/php8-httpjet.sock]
+      --lsphp-external <LSPHP_EXTERNAL>
+          (OPS7) EXTERNAL lsphp: connect to an lsphp master already listening on this socket (run by a separate `httpjet lsphp` process) instead of spawning one. Lets the web tier restart for a zero-downtime binary deploy without cold- starting PHP. Overrides --php-socket. Mutually exclusive with spawning
+      --lsphp-generation-file <LSPHP_GENERATION_FILE>
+          Shared lsphp generation epoch used to invalidate pooled external connections after a supervisor reload or restart. When supplied with --lsphp-external, startup fails if the 16-byte mapping cannot be opened
+      --page-cache
+          Enable the LSCache-equivalent origin full-page cache (OFF by default; opt-in / R&D). Per-vhost `<cache><enableCache>` + `.htaccess CacheLookup` still gate each request, and the app must opt responses in via `X-LiteSpeed-Cache-Control`. With this flag absent the cache is inert
+      --page-cache-mem <MEM>
+          RAM budget (bytes) for the in-process index: entry metadata + precompressed variants + any in-RAM body. With --page-cache-store-path, persisted (tmpfs) bodies do NOT count here — they are bounded by --page-cache-disk-mem instead — so this should be sized for metadata, not body bytes. Without a file tier it is the whole body budget, as before. Default 128 MiB [default: 134217728]
+      --page-cache-disk-mem <DISK_MEM>
+          tmpfs file-tier footprint budget (bytes) for --page-cache-store-path: the disk LRU evicts the least-recently-served entry once charged file footprint under the store path exceeds this. tmpfs IS RAM, so size it against the box's headroom (with dict compression a 2 GiB cap holds the compressed equivalent of ~7–18 GiB of pages). 0 ⇒ fall back to --page-cache-mem. Ignored without a file tier. Default 2 GiB [default: 2147483648]
+      --page-cache-store-path <STORE_PATH>
+          Directory for the PERSISTENT tmpfs file tier. The default is "none": bodies stay in the in-process RAM cache and flush on restart. Pass an explicit directory such as /dev/shm/jetcache to opt into the LiteSpeed-Enterprise-style store where bodies live as files and the cache survives restarts via a boot-time warm scan. The LiteSpeed config's cacheStorePath is intentionally NOT used [default: none]
+      --page-cache-integrity-key <INTEGRITY_KEY>
+          Integrity key used for persistent cache containers [default: /usr/local/httpjet/conf/.jetcache.key]
+      --page-cache-hot-mem <HOT_MEM>
+          Byte cap of the in-RAM hot tier in front of the file store (zero-syscall zero-copy serves for the hottest bodies). Only meaningful with --page-cache-store-path. Default 192 MiB [default: 201326592]
+      --page-cache-dict <DICT>
+          (dedup) Path to a shared zstd dictionary used to store cached bodies far smaller. CMS pages share ~60%+ of their bytes as position-shifted boilerplate that only a dictionary captures; with this set, `cache_store` dict-compresses the stored body (the SERVED bytes stay standard zstd/br/gzip — browsers/CF can't decode a private dict). Absent/empty/unreadable ⇒ bodies are stored as plain identity (today's behaviour). Build one from a reviewed local corpus with scripts/train-pagecache-dict-from-files.sh [default: ""]
+      --page-cache-dict-vhost <DICT_VHOST>
+          Comma-separated `vhost=path` pairs: a PER-VHOST zstd dictionary, trained on that vhost's own content (train one local corpus per vhost). A shared dictionary trained on one site's boilerplate does little for a differently templated site, so each vhost compresses against its own. A vhost not listed here falls back to --page-cache-dict if set, else stores identity (today's behaviour). Example: `forum.example=conf/pagecache-forum.dict,moon.example=conf/pagecache-moon.dict` [default: ""]
+      --page-cache-admit-threshold <ADMIT_THRESHOLD>
+          (W-TinyLFU) Base admission bar: minimum frequency a cacheable response must show before it is STORED. 2 = store on the 2nd sighting (miss-miss-hit; rejects the long-tail of one-hit-wonders — the default). 1 = store on the 1st sighting (miss-hit; cache everything — now cheap with --page-cache-dict, with the store's byte LRU protecting the hot set). Size-weighting adds +1 per 256 KiB on top. Watch httpjet_cache_hit_ratio_real to tune [default: 2]
+      --page-cache-vary-cookies <VARY_COOKIES>
+          Comma-separated public-vary cookie names: a cacheable public response may declare `X-LiteSpeed-Vary: cookie=NAME,...` and the entry is keyed by these cookies' values (shared, non-sensitive prefs). Default matches the XenForo style/language set [default: xf_style_variation,xf_style_id,xf_language_id]
+      --page-cache-private-cookies <PRIVATE_COOKIES>
+          Comma-separated cookie names that forbid public caching if a public response tries to Set-Cookie them (session guard). Default: XenForo [default: xf_session,xf_user]
+      --page-cache-private
+          Enable the per-session PRIVATE cache tier: an `X-LiteSpeed-Cache-Control: private[,max-age=N]` response from a logged-in request is stored keyed by the session cookie and served only to that same session. OFF by default — without the flag a private opt-in bypasses exactly as before
+      --page-cache-private-session-cookie <PRIVATE_SESSION_COOKIE>
+          Request cookie whose VALUE keys a private entry's owner (the session) [default: xf_session]
+      --page-cache-private-user-cookie <PRIVATE_USER_COOKIE>
+          Request cookie whose PRESENCE routes a request to the private tier (the logged-in marker; XenForo's remember cookie) [default: xf_user]
+      --page-cache-shared-paths <SHARED_PATHS>
+          (shared-paths) Comma-separated matchers for visitor-invariant endpoints that MEMBER (logged-in) requests may still read/populate on the PUBLIC cache tier — sharing one entry across guests and every member session instead of duplicating per session and re-rendering each member's first view through PHP. Two matcher forms: `PATH?PARAM` (path equals PATH exactly AND the query carries `PARAM=`, e.g. `proxy.php?image`) and `PATH` (path prefix, e.g. `/wf-unfurl/image`); a missing leading `/` is normalized on. ONLY list endpoints whose bytes are identical for every visitor (HMAC-gated image proxies) — never HTML pages. Malformed specs abort startup. Empty/absent = feature inert (kill switch; members keep today's private routing). GLOBAL like the other --page-cache-private-* knobs — not per-vhost — but a matching request still passes every per-vhost public gate (`vhost` cache policy, `.htaccess` CacheLookup) and every public-store guard before it is served or stored [default: ""]
+      --page-cache-shared-paths-canary-percent <SHARED_PATHS_CANARY_PERCENT>
+          (shared-paths) Deterministic percentage (0-100) of member requests matching --page-cache-shared-paths that actually route to the public tier; the rest keep today's private-tier behavior. Sticky per member (bucketed by a hash of the user/session cookie value, exactly like --xf-capsule-member-canary-percent), so one member never flickers between tiers. 100 = all matching requests [default: 100]
+      --page-cache-standard-vhosts <STANDARD_VHOSTS>
+          Comma-separated vhost names put into "standards mode": they honor a standard `Cache-Control: public, max-age=N` as a cache opt-in (OpenLiteSpeed's `checkPublicCache` equivalent), get a default public cache policy when they declare no `<cache>` block, and default `CacheLookup` to on — so a non-LiteSpeed app (e.g. moon.example) caches like a standards-compliant shared cache. ALLOWLIST, not a global switch: a vhost not listed is unaffected (X-LiteSpeed opt-in only), so opting one content site in can't make an unrelated vhost (status/admin API) cache a response it merely marked public. All other guards (GET-only, Set-Cookie/private-cookie, vary, status, self-redirect) always apply [default: ""]
+      --page-cache-stale-default-secs <STALE_DEFAULT_SECS>
+          Stale-while-revalidate window (seconds) applied when the app declares none. 0 = off (serve only fresh unless the app sets stale-while-revalidate / max-stale) [default: 0]
+      --page-cache-stale-max-secs <STALE_MAX_SECS>
+          Hard cap (seconds) on the stale-while-revalidate window honored from the app [default: 86400]
+      --page-cache-stale-if-error-max-secs <STALE_IF_ERROR_MAX_SECS>
+          Hard cap (seconds) on the stale-if-error window honored from the app [default: 86400]
+      --page-cache-stale-if-error-default-secs <STALE_IF_ERROR_DEFAULT_SECS>
+          Stale-if-error window (seconds) applied when the app declares none: how long past freshness a public entry stays servable as a backend-5xx fallback (a brief lsphp/DB outage serves slightly-stale pages instead of error pages). 0 = off (the prior behavior: only an app-declared stale-if-error window arms the fallback) [default: 0]
+      --xf-capsule
+          Enable XenForo public-shell capsules. Requires --page-cache; otherwise inert
+      --xf-capsule-vhosts <VHOSTS>
+          Comma-separated resolved vhost names allowed to serve capsules. Empty DISABLES the capsule tier for every vhost (#239 fail-closed default) [default: ""]
+      --xf-capsule-paths <PATHS>
+          Comma-separated request-path prefixes eligible for capsule lookup/store [default: /,/forums/,/threads/,/whats-new/,/help/]
+      --xf-capsule-safe-get-mode <SAFE_GET_MODE>
+          Capsule route coverage. `prefixes` honors --xf-capsule-paths; `all-get-classified` uses a conservative unsafe-route classifier [default: prefixes] [possible values: prefixes, all-get-classified]
+      --xf-capsule-stale-secs <STALE_SECS>
+          Stale-while-revalidate window for capsule shell entries. This is applied to public-shell capsule stores even if the app declares a smaller window [default: 86400]
+      --xf-capsule-canary-percent <CANARY_PERCENT>
+          Deterministic percentage of eligible requests that may be served a capsule hit [default: 100]
+      --xf-capsule-members
+          Allow explicitly-marked member-cookie requests to receive public-shell capsules
+      --xf-capsule-member-canary-percent <MEMBER_CANARY_PERCENT>
+          Deterministic percentage of eligible member-cookie requests that may receive capsules [default: 0]
+      --cf-send-zstd
+          (CF_SEND_ZSTD) Compress responses to a trusted-proxy (Cloudflare) peer as zstd, ignoring the forwarded Accept-Encoding. CF asks the origin for br/gzip but decodes an origin `Content-Encoding: zstd` and re-encodes per browser at its edge — so this hands CF the cheapest-to-produce form (zstd ≪ brotli to compress) without changing what browsers receive. Officially unsupported CF↔origin; opt-in, default off. Never applies to untrusted (direct) clients. Off ⇒ byte-identical to today
+      --metrics-addr <METRICS_ADDR>
+          (OPS1) Loopback-only Prometheus metrics endpoint address. Empty to disable. Exposes the page-cache hit/miss ratio (the key operational number once --page-cache is live) plus request/connection counters [default: 127.0.0.1:9090]
+      --admin-addr <ADMIN_ADDR>
+          Opt-in read-only operational JSON endpoint (loopback TCP only)
+      --admin-write-addr <ADMIN_WRITE_ADDR>
+          Authenticated application-config writes on a separate loopback listener
+      --admin-token-file <ADMIN_TOKEN_FILE>
+          Private file containing a 64-character lowercase hexadecimal bearer token
+      --admin-resource-root <ADMIN_RESOURCE_ROOT>
+          Allowed existing filesystem root for submitted resources; repeatable
+      --waf-sidecar-addr <WAF_SIDECAR_ADDR>
+          Opt-in loopback HTTP request-inspection sidecar. The sidecar must return 204 to allow or 403 to block; absent keeps the WAF seam completely inert
+      --waf-sidecar-path <WAF_SIDECAR_PATH>
+          [default: /inspect]
+      --waf-timeout-ms <WAF_TIMEOUT_MS>
+          [default: 100]
+      --waf-body-max <WAF_BODY_MAX>
+          [default: 65536]
+      --waf-concurrency <WAF_CONCURRENCY>
+          [default: 128]
+      --waf-fail-open
+          Continue when the configured WAF sidecar is unavailable or malformed. Default is fail-closed (503); this weaker policy requires explicit opt-in
+      --request-decompression-extra <REQUEST_DECOMPRESSION_EXTRA>
+          Additional request Content-Encoding values to decode before dispatch. Gzip remains enabled for compatibility; Brotli and zstd are opt-in. Accepted comma-separated values: br,zstd [default: ""]
+      --telemetry-file <TELEMETRY_FILE>
+          (telemetry) Append a cumulative per-request telemetry snapshot row to this file every --telemetry-flush-secs: durability across restarts + a self-contained time-series for the two-node A/B. Empty = no disk flush (the in-RAM aggregates + the :9090 endpoint still work). e.g. logs/telemetry.tsv [default: ""]
+      --telemetry-flush-secs <TELEMETRY_FLUSH_SECS>
+          (telemetry) Snapshot flush interval in seconds (only used when --telemetry-file is set). Fixed RAM; ~1 MB/day on disk at the default [default: 30]
+      --php-slow-log <PHP_SLOW_LOG>
+          (attribution) Per-request PHP render log: a TSV line for every LSAPI request whose render TTFB exceeds --php-slow-threshold-ms, plus a 1-in-128 sample of ALL PHP requests as the population baseline — the per-URL / user-class attribution behind the lsapi_ttfb histogram. Rolls at 64 MiB, gzip archives, 30-day prune. Empty = disabled. e.g. logs/php-slow.tsv [default: ""]
+      --php-slow-threshold-ms <PHP_SLOW_THRESHOLD_MS>
+          (attribution) "Slow" threshold in milliseconds for --php-slow-log [default: 50]
+      --php-max-process-time-ms <PHP_MAX_PROCESS_TIME_MS>
+          (ops2/resilience) Total request processing deadline in milliseconds. When exceeded, the handler closes the connection (504); in OWNED/spawn mode the monitor also kills+restarts the worker (Tier-2). Under --lsphp-external (prod) there is no monitor in this process, so only the Tier-1 504 applies — a wedged worker is NOT auto-reclaimed here. 0 = no deadline (matches the LiteSpeed XML `maxProcessTime` 0-means-unlimited convention). Absent ⇒ the XML value if present, else no deadline. Must be conservative: too low kills slow renders
+      --request-id-header
+          (obs) Echo the per-request correlation id (also in the access/error/php-slow logs) as an `X-Request-Id` response header, so a client/CDN can join a response to the server-side logs. Off by default
+      --mimalloc-trim-secs <MIMALLOC_TRIM_SECS>
+          (mem) Interval (seconds) for the background mimalloc OS-trim that calls mi_collect(force) to hand retained/cold arena pages back to the OS (counters the swap retention seen in prod after a burst). 0 = disable [default: 120]
+      --mimalloc-trim-threshold-mib <MIMALLOC_TRIM_THRESHOLD_MIB>
+          (mem) Only run the mimalloc trim when process RSS+swap (read from /proc/self/status) is at least this many MiB; 0 = always. Lets a small, healthy process skip the collect entirely. Default 768: well above the measured healthy steady-state (x86 ~360 MiB, ARM ~240 MiB) so a process at rest never pays the force-collect cost, while genuine post-burst arena retention still trips the safety-net reclaim [default: 768]
+      --profile-token <PROFILE_TOKEN>
+          (profiling) Optional shared token guarding the /debug/pprof/profile endpoint (only built with `--features profiling`; loopback-only regardless). Empty = no token (loopback is the only guard) [default: ""]
+      --rewrite-outcome-ttl-ms <REWRITE_OUTCOME_TTL_MS>
+          (rewrite) TTL in milliseconds for the rewrite-outcome cache (memoized rewrite decisions for `path_cacheable` chains, keyed by vhost/scheme/ method/host/path/query + any keyable header vars). 0 disables the cache entirely. The default (1000 ms) matches the historical hard-coded TTL — it bounds `-f`/`-d` filesystem staleness exactly like the StatCache and lets `.htaccess` edits take effect within ~1 s [default: 1000]
+      --rewrite-ua-classify
+          (rewrite) Key UA-reading rewrite chains by the bitmap of matching User-Agent RewriteConds instead of the raw UA string, when parse-time analysis proves the outcome depends on the UA only through those match results. Collapses real-world UA diversity (near-zero hit rate on raw UAs) onto a handful of outcome-cache entries. Default OFF — enabling is a deploy-time decision
+      --ktls [<KTLS>]
+          (uring, STAGED) Kernel-TLS on the io_uring TLS path: after the rustls handshake, upgrade the socket to kTLS so H1/H2 serve plaintext over the raw fd (kernel encrypt/decrypt), removing the userspace AEAD copy on large-body egress. Runs only on the io_uring TLS path (the default transport). `auto` (default) requires a `--features ktls` build, a physical default-route NIC, and active `tls-hw-tx-offload`; otherwise it logs one reason and stays on rustls. `on` forces kTLS for isolated benchmarking and fails when the feature is absent; `off` never enables it. A bare `--ktls` remains an alias for `--ktls=on`. TLS 1.3 only (1.2 falls back to userspace); peer KeyUpdate is handled (RX rekey + reply). STAGED — validate on an alt port before production [default: auto] [possible values: auto, on, off]
+  -h, --help
+          Print help

@@ -1,0 +1,16 @@
+stateDiagram-v2
+  direction LR
+  [*] --> Cold: healthCheck configured
+  [*] --> Eligible: no healthCheck (passive only)
+  Cold --> Eligible: rise consecutive probe successes
+  Eligible --> Down: fall consecutive probe failures
+  Eligible --> Broken: 3 consecutive dial failures (passive breaker)
+  Broken --> Eligible: successful dial
+  Down --> Eligible: rise successes (no user traffic needed)
+  note right of Cold
+    ineligible until the rise
+    threshold is met
+  end note
+  note right of Down
+    all peers ineligible → 503
+  end note

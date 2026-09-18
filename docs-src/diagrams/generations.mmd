@@ -1,0 +1,13 @@
+stateDiagram-v2
+  direction LR
+  [*] --> Candidate: SIGHUP · PUT /v1/config
+  Candidate --> Rejected: parse error · restart_required · stale revision · missing vhost file
+  Candidate --> Published: exact revision recheck passes
+  Rejected --> [*]: serving generation untouched
+  Published --> Serving
+  Serving --> Retiring: a newer generation publishes
+  Retiring --> [*]: in-flight requests finish on their pinned generation
+  note right of Published
+    caches keyed by epoch + generation:
+    old renders cannot overwrite new entries
+  end note

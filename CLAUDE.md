@@ -10,21 +10,37 @@ This directory is **not tracked in the `/web` monorepo git** (`git ls-files` ret
 
 The site is dogfooded: per `/web/CLAUDE.md` the httpjet Rust server is what serves production `:80`/`:443`, and it honors `.htaccess` — so this site is served by the very server it documents.
 
-## No build system — minified siblings are committed by hand
+## Two surfaces, two build models
 
-There is no `package.json`, bundler, `Makefile`, or build step anywhere in this tree. Instead, **every source asset has a committed minified sibling, and the HTML loads the `.min.*` version**:
+**Landing (`/`)** has no build system: `index.js`/`index.css` are minified by hand into
+`index.min.js`/`index.min.css`, and the landing CSS is additionally **inlined** into a
+`<style>` block in `index.html` (perf, see `PERFORMANCE.md`). Edit source → minify →
+paste. Nothing in the repo does this for you.
 
-| Source (edit this) | Shipped (HTML loads this) |
+**Docs (`/docs/`) are GENERATED — do not hand-edit `docs/*.html`.** Since 2026-09-17 the
+docs are assembled by `docs-src/build.py` (a directory that is denied over HTTP and not
+in any git repo):
+
+| Edit this | To change |
 |---|---|
-| `index.js` / `index.css` | `index.min.js` / `index.min.css` |
-| `docs/assets/docs.js` / `docs.css` | `docs/assets/docs.min.js` / `docs.min.css` |
-| `docs/assets/docs-head.js` | `docs/assets/docs-head.min.js` |
-| `docs/assets/search-index.js` | `docs/assets/search-index.min.js` |
-| `analytics-helper.js` | `analytics-helper.min.js` |
+| `docs-src/pages/<slug>.html` | a page's body (inner content of `<main>`; the shell, crumbs, pager and footer are added by the build) |
+| `docs-src/build.py` → `NAV` | the sidebar groups, page order/pager, `<title>` and meta descriptions, the search index |
+| `docs-src/build.py` → `CHARTS` | the SVG bar charts (`<!--chart:name-->` in a page) |
+| `docs-src/diagrams/<n>.mmd` | a mermaid diagram (`<!--diagram:<n>|caption-->` in a page); run `node render.js` after editing |
+| `docs/assets/docs.css`, `docs.js`, `docs-head.js` | styles/behavior/header — the build minifies them and rewrites the `groups` array + `?v=` in `docs-head.js` |
+| `docs-src/build.py` → `VERSION` | the `?v=YYYYMMDDx` cache-buster on every docs asset |
 
-The `.min.*` files are single-line, whitespace-stripped versions. **Editing a source file alone changes nothing in production** — you must regenerate its `.min` sibling (no in-repo tool; minify by hand or with an external minifier preserving behavior). When in doubt, verify the `.min` file reflects your edit before considering the change done.
+```bash
+cd /web/httpjet/docs-src && npm install     # once; mermaid + esbuild (puppeteer from /web/node_modules)
+node render.js                              # diagrams/*.mmd → rendered/*.svg (headless Chrome)
+python3 build.py                            # writes docs/*.html, search-index(.min).js, docs-head(.min).js, docs.min.{css,js}
+```
 
-> **Landing CSS exception (perf):** `index.html` no longer loads `index.min.css` via a `<link>` — the minified landing CSS is **inlined** in a `<style>` block in `<head>` to eliminate the render-blocking stylesheet request (this is what makes the landing a 100/100 PageSpeed page; see `PERFORMANCE.md`). So the landing CSS now has a **three-step** chain: edit `index.css` → minify to `index.min.css` → **paste that minified content into the `<style>` block in `index.html`** (replacing everything between the style tags). `index.min.css` is kept as the canonical source-of-minified but is no longer fetched by the landing page. The docs CSS (`docs/assets/docs.min.css`) is unchanged — still loaded via `<link>`.
+Diagrams are pre-rendered to inline SVG (the zone CSP is `script-src 'self'`, so no
+mermaid at runtime); `search-index.js` is generated from the pages' `h2`/`h3` ids; the
+`docs-head.js` version selector is rewritten by the build. `docs-src/README.md` has the
+mermaid gotchas. Content facts come only from `/usr/local/httpjet` — re-sync from
+`CLAUDE.md`, `ARCHITECTURE.md`, `RESULTS.md`, `docs/*.md` and `serve --help` there.
 
 ## Cache busting (assets are immutable for a year)
 
@@ -32,18 +48,18 @@ The `.min.*` files are single-line, whitespace-stripped versions. **Editing a so
 
 - Landing: only `index.min.js` still uses `?v=` (the landing CSS is inlined, so it has no cache-bust query — it ships inside the HTML, which is `max-age=3600`). Docs assets use `?v=`. The two surfaces version independently.
 - After editing landing files, the HTML is cached at the edge (`max-age=3600`) — purge the Cloudflare cache for the httpjet.net zone to make changes live immediately (Cloudflare dash → Caching → Purge, or the API).
-- **Gotcha:** the docs version string is also hardcoded inside `docs/assets/docs-head.js` (the `body.querySelector('script[src="assets/search-index.min.js?v=20260621n"]')` selector at ~line 85). If you bump the docs `?v=` in the HTML heads, update that selector too or the search overlay injection silently breaks.
+- **Gotcha:** the docs version string is also hardcoded inside `docs/assets/docs-head.js` (the `body.querySelector('script[src="assets/search-index.min.js?v=…"]')` selector). `docs-src/build.py` rewrites it from `VERSION`; if you ever bump `?v=` by hand, update that selector too or the search overlay injection silently breaks.
 
 ## Two surfaces
 
 **Landing (`/` → `index.html`)** — a single-page teaser driven by `index.js` + `index.css`: rotating taglines, animated counter chips, competitor-logo "flyby" animation (`assets/logos/`), a canvas FX background, and an "epic mode" procedural Web Audio synth player. Self-contained; no shared chrome with the docs.
 
-**Docs (`/docs/` → `docs/index.html` + 11 sibling pages)** — content-only pages. Each docs HTML file is a bare `<main class="content">` of `<section>`s. **The header, sidebar nav, on-page TOC, and search overlay are injected at runtime by `docs-head.js`** — they are *not* duplicated in each page's HTML. Consequences:
+**Docs (`/docs/` → `docs/index.html` + 20 sibling pages, generated from `docs-src/`)** — content-only pages. Each docs HTML file is a bare `<main class="content">` of `<section>`s. **The header, sidebar nav, on-page TOC, and search overlay are injected at runtime by `docs-head.js`** — they are *not* duplicated in each page's HTML. Consequences:
 
-- The **sidebar nav is single-sourced** in the `groups` array inside `docs-head.js`. To add/rename/reorder a docs page in the nav, edit that array (and the header's primary `<nav>` if it's a top-level link) — do not hand-edit nav markup in each page.
-- The **client-side search index is hand-maintained** in `docs/assets/search-index.js` (`window.DOCS_INDEX`, one entry per page with its headings). It is delivered as a `<script>` (assigning a global), **not** fetched, because the zone CSP forbids `connect-src` — so the search index cannot be loaded via `fetch`/XHR. Add a new docs page → add its entry here by hand.
+- The **sidebar nav is single-sourced** in `NAV` in `docs-src/build.py`, which rewrites the `groups` array inside `docs-head.js` on every build (the header's primary `<nav>` is still hand-edited in `docs-head.js`).
+- The **client-side search index is generated** into `docs/assets/search-index.js` (`window.DOCS_INDEX`, one entry per page with its `h2`/`h3` headings) by the build. It is delivered as a `<script>` (assigning a global), **not** fetched, because the zone CSP forbids `connect-src` — so the search index cannot be loaded via `fetch`/XHR.
 
-**Adding a docs page** therefore takes three coordinated edits: (1) create `docs/<page>.html` (copy an existing page's `<head>` + `<main class="content">` skeleton), (2) add it to the `groups` array in `docs-head.js` (and bump/minify), (3) add its entry to `search-index.js` (and minify).
+**Adding a docs page**: create `docs-src/pages/<slug>.html` (body only), add its tuple to `NAV` in `docs-src/build.py`, bump `VERSION`, run `python3 build.py`. Interactive components available in every page: `.tabs`, filterable `.flagtable` with a `.filterbar[data-filter=<table id>]`, `.steps`, `.kv`, `.badge`, `.widget` (the cache-key explorer and budget calculator in `docs.js` are bound by element id).
 
 ## CSP is defined twice — keep them in sync
 

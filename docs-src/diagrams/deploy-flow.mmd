@@ -1,0 +1,15 @@
+flowchart TB
+  classDef gate fill:#1a1f33,stroke:#fbbf73,color:#e8ecf6
+  classDef ok fill:#0f2a24,stroke:#34d399,color:#fff
+  classDef bad fill:#2a1420,stroke:#e879f9,color:#fff
+  A["cargo build --release -p httpjet<br/>(or scripts/build-pgo.sh)"] --> B["httpjet --root … check --strict"]:::gate
+  B -- findings --> STOP[fix config first]:::bad
+  B -- clean --> C["install to a stable path outside target/<br/>keep the previous binary beside it"]
+  C --> D["systemctl restart httpjet<br/>(socket activation keeps :80/:443 open; PHP pool untouched)"]
+  D --> E["health probe on loopback<br/>curl -sk -H 'Host: …' https://127.0.0.1/"]:::gate
+  E -- fail --> RB["restore previous binary → systemctl restart"]:::bad
+  E -- ok --> F["cache gates (only with --page-cache)<br/>cache_xurl · cache_scheme · cache_xhost · cache_private · cache_persist"]:::gate
+  F -- fail --> RB
+  F -- ok --> G["purge probe: POST /__hj_cache_purge → 204"]:::gate
+  G --> H["done — watch httpjet_requests_total, 5xx, hit ratio"]:::ok
+  RB --> I["if wrong content reached the CDN: purge the edge too"]

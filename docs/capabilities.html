@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>httpjet — capabilities and limits</title>
+<meta name="description" content="What httpjet supports today, what is optional behind build features, what is deliberately unsupported, and the fixed operational bounds.">
+<meta property="og:title" content="httpjet — capabilities and limits">
+<meta property="og:description" content="What httpjet supports today, what is optional behind build features, what is deliberately unsupported, and the fixed operational bounds.">
+<meta property="og:image" content="https://httpjet.net/og.jpg">
+<meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:url" content="https://httpjet.net/docs/capabilities.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="httpjet — capabilities and limits">
+<meta name="twitter:description" content="What httpjet supports today, what is optional behind build features, what is deliberately unsupported, and the fixed operational bounds.">
+<meta name="twitter:image" content="https://httpjet.net/og.jpg">
+<link rel="canonical" href="https://httpjet.net/docs/capabilities.html">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/docs.min.css?v=20260917b">
+<script defer src="assets/docs-head.min.js?v=20260917b"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-ZR4WV214JT');
+</script>
+</head>
+<body>
+
+<main class="content">
+<div class="callout gotcha construction-notice" role="note" aria-label="Documentation status"><div class="ico" aria-hidden="true">!</div><div class="body"><span class="tag">Under construction</span><p>This documentation is still in progress. Some information may be incomplete or out of date. Please check back later.</p></div></div>
+<p class="crumbs"><a href="./">Docs</a><span>/</span>Capabilities &amp; limits</p>
+<p class="eyebrow">Guide</p>
+<h1>Capabilities &amp; limits</h1>
+    <p class="lede">What the current source tree does, what it does only behind a build feature, what is a tested subset, and what is deliberately unsupported. <strong>Supported</strong> means an implemented, tested code path — not directive-for-directive parity with LiteSpeed, NGINX, Apache or Caddy. Optional features stay off unless explicitly enabled at build <em>and</em> at runtime.</p>
+
+    <div class="chips">
+      <span class="chip"><span class="badge ok">supported</span> implemented + tested</span>
+      <span class="chip"><span class="badge opt">optional</span> build feature + runtime opt-in</span>
+      <span class="chip"><span class="badge part">partial</span> tested subset — review the boundary</span>
+      <span class="chip"><span class="badge no">unsupported</span> deliberate, documented</span>
+    </div>
+
+    <section>
+      <h2 id="matrix">Capability matrix</h2>
+      <div class="filterbar" data-filter="captable"><input type="search" placeholder="filter capabilities… (e.g. h3, cache, auth)" aria-label="Filter capabilities"><span class="count"></span></div>
+      <div class="tablewrap"><table id="captable" class="flagtable"><colgroup><col class="c-key"><col class="c-mid"><col class="c-txt"></colgroup><thead><tr><th>Area</th><th>Status</th><th>Scope and important limits</th></tr></thead>
+        <tbody>
+          <tr><td>HTTP/1.1</td><td><span class="badge ok">supported</span></td><td>Keep-alive, pipelining, chunked bodies; strict framing; configured header/URL/body/timeout/request-count limits; 103 Early Hints; single + multipart ranges; <code>CONNECT</code> answered 405. <a href="protocols.html#http1">→</a></td></tr>
+          <tr><td>HTTP/2</td><td><span class="badge ok">supported</span></td><td>Native TLS h2 and h2c prior knowledge; flow-controlled buffered, file and streaming responses; h2spec 146/146. No server push; no <code>Upgrade: h2c</code>. <a href="protocols.html#http2">→</a></td></tr>
+          <tr><td>HTTP/3</td><td><span class="badge ok">supported</span></td><td>QUIC over UDP through the same pipeline; TCP <em>and</em> UDP HTTPS ports must both be published. Connection migration disabled. <a href="protocols.html#http3">→</a></td></tr>
+          <tr><td>TLS</td><td><span class="badge ok">supported</span></td><td>rustls (aws-lc-rs) TLS 1.2/1.3, SNI, ALPN, dual ECDSA+RSA chains, certificate reload, optional/required client certificates, CRLs. <a href="certificates.html">→</a></td></tr>
+          <tr><td>Automatic certificates</td><td><span class="badge opt">optional</span></td><td>HTTP-01 and DNS-01 behind <code>--features acme</code> + CLI opt-in. One managed account/identifier set per process; DNS-01 needs an operator-supplied webhook controller. <a href="certificates.html#acme">→</a></td></tr>
+          <tr><td>OCSP stapling</td><td><span class="badge opt">optional</span></td><td><code>--features ocsp</code>, OpenSSL 3.x, an explicit responder that covers every issuer. Not for CAs that retired OCSP (Let's Encrypt). <a href="certificates.html#ocsp">→</a></td></tr>
+          <tr><td>kTLS / sendfile</td><td><span class="badge part">partial</span></td><td>Plain-TCP H1 file bodies use <code>sendfile(2)</code> always; a <code>--features ktls</code> build adds TLS 1.3 H1 sendfile only when <code>--ktls=auto</code> finds a physical NIC with active <code>tls-hw-tx-offload</code>. H2/H3/UDS/TLS 1.2 keep userspace paths. <a href="protocols.html#sendfile">→</a></td></tr>
+          <tr><td>Virtual hosts</td><td><span class="badge ok">supported</span></td><td>Listener + exact Host/SNI maps and a bare <code>*</code> fallback. <code>*.example.test</code> is <em>not</em> a wildcard match (warned).</td></tr>
+          <tr><td>Static content</td><td><span class="badge ok">supported</span></td><td>Conditional requests, LiteSpeed ETags, ranges, in-memory small-file promotion, precompressed <code>.br</code>/<code>.gz</code> siblings, traversal-safe opens. <a href="protocols.html#sendfile">→</a></td></tr>
+          <tr><td>Reverse proxy</td><td><span class="badge ok">supported</span></td><td>HTTP/1 upstreams plus explicit <code>h2://</code>/<code>h2s://</code>; request/response streaming, SSE; upstream mTLS. <a href="gateways.html">→</a></td></tr>
+          <tr><td>WebSocket</td><td><span class="badge part">partial</span></td><td>HTTP/1 upgrade and raw relay. Relay does not support TLS, H2 or Unix-socket upstreams. <a href="gateways.html#websocket">→</a></td></tr>
+          <tr><td>Upstream groups</td><td><span class="badge ok">supported</span></td><td>Primary-first, smooth weighted round-robin, weighted least-active, passive breaker, optional connect/GET/HEAD probes. No automatic replay of unsafe requests. <a href="gateways.html#groups">→</a></td></tr>
+          <tr><td>PHP / LSAPI</td><td><span class="badge ok">supported</span></td><td>Native LSAPI; owned pool or separately supervised external pool with generation tracking and candidate-first reload. <a href="lsapi.html">→</a></td></tr>
+          <tr><td>FastCGI</td><td><span class="badge ok">supported</span> opt-in</td><td>Explicit <code>fcgi</code>/<code>fastcgi</code> processor + suffix routing over TCP or Unix sockets; the app is externally supervised; bodies buffered. <a href="gateways.html#fastcgi">→</a></td></tr>
+          <tr><td>CGI execution, uWSGI</td><td><span class="badge no">unsupported</span></td><td>Design contracts exist; nothing is routable. A <code>cgi</code> handler without an explicit FastCGI processor fails closed (never serves source). <a href="gateways.html#cgi">→</a></td></tr>
+          <tr><td>Rewrites &amp; <code>.htaccess</code></td><td><span class="badge part">partial</span></td><td>Common rewrite, access, auth, header, expiry, cache and env directives. <code>Header</code> is a tested subset; <code>RequestHeader</code> is ignored. Run <code>check --strict</code>. <a href="rewrite.html#directives">→</a></td></tr>
+          <tr><td>Compression</td><td><span class="badge ok">supported</span></td><td>Dynamic gzip/brotli/zstd + precompressed siblings. Gzip <em>request</em> decoding on by default; brotli/zstd request decoding opt-in and bounded. <a href="compression.html">→</a></td></tr>
+          <tr><td>Origin page cache</td><td><span class="badge ok">supported</span> opt-in</td><td>Public/private tiers, vary, purge tags, stale policies, single flight, admission, RAM/file tiers, dictionaries, restart scan, generation-scoped keys. A first-class route-level <em>microcache policy</em> is specified, not implemented. <a href="page-cache.html">→</a></td></tr>
+          <tr><td>Access controls</td><td><span class="badge ok">supported</span></td><td>Peer ACLs, trusted-proxy client IP, GeoIP/ASN CIDR rules, per-IP rate limit, body limits, Basic auth (bcrypt/SHA htpasswd). <a href="security.html">→</a></td></tr>
+          <tr><td>WAF</td><td><span class="badge opt">external</span> opt-in</td><td>Bounded loopback inspection sidecar, fail-closed by default. No embedded ModSecurity/CRS engine. <a href="extensions.html#waf">→</a></td></tr>
+          <tr><td>Logs and metrics</td><td><span class="badge ok">supported</span></td><td>Combined or JSON access logs, text or JSON error logs with redaction, syslog tap, Prometheus text metrics, request ids, telemetry TSV, PHP slow log. <a href="observability.html">→</a></td></tr>
+          <tr><td>OpenTelemetry</td><td><span class="badge opt">optional</span></td><td>OTLP traces and metrics behind <code>--features otel</code> + <code>HTTPJET_OTEL=1</code>. Bounded queues; no payload export. <a href="observability.html#otel">→</a></td></tr>
+          <tr><td>Runtime APIs</td><td><span class="badge opt">opt-in</span></td><td>Loopback read-only status API; separately authenticated transactional config API. Boot-owned resources stay restart-required. <a href="admin-api.html">→</a></td></tr>
+          <tr><td>Extensions</td><td><span class="badge part">compile-time only</span></td><td>Trusted Rust crates register read-only pre-handlers and response transforms. No dynamic ABI, no in-process sandbox. <a href="extensions.html">→</a></td></tr>
+          <tr><td>Deployment</td><td><span class="badge ok">examples</span></td><td>Generic systemd units (socket activation, boot gate, PHP pool) and a hardened OCI example that still needs an io_uring-permitting runtime. <a href="operations.html">→</a></td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="unsupported">Deliberately unsupported or deferred</h2>
+      <ul>
+        <li><strong>Generic CGI process execution and uWSGI</strong> are not routable; their fail-closed design gates are documented. FastCGI, LSAPI or HTTP proxying cover application paths.</li>
+        <li><strong>HTTP/2 server push</strong> is not implemented — use <code>Link</code> preload plus 103 Early Hints.</li>
+        <li><strong>HTTP trailers</strong> (inbound h2/h3 trailing HEADERS, chunked trailers) are discarded and not forwarded through gateways. LSAPI has no trailer concept.</li>
+        <li><strong>h2c is prior-knowledge only</strong>; the HTTP/1.1 <code>Upgrade: h2c</code> handshake was removed by RFC 9113 and is not implemented.</li>
+        <li><strong>QUIC connection migration</strong> is disabled: listener steering does not yet preserve connection ownership across an address change.</li>
+        <li><strong>No epoll/tokio transport fallback</strong>, no Windows/macOS. Linux io_uring is mandatory.</li>
+        <li><strong>No native dynamic-module ABI.</strong> Untrusted inspection belongs behind the bounded sidecar contract.</li>
+        <li><strong>LiteSpeed anti-abuse elements</strong> (<code>lsrecaptcha</code>, <code>censorshipControl</code>, permission masks, <code>cgiRlimit</code>) are parsed and warned about, never enforced.</li>
+        <li><strong>Legacy htpasswd schemes</strong> (APR1 <code>$apr1$</code>, <code>crypt()</code>) verify <em>false</em> with a parse-time warning — re-hash with <code>htpasswd -B</code>.</li>
+        <li><strong>Cross-node cache peers</strong> (<code>--cache-peer</code>, peer fill/purge fan-out) were removed in August 2026; the loopback purge and readiness endpoints remain.</li>
+        <li><strong>Multipath QUIC</strong> was assessed and deferred (June 2026).</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 id="features">Build-time feature gates</h2>
+      <p>The default binary includes the serving engine, LSAPI, FastCGI, proxy, cache, logging, metrics, the WAF sidecar client and an empty extension registry. These features add dependencies and require an explicit build — and still nothing happens until the matching runtime switch is set:</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Cargo feature</th><th>Adds</th><th>Runtime opt-in</th></tr></thead>
+        <tbody>
+          <tr><td><code>acme</code></td><td><code>hj-acme</code>: HTTP-01 / DNS-01 issuance and renewal</td><td><code>--acme-directory … --acme-domains … --acme-store … --acme-accept-terms</code></td></tr>
+          <tr><td><code>ocsp</code></td><td><code>hj-ocsp</code>: fetch, validate, staple (OpenSSL 3.x)</td><td><code>--ocsp-responder URL</code> (+ <code>--ocsp-required</code>)</td></tr>
+          <tr><td><code>otel</code></td><td>OTLP HTTP/protobuf tracing and metrics exporters</td><td><code>HTTPJET_OTEL=1</code> (+ <code>HTTPJET_OTEL_METRICS=1</code>)</td></tr>
+          <tr><td><code>profiling</code></td><td>Loopback pprof CPU profile endpoint</td><td><code>--profile-token</code> policy; loopback only regardless</td></tr>
+          <tr><td><code>ktls</code></td><td>Kernel TLS on the io_uring TLS path</td><td><code>--ktls=auto|on|off</code>; <code>auto</code> requires a physical NIC with <code>tls-hw-tx-offload</code></td></tr>
+          <tr><td><code>allocount</code></td><td>Allocation-measurement harness</td><td>Diagnostic builds only</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="bounds">Operational bounds</h2>
+      <p>Request limits come from the LiteSpeed <code>&lt;tuning&gt;</code> block and per-context overrides; inspect the effective values with <code>check --strict</code> and <code>serve --help</code>. Fixed or separately configured bounds worth knowing:</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Bound</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Page-cache single object</td><td>100 MiB — larger responses serve uncached</td></tr>
+          <tr><td>Page-cache budgets</td><td>Independent index (<code>--page-cache-mem</code>), file tier (<code>--page-cache-disk-mem</code>), hot tier (<code>--page-cache-hot-mem</code>), object TTL and stale-window caps; persistent files need an integrity key (<code>--page-cache-integrity-key</code>, created <code>O_EXCL</code> 0600)</td></tr>
+          <tr><td>Bridge buffering</td><td>Bodies ≤ 256 KiB buffered, larger streamed (H1/H2/H3)</td></tr>
+          <tr><td>Request body budget</td><td>Process-wide byte budget with leases; usage, capacity and rejections exported as <code>httpjet_body_buffer_*</code></td></tr>
+          <tr><td>Request decompression</td><td>16 MiB decoded ceiling; 17 MiB codec workspace reservation for br/zstd; zstd window ≤ 2<sup>24</sup></td></tr>
+          <tr><td>Multipart ranges</td><td>8 ranges / 8 MiB of part bytes, else a full 200</td></tr>
+          <tr><td><code>.htaccess</code> chain depth</td><td>64 directories, then a deny-all sentinel</td></tr>
+          <tr><td>sub_filter buffering</td><td>4 MiB default (<code>subFilterMaxBody</code>); beyond it the stream passes through raw</td></tr>
+          <tr><td>WAF sidecar</td><td>Body ≤ 1 MiB inspected (<code>--waf-body-max</code>), total timeout ≤ 30 s, concurrency ≤ 4096, 4 KiB response head, 64 MiB process-wide serialization budget</td></tr>
+          <tr><td>Admin APIs</td><td>Read: 4 KiB/32 header fields, 4 connections, 5 s deadlines, 1 MiB response. Write: 8 KiB/32 fields, 1 MiB body, ≤128 vhosts, ≤64 XML nesting, 4 connections, one candidate build, 5 s lock / 10 s wait</td></tr>
+          <tr><td>Active health probes</td><td>Intervals/timeouts 1 s–1 h, rise/fall 1–100, process-wide cap of 16 concurrent probes</td></tr>
+          <tr><td>FastCGI</td><td>65,535-byte records; separately bounded PARAMS aggregate, response head, STDERR, body buffering, pool size and deadlines</td></tr>
+          <tr><td>ACME</td><td>1–100 identifiers, ≤128 live challenges, 1 MiB snapshots and CA bodies, 120 s per attempt</td></tr>
+          <tr><td>OCSP</td><td>≤128 identities, ≤4 concurrent fetches, 64 KiB responses, 7-day staple validity cap</td></tr>
+          <tr><td>OpenTelemetry</td><td>2048 queued spans + one 256-span batch, 1 s interval, 2 s export timeout, 3 s shutdown bound</td></tr>
+          <tr><td>Loopback-only endpoints</td><td><code>/__hj_cache_purge</code>, <code>/__hj_cache_ready</code> (raw loopback peer), metrics <code>:9090</code>, admin listeners</td></tr>
+        </tbody></table></div>
+      <p class="mini">Defaults are starting points, not sizing recommendations. Worker count, open-file limit, body budget, cache caps, PHP/backend concurrency and health/WAF timeouts must be sized together for the deployment.</p>
+    </section>
+
+    <section>
+      <h2 id="reload">Reload boundary (summary)</h2>
+      <p>SIGHUP and the transactional API replace application state without dropping in-flight requests: vhost maps, rewrites, document roots, contexts, reloadable request settings, TLS material on an unchanged listener topology, and the trust policy of an already-enabled QUIC endpoint. Listener addresses/roles, QUIC enablement, Unix-listener topology, PHP topology, cache-store identity, process user/namespace policy and other boot-owned resources are <strong>restart-required</strong>; the write API says so instead of partially applying. Details: <a href="admin-api.html#reload">Admin API &amp; reload</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="checks">Reproducible checks</h2>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>verify the tree</b> · what CI runs</span></div><pre><code>cargo fmt --all -- --check
+cargo check --locked -p httpjet --bin httpjet
+cargo run --locked -p httpjet -- --root "$PWD/examples/litespeed" check --strict
+cargo test --locked --workspace</code></pre></div>
+      <p>Protocol, cache, ACME, OCSP, OTel, FastCGI, WAF, admin and OCI pages carry their narrower acceptance commands. Every test uses synthetic configuration, temporary files and ephemeral loopback ports.</p>
+    </section>
+
+<nav class="pager" aria-label="Pagination"><a class="prev" href="architecture.html"><div class="dir">← Prev</div><div class="ttl">Architecture</div></a><a class="next" href="protocols.html"><div class="dir">Next →</div><div class="ttl">Protocol stacks</div></a></nav>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-09-17 (v0.0.1).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+</main>
+<script defer src="assets/search-index.min.js?v=20260917b"></script>
+<script defer src="assets/docs.min.js?v=20260917b"></script>
+</body>
+</html>

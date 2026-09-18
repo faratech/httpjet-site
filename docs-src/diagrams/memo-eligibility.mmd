@@ -1,0 +1,12 @@
+flowchart TB
+  classDef ok fill:#0f2a24,stroke:#34d399,color:#fff
+  classDef bad fill:#2a1420,stroke:#e879f9,color:#fff
+  A["static GET/HEAD on the on-core path"] --> B("docroot chain MemoClass<br/>(parse-time verdict, shown by httpjet check)")
+  B -- "reads Remote_Addr / Server_Addr / Request_Protocol,<br/>Allow/Deny from net|env|host, REDIRECT_STATUS,<br/>%{HTTP_COOKIE} %{REMOTE_ADDR} %{TIME*} …" --> X["ineligible → full pipeline every time<br/>httpjet_fast_memo_ineligible_total"]:::bad
+  B -- "path-cacheable + keyable inputs only" --> C("request shape")
+  C -- "cookie · Range · If-* · Authorization" --> X
+  C -- "cookieless GET, 200, full body, no Set-Cookie" --> D["key = listener · scheme · trusted-proxy bit · vhost · Host · path?query · Accept-Encoding<br/>+ VARY-SET: raw value of every header the chain reads (Origin, UA bitmap …)"]
+  D --> E("memo hit within 1 s TTL?")
+  E -- yes --> H["serve finished bytes<br/>zero pipeline work"]:::ok
+  E -- no --> P["full pipeline once → store (64 MiB/worker)"]
+  P --> H

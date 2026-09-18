@@ -1,0 +1,13 @@
+flowchart TB
+  classDef pol fill:#13203a,stroke:#818cf8,color:#fff
+  R["request → proxy context or [P] rewrite"] --> G["resolve extProcessor group<br/>(server or vhost scope)"]
+  G --> E["eligible peers = active-health OK ∧ breaker closed"]
+  E --> P("loadBalancePolicy"):::pol
+  P -- "primary-first (default)" --> S1["first eligible in address order"]
+  P -- weighted-round-robin --> S2["smooth weighted RR<br/>addressWeights 1..1000"]
+  P -- weighted-least-active --> S3["min(active ÷ weight), smooth-WRR tie-break"]
+  S1 & S2 & S3 --> C["checkout pooled connection<br/>h1 · h2:// · h2s:// (scheme-scoped pool keys)"]
+  C -- "dial fails" --> F["mark bad, try next eligible<br/>(no unsafe-body replay)"]
+  F --> E
+  C -- "response head" --> H["stream body / SSE / WebSocket relay<br/>reservation released on completion"]
+  E -- "none eligible" --> X[503]

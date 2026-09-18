@@ -1,0 +1,14 @@
+flowchart TB
+  classDef bad fill:#2a1420,stroke:#e879f9,color:#fff
+  classDef ok fill:#0f2a24,stroke:#34d399,color:#fff
+  classDef warn fill:#2a2314,stroke:#fbbf73,color:#fff
+  A["--ocsp-responder URL<br/>(build with --features ocsp)"] --> B["background manager<br/>≤128 identities · ≤4 concurrent fetches<br/>5 s connect / 10 s total / 64 KiB"]
+  B --> C("response verified?<br/>issuer or delegated signer · SHA-256 CertID<br/>thisUpdate ≤ 7 d old · nextUpdate in future")
+  C -- GOOD --> D["staple installed in generation-bound slot<br/>refresh before expiry with jitter"]:::ok
+  C -- REVOKED --> E["suppress future handshakes for that leaf<br/>(not undone by same-leaf reload)"]:::bad
+  C -- UNKNOWN / malformed / transient --> F("still-valid cached staple?")
+  F -- yes --> D
+  F -- no --> G("--ocsp-required<br/>or Must-Staple?")
+  G -- no --> H["serve without a staple"]:::warn
+  G -- yes --> I["reject new TLS handshakes until a valid response arrives"]:::bad
+  D --> J["handshake: staple attached<br/>TLS resumption disabled while OCSP is enabled"]

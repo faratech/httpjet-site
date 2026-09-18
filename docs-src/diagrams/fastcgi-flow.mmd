@@ -1,0 +1,15 @@
+sequenceDiagram
+  participant P as pipeline<br/>suffix routing
+  participant H as hj-fastcgi handler
+  participant Pool as bounded pool<br/>(maxConns, one acquisition deadline)
+  participant A as FastCGI app<br/>(externally supervised, TCP or uds://)
+  P->>H: validated script target (beneath docroot, regular file, access checks passed)
+  H->>H: build CGI params — server-derived, HTTP_* validated, protected names not overridable
+  H->>H: buffer request body under the shared budget (exact STDIN length)
+  H->>Pool: acquire — poisoned by default
+  Pool->>A: BEGIN_REQUEST · PARAMS (≤65,535 B records) · STDIN · empty terminators
+  A-->>H: STDOUT: strict CGI head (CRLF only, one Status, Location default) + streamed body
+  A-->>H: STDERR — byte-capped, control-escaped → error log, never to client
+  A-->>H: END_REQUEST (exact 8-byte body)
+  H->>Pool: clean END_REQUEST → mark reusable — anything else → poison + close
+  H-->>P: response (hop-by-hop fields rejected)

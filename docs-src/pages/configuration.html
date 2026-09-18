@@ -1,0 +1,169 @@
+    <h1>Configuration reference</h1>
+    <p class="lede">httpjet is configured by a <strong>LiteSpeed-compatible XML tree</strong> selected with <code>--root</code>: <code>conf/httpd_config.xml</code>, the per-vhost files it references, and <code>conf/mime.properties</code>. An existing LiteSpeed or OpenLiteSpeed tree works as-is. On that base httpjet layers its own opt-in directives — marked <span class="badge hj">httpjet</span> — which LiteSpeed ignores. Operational overrides live on the <a href="cli.html">command line</a>, not in the XML.</p>
+
+    <section>
+      <h2 id="config-tree">The configuration tree</h2>
+      <p>With no <code>--root</code>, httpjet uses <code>/usr/local/lsws</code>. The parser (<code>hj-config</code>) applies LiteSpeed value semantics faithfully:</p>
+      <ul>
+        <li>Variables <code>$SERVER_ROOT</code>, <code>$HOSTNAME</code>, <code>$VH_ROOT</code>, <code>$VH_NAME</code> substitute in <code>$VAR</code> and <code>${VAR}</code> forms.</li>
+        <li>Sizes accept <code>K</code>/<code>M</code>/<code>G</code>/<code>B</code> suffixes; times are bare seconds.</li>
+        <li>Bounded integers use OLS semantics: absent, unparsable <em>or out-of-range</em> values fall back to the default (never clamped). The isolation modes <code>setUIDMode</code>/<code>chrootMode</code> are the exception: out-of-range is a hard error (2026-09-16).</li>
+        <li>Booleans are <code>1</code>, <code>2</code> or <code>true</code> (case-insensitive); <code>followSymbolLink</code>/<code>allowSymbolLink</code> treat <code>2</code> (owner-restricted) as fail-closed never-follow.</li>
+        <li>Unknown elements are ignored so real trees load; <code>check --strict</code> reports the ones that would silently do nothing.</li>
+      </ul>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>layout</b> · a server root</span></div><pre><code>/usr/local/lsws/
+├── conf/
+│   ├── httpd_config.xml          <span class="t-c"># server, tuning, security, listeners, extProcessors, vhost declarations</span>
+│   ├── mime.properties           <span class="t-c"># mime/type = ext1, ext2   (best-effort)</span>
+│   └── vhosts/example.test.xml   <span class="t-c"># &lt;virtualHostConfig&gt;: docroot, contexts, rewrite, vhssl, cache, logging</span>
+└── logs/</code></pre></div>
+    </section>
+
+    <section>
+      <h2 id="server">Server and tuning</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Directive</th><th>Default</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>serverName</code></td><td><code>$HOSTNAME</code></td><td>Server identity (else <code>localhost</code>).</td></tr>
+          <tr><td><code>user</code> / <code>group</code></td><td><code>nobody</code></td><td>Run-as credentials (the systemd unit usually sets these).</td></tr>
+          <tr><td><code>indexFiles</code></td><td><code>index.html</code></td><td>Directory-index candidates (vhost may override).</td></tr>
+          <tr><td><code>useIpInProxyHeader</code></td><td><code>2</code></td><td>Client-IP trust: 0 never · 1 always · 2 trusted peers only (+ <code>CF-Connecting-IP</code>) · 3 as 2 for IP purposes · 4 always. Restart-required through the write API.</td></tr>
+          <tr><td><code>&lt;quic&gt;&lt;quicEnable&gt;</code></td><td><code>0</code></td><td>HTTP/3 master switch; also drives <code>Alt-Svc</code>. Needs the UDP port published.</td></tr>
+          <tr><td><code>&lt;tuning&gt;maxConnections</code></td><td><code>65000</code></td><td>Connection cap.</td></tr>
+          <tr><td><code>connTimeout</code> / <code>keepAliveTimeout</code></td><td><code>60</code> / <code>5</code> s</td><td>Idle / keep-alive timeouts.</td></tr>
+          <tr><td><code>maxKeepAliveReq</code></td><td><code>1000</code></td><td>Requests per keep-alive connection (0 = unlimited).</td></tr>
+          <tr><td><code>maxReqURLLen</code> / <code>maxReqHeaderSize</code></td><td><code>8192</code> / <code>16380</code></td><td>URL and header-block caps.</td></tr>
+          <tr><td><code>maxReqBodySize</code></td><td><code>100M</code></td><td>Server-wide request-body cap (413); per-context override below.</td></tr>
+          <tr><td><code>perIpRate</code> · <code>perIpRateWindowSecs</code> <span class="badge hj">httpjet</span></td><td><code>0</code> · <code>1</code></td><td>Per-client-IP request throttle (0 = off) and its fixed window. 429 on exceed; fail-open under state pressure.</td></tr>
+          <tr><td><code>bandwidthLimit</code> <span class="badge hj">httpjet</span></td><td><code>0</code></td><td>Per-connection egress throttle, bytes/s (0 = unlimited). H2 paces per connection; H3 unpaced.</td></tr>
+          <tr><td><code>maxCachedFileSize</code> / <code>totalInMemCacheSize</code></td><td><code>4M</code> / <code>4G</code></td><td>Small-file in-memory promotion threshold and budget (<code>CacheCaps</code>).</td></tr>
+          <tr><td><code>maxMMapFileSize</code> / <code>totalMMapCacheSize</code></td><td><code>256K</code> / <code>2G</code></td><td>Parsed for compatibility; the mmap file cache was removed.</td></tr>
+          <tr><td><code>fileETag</code></td><td><code>28</code></td><td>ETag bitmask (INODE|MTIME|SIZE → <code>"size-mtime-inode;;;"</code>); 0 = no ETag.</td></tr>
+          <tr><td><code>enable{Gzip,Br,Zstd}Compress</code> (+<code>Dyn</code>)</td><td>on</td><td>Static/dynamic compression per codec; <code>zstdCompressLevel</code> 3, <code>brCompressLevel</code> 5.</td></tr>
+          <tr><td><code>&lt;expires&gt;enableExpires</code>, <code>expiresByType</code></td><td>off</td><td><code>image/*=A604800, text/css=M86400</code> (A = access, M = modify). XML only; not honored in <code>.htaccess</code>. Authenticated responses get <code>private, no-store</code> when no explicit policy exists.</td></tr>
+          <tr><td><code>&lt;cache&gt;expireInSeconds</code> · <code>privateExpireInSeconds</code> · <code>cacheStatusCode</code> · <code>enablePostCache</code></td><td><code>900</code> · <code>0</code> · <code>200,301</code> · off</td><td>Default public/private TTLs and cacheable statuses. <code>cacheStorePath</code> is parsed but deliberately unused (see <code>--page-cache-store-path</code>).</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="security">Security directives</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Directive</th><th>Default</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>&lt;security&gt;&lt;accessControl&gt;</code> <code>allow</code>/<code>deny</code></td><td>—</td><td><code>ALL</code> or CIDR lists, most-specific wins. A trailing <code>T</code> on an allow rule marks a trusted proxy.</td></tr>
+          <tr><td><code>&lt;accessDenyDir&gt;&lt;dir&gt;</code></td><td>—</td><td>Globs never served; a malformed glob is a hard start/reload error.</td></tr>
+          <tr><td><code>&lt;fileAccessControl&gt;followSymbolLink</code></td><td>off</td><td>Folded into each vhost's effective <code>allowSymbolLink</code>; <code>2</code> fails closed.</td></tr>
+          <tr><td><code>geoipDBFile</code> · <code>geoAllow</code>/<code>geoDeny</code> · <code>asnAllow</code>/<code>asnDeny</code> <span class="badge hj">httpjet</span></td><td>none</td><td>Offline CidrList source and label lists; deny-first, allow-only = whitelist, unknown label = build error. <a href="security.html#geo">→</a></td></tr>
+          <tr><td><code>&lt;suexec&gt;enable</code> · <code>uidMin</code> · <code>gidMin</code></td><td><code>0</code> · <code>100</code> · <code>100</code></td><td>suEXEC master gate and floors; uid/gid 0 always rejected.</td></tr>
+          <tr><td><code>&lt;suexec&gt;&lt;namespace&gt;</code> <code>enable</code>, <code>mount</code>, <code>pid</code>, <code>net</code>, <code>uts</code>, <code>ipc</code></td><td>off</td><td>Namespace isolation for PHP workers; <code>pid</code> is accepted but not honored.</td></tr>
+          <tr><td><code>&lt;CGIRLimit&gt;</code> <code>CPUSoftLimit</code>/<code>CPUHardLimit</code></td><td>—</td><td>Inherited by <code>phpConfig</code>; other rlimit fields are warned as no-ops.</td></tr>
+          <tr><td><code>lsrecaptcha</code>, <code>censorshipControl</code>, permission masks</td><td>—</td><td><span class="badge no">not enforced</span> — <code>check</code> warns.</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="listeners">Listeners and TLS</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Directive</th><th>Default</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>name</code>, <code>address</code></td><td><code>*:80</code></td><td><code>ip:port</code> / <code>host:port</code>. <span class="badge hj">httpjet</span> also <code>unix:/path</code> or <code>uds:/path</code> for an HTTP-over-Unix-socket listener (TLS over UDS is rejected). Listener names are the stable identity across reloads.</td></tr>
+          <tr><td><code>secure</code>, <code>keyFile</code>, <code>certFile</code>, <code>certChain</code></td><td>off</td><td>TLS material; <code>certChain=1</code> appends <code>CACertFile</code> to the served chain.</td></tr>
+          <tr><td><code>CACertFile</code> · <code>clientVerify</code> · <code>verifyDepth</code></td><td>none · <code>0</code> · <code>1</code></td><td>Client-certificate verification (0 none · 1 optional · 2 required · 3 optional without CA) against the listener CA.</td></tr>
+          <tr><td><code>crlFile</code> <span class="badge hj">httpjet</span></td><td>none</td><td>PEM CRL/bundle enforced by the client verifier.</td></tr>
+          <tr><td><code>enableStapling</code></td><td><code>0</code></td><td>Compatibility only; OCSP needs <code>--features ocsp</code> + <code>--ocsp-responder</code>.</td></tr>
+          <tr><td><code>proxyProtocol</code> <span class="badge hj">httpjet</span></td><td><code>0</code></td><td>PROXY v2/v1 required on <em>this</em> listener; fail-closed; never on a public bind.</td></tr>
+          <tr><td><code>vhostMapList/vhostMap</code> <code>vhost</code>, <code>domain</code></td><td>—</td><td>Host→vhost; domains lowercased; only bare <code>*</code> is a catch-all (<code>*.example.com</code> warns).</td></tr>
+        </tbody></table></div>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>httpd_config.xml</b> · a TLS listener with h3</span></div><pre><code>&lt;quic&gt;&lt;quicEnable&gt;1&lt;/quicEnable&gt;&lt;/quic&gt;
+&lt;listenerList&gt;
+  &lt;listener&gt;
+    &lt;name&gt;https&lt;/name&gt;
+    &lt;address&gt;*:443&lt;/address&gt;
+    &lt;secure&gt;1&lt;/secure&gt;
+    &lt;keyFile&gt;/etc/letsencrypt/live/example.test/privkey.pem&lt;/keyFile&gt;
+    &lt;certFile&gt;/etc/letsencrypt/live/example.test/fullchain.pem&lt;/certFile&gt;
+    &lt;clientVerify&gt;0&lt;/clientVerify&gt;
+    &lt;vhostMapList&gt;&lt;vhostMap&gt;&lt;vhost&gt;example.test&lt;/vhost&gt;&lt;domain&gt;example.test,www.example.test&lt;/domain&gt;&lt;/vhostMap&gt;&lt;/vhostMapList&gt;
+  &lt;/listener&gt;
+&lt;/listenerList&gt;</code></pre></div>
+    </section>
+
+    <section>
+      <h2 id="extprocessor">External processors</h2>
+      <p>An <code>&lt;extProcessor&gt;</code> (server-level <code>&lt;extProcessorList&gt;</code> or per-vhost) is a reverse-proxy upstream (<code>proxy</code>), an LSAPI app (<code>lsapi</code>), or <span class="badge hj">httpjet</span> a FastCGI app (<code>fcgi</code>/<code>fastcgi</code>). <code>&lt;phpConfig&gt;</code> configures the default PHP handler with the same pool knobs. Unknown legacy types (<code>rails</code>, <code>appserver</code>, …) keep proxy behavior; <code>cgi</code> contexts are not executed.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Directive</th><th>Default</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>name</code>, <code>type</code></td><td>required</td><td><code>proxy</code> · <code>lsapi</code> · <code>fcgi</code>/<code>fastcgi</code> <span class="badge hj">httpjet</span>.</td></tr>
+          <tr><td><code>address</code> (repeatable)</td><td>required</td><td><code>ip:port</code>, <code>host:port</code>, <code>uds:///path</code>, <code>http://</code>, <code>https://</code>, and <span class="badge hj">httpjet</span> <code>h2://</code> (prior knowledge) / <code>h2s://</code> (TLS, ALPN fail-closed). Additional addresses form a group: ordered failover by default, load-balanced with the options below.</td></tr>
+          <tr><td><code>loadBalancePolicy</code> <span class="badge hj">httpjet</span></td><td><code>primary-first</code></td><td><code>weighted-round-robin</code> · <code>weighted-least-active</code>. Invalid on non-proxy processors.</td></tr>
+          <tr><td><code>addressWeights</code> <span class="badge hj">httpjet</span></td><td>all 1</td><td>One integer 1–1000 per address.</td></tr>
+          <tr><td><code>&lt;healthCheck&gt;</code> <code>mode</code> · <code>path</code> · <code>host</code> · <code>interval</code> · <code>timeout</code> · <code>rise</code> · <code>fall</code> · <code>expectedStatus</code> <span class="badge hj">httpjet</span></td><td><code>connect</code> · <code>/</code> · — · 10 · 2 · 2 · 3 · 200</td><td>Active probes; intervals 1–3600 s, timeout ≤ interval, thresholds 1–100, status 200–599. <a href="gateways.html#groups">→</a></td></tr>
+          <tr><td><code>maxConns</code></td><td><code>100</code></td><td>Pool cap (LSAPI: worker count source unless <code>--php-children</code> overrides).</td></tr>
+          <tr><td><code>initTimeout</code> / <code>retryTimeout</code> / <code>pcKeepAliveTimeout</code></td><td><code>60</code> / <code>0</code> / <code>60</code> s</td><td>Connect timeout / bad-mark cooldown (retry dials fresh; a backend timeout is 504) / idle recycle.</td></tr>
+          <tr><td><code>respBuffer</code></td><td><code>0</code></td><td>Parsed; responses always stream (<code>check</code> warns if set).</td></tr>
+          <tr><td><code>clientCertFile</code> / <code>clientKeyFile</code> <span class="badge hj">httpjet</span></td><td>none</td><td>Upstream mTLS client identity for <code>https://</code>/<code>h2s://</code> targets; must lie within an admin resource root when submitted via the API.</td></tr>
+          <tr><td><code>env</code> (repeatable)</td><td>—</td><td><code>K=V</code> worker environment. Server-computed CGI names are protected.</td></tr>
+          <tr><td><code>path</code>, <code>backlog</code>, <code>instances</code>, <code>autoStart</code>, <code>runOnStartUp</code></td><td>— / <code>100</code> / <code>1</code> / <code>0</code> / <code>0</code></td><td>LSAPI worker binary and supervision (<code>instances&gt;1</code> warns: one fixed upstream).</td></tr>
+          <tr><td colspan="3"><em><code>phpConfig</code> additionally:</em> <code>phpHandler</code> (<code>command</code>, <code>suffixes</code>), <code>memSoftLimit</code>/<code>memHardLimit</code>, <code>maxProcessTime</code> (0 = unlimited; <code>--php-max-process-time-ms</code> overrides), <code>procSoftLimit</code>/<code>procHardLimit</code>, <code>extMaxIdleTime</code>, <code>backlog</code> default 1024, <code>detachedMode</code>.</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="vhosts">Virtual hosts</h2>
+      <p>Declarations live in <code>httpd_config.xml</code> (<code>name</code>, <code>vhRoot</code>, <code>configFile</code>, <code>allowSymbolLink</code>, <code>enableScript</code>, <code>restrained</code>); behavior lives in the referenced <code>&lt;virtualHostConfig&gt;</code>. <code>allowSymbolLink</code> is a tri-state override (file &gt; declaration &gt; server); <code>restrained</code> confines the vhost to <code>vhRoot</code> and forces symlinks off; <code>enableScript=0</code> disables script handlers for the vhost.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Vhost directive</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>docRoot</code>, <code>indexFiles</code>, <code>enableExpires</code>/<code>expiresByType</code></td><td>Root and per-vhost overrides of the server settings.</td></tr>
+          <tr><td><code>&lt;rewrite&gt;</code> <code>enable</code>, <code>autoLoadHtaccess</code>, <code>base</code>, <code>rules</code></td><td>Inline rules run before the <code>.htaccess</code> chain.</td></tr>
+          <tr><td><code>&lt;htAccess&gt;</code> <code>allowOverride</code>, <code>accessFileName</code></td><td><code>allowOverride 0</code> kills the whole chain; the access file name defaults to <code>.htaccess</code>.</td></tr>
+          <tr><td><code>&lt;vhssl&gt;</code> <code>keyFile</code>, <code>certFile</code>, <code>certChain</code>, <code>CACertFile</code></td><td>The SNI identity for this vhost's domains (chain material, not a client-verify root).</td></tr>
+          <tr><td><code>&lt;cache&gt;</code> <code>enableCache</code>, <code>enablePublicCache</code>, <code>enablePrivateCache</code></td><td>Per-vhost page-cache gates (with <code>--page-cache-standard-vhosts</code> a missing block gets a default public policy).</td></tr>
+          <tr><td><code>&lt;scriptHandlerList&gt;&lt;scriptHandler&gt;</code> <code>suffix</code>, <code>type</code>, <code>handler</code></td><td>Suffix routing to <code>lsapi</code>/<code>php</code> handlers or a <code>cgi</code> handler bound to a FastCGI processor.</td></tr>
+          <tr><td><code>&lt;websocketList&gt;&lt;websocket&gt;</code> <code>uri</code>, <code>address</code></td><td>WebSocket relay maps (plain TCP HTTP/1 upstreams).</td></tr>
+          <tr><td><code>&lt;logging&gt;</code> <code>accessLog</code>/<code>errorLog</code> with <code>useServer=0</code>, <code>fileName</code>, <code>rollingSize</code>, <code>keepDays</code>, <code>logHeaders</code> <span class="badge hj">httpjet</span></td><td>Per-vhost log files (default roll 50 MB, keep 30 days; <code>logHeaders</code> 7 = combined). Log paths are boot-owned.</td></tr>
+          <tr><td><code>setUIDMode</code> (0/1/2), <code>chrootMode</code> (0/1/2), <code>chrootPath</code>, <code>suexecUser</code>/<code>suexecGroup</code>, <code>&lt;namespace&gt;</code></td><td>Per-vhost PHP isolation (needs the server <code>&lt;suexec&gt;</code> gate). Out-of-range modes are hard errors. <a href="lsapi.html#jail">→</a></td></tr>
+          <tr><td><code>&lt;extProcessorList&gt;</code></td><td>Vhost-scoped processors (distinct scope from server-level ones).</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="contexts">Contexts</h2>
+      <p>Contexts map URI prefixes to terminals (<code>static</code>, <code>proxy</code>, <code>redirect</code>, <code>php</code>/<code>lsapi</code> via <code>handler</code>) and carry per-context overrides:</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Context directive</th><th>Default</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>type</code>, <code>uri</code>, <code>location</code>, <code>handler</code>, <code>enabled</code></td><td>—</td><td>Kind, prefix, on-disk location (static), processor name (proxy/lsapi).</td></tr>
+          <tr><td><code>extraHeaders</code></td><td>—</td><td>Additional response headers for the context.</td></tr>
+          <tr><td><code>addDefaultCharset</code> / <code>addDefaultCharsetCustomized</code></td><td>off</td><td>Charset appended to text types.</td></tr>
+          <tr><td><code>cachePolicy/*</code></td><td>on</td><td><code>checkPublicCache</code>, <code>checkPrivateCache</code>, <code>respectCacheable</code>, <code>enableCache</code>, <code>enablePrivateCache</code>, <code>enablePostCache</code> — the six LSWS gates, enforced on both cache tiers.</td></tr>
+          <tr><td><code>maxReqBodySize</code> <span class="badge hj">httpjet</span></td><td>inherit</td><td>Per-context body cap (413) on every terminal.</td></tr>
+          <tr><td><code>responseTimeout</code> <span class="badge hj">httpjet</span></td><td>inherit</td><td>Upstream response-head deadline, seconds (proxy paths).</td></tr>
+          <tr><td><code>bandwidthLimit</code> <span class="badge hj">httpjet</span></td><td><code>0</code></td><td>Egress throttle overriding the server-wide rate.</td></tr>
+          <tr><td><code>subFilter</code> (repeatable) · <code>subFilterOnce</code> · <code>subFilterTypes</code> · <code>subFilterMaxBody</code> <span class="badge hj">httpjet</span></td><td>— · <code>0</code> · <code>text/html</code> · <code>4M</code></td><td><code>SEARCH =&gt; REPLACEMENT</code> literal body substitution. The <code>=&gt;</code> separator is mandatory — a rule missing it disables the whole context's sub_filter with a warning. <a href="rewrite.html#context-overrides">→</a></td></tr>
+        </tbody></table></div>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>vhost XML</b> · a proxied API prefix with overrides</span></div><pre><code>&lt;contextList&gt;
+  &lt;context&gt;
+    &lt;type&gt;proxy&lt;/type&gt;
+    &lt;uri&gt;/api/&lt;/uri&gt;
+    &lt;handler&gt;application&lt;/handler&gt;
+    &lt;maxReqBodySize&gt;2M&lt;/maxReqBodySize&gt;
+    &lt;responseTimeout&gt;15&lt;/responseTimeout&gt;
+    &lt;subFilter&gt;http://internal.example =&gt; https://example.test&lt;/subFilter&gt;
+    &lt;subFilterTypes&gt;text/html,application/json&lt;/subFilterTypes&gt;
+  &lt;/context&gt;
+&lt;/contextList&gt;</code></pre></div>
+    </section>
+
+    <section>
+      <h2 id="checking">Checking a configuration</h2>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>check</b></span></div><pre><code>httpjet --root /abs/root check            <span class="t-c"># summary: listeners, vhost map, fast-memo verdicts, warnings</span>
+httpjet --root /abs/root check --strict   <span class="t-c"># + topology lint, missing docroots, vhost-map-fingerprint; non-zero on findings</span></code></pre></div>
+      <p>Run the check under the intended service identity as well as as root: readable-by-root is not proof the runtime user can read certificates or write logs and sockets. The same normalization runs for the <a href="admin-api.html#write">write API</a>'s in-memory bundle (<code>parse_bundle</code>), which additionally refuses DTDs, more than 64 nesting levels, more than 128 vhosts, and 1 MiB of XML.</p>
+    </section>
+
+    <section>
+      <h2 id="env">Environment variables</h2>
+      <p>The full list, with the flags they pair with, is on the <a href="cli.html#env">CLI reference</a>. The ones most often set in a unit drop-in: <code>HTTPJET_ACCESS_LOG_FORMAT=json</code>, <code>HTTPJET_ERROR_LOG_FORMAT=json</code>, <code>HTTPJET_SYSLOG_TARGET</code>, <code>CF_SEND_ZSTD=1</code>, <code>HJ_FAST_MEMO=0</code>, <code>HTTPJET_OTEL=1</code>, <code>RUST_LOG</code>.</p>
+    </section>

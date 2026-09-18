@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant C as client
+  participant J as httpjet pipeline
+  participant W as WAF sidecar<br/>(loopback, e.g. Coraza adapter)
+  C->>J: request
+  J->>J: decode/normalize URI · enforce body limit · resolve client IP
+  J->>J: reserve serialization allowance (64 MiB process budget) within --waf-timeout-ms
+  J->>W: POST /inspect {"version":1, method, path, query, vhost, client_ip, protocol, tls, headers_hex, body_hex ≤ --waf-body-max | body_omitted:true}
+  alt 204 + Content-Length: 0
+    W-->>J: allow
+    J->>J: continue: rewrite → cache → dispatch
+  else 403 + Content-Length: 0
+    W-->>J: block
+    J-->>C: 403
+  else timeout · EOF · other status · malformed head (> 4 KiB)
+    W--xJ: sidecar failure
+    J-->>C: 503 (fail-closed) — or continue if --waf-fail-open (logged)
+  end
+  Note over J,W: one close-delimited HTTP/1.1 request per inspection — connections never reused

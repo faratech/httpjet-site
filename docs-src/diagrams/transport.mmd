@@ -1,0 +1,36 @@
+flowchart TB
+  classDef core fill:#13203a,stroke:#818cf8,color:#fff
+  classDef k fill:#0a0d17,stroke:#2c3856,color:#c2cadd
+  subgraph sockets ["listeners: systemd socket activation or self-bound, SO_REUSEPORT ×N workers"]
+    direction LR
+    tcp80["TCP :80"]:::k
+    tcp443["TCP :443"]:::k
+    udp443["UDP :443"]:::k
+    uds["unix:/path"]:::k
+  end
+  subgraph cores ["one monoio io_uring runtime per listener fd, pinned to its core"]
+    direction TB
+    pp["PROXY protocol strip (per-listener opt-in)"]
+    tls["monoio-rustls handshake · ALPN · optional kTLS"]
+    sniff["cleartext sniff: 24-byte h2 preface?"]
+    h1["H1 codec (httparse, sendfile)"]
+    h2["hj-h2 · one task per connection"]
+    quic["quinn-proto QUIC driver · HTTP/3 · QPACK"]
+    memo["on-core fast path: finished-response memo · static · cache hit"]
+  end
+  tcp80 --> pp
+  tcp443 --> pp
+  uds --> sniff
+  udp443 --> quic
+  pp -- plain --> sniff
+  pp -- secure --> tls
+  sniff -- "http/1.x" --> h1
+  sniff -- "h2c" --> h2
+  tls -- "http/1.1" --> h1
+  tls -- "h2" --> h2
+  h1 --> memo
+  h2 --> memo
+  quic --> memo
+  memo -- "miss or dynamic" --> bridge["uring::bridge — hand the request to the tokio runtime"]:::core
+  bridge --> pipe["pipeline::handle() · ServerState · LSAPI pool · page cache · reload · metrics"]:::core
+  pipe -- "response: buffered ≤ 256 KiB, streamed above" --> bridge

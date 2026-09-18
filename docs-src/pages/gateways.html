@@ -1,0 +1,102 @@
+    <h1>Proxy &amp; gateways</h1>
+    <p class="lede">Everything that hands a request to another process: the <strong>reverse proxy</strong> (HTTP/1, <code>h2://</code>, <code>h2s://</code>) with <strong>weighted upstream groups and active health checks</strong>, <strong>WebSocket</strong> and <strong>SSE</strong> relay, and the opt-in <strong>FastCGI</strong> gateway. LSAPI/PHP has <a href="lsapi.html">its own page</a>. Generic CGI execution and uWSGI are specified but deliberately not routable.</p>
+
+    <div class="rail locator" role="img" aria-label="You are here: the dispatch stage."><div class="rail__track"><span class="stage"><span class="k">resolve</span></span><span class="stage"><span class="k">acl</span></span><span class="stage"><span class="k">rewrite</span></span><span class="stage"><span class="k">cache</span></span><span class="stage on"><span class="k">dispatch</span></span><span class="stage"><span class="k">finalize</span></span><span class="stage"><span class="k">store</span></span></div></div>
+
+    <section>
+      <h2 id="overview">How a request reaches a backend</h2>
+      <p>Three routes select a gateway, in dispatch order: a <strong>WebSocket map</strong> (<code>&lt;websocketList&gt;</code>) when the request carries an upgrade, a <strong>proxy <code>&lt;context&gt;</code></strong> whose URI prefix matches and whose <code>handler</code> names a <code>proxy</code> extProcessor, and a <strong>rewrite <code>[P]</code></strong> target (deferred so it can still participate in the page cache). Script suffixes (<code>scriptHandler</code>) route to LSAPI or FastCGI. A proxy context that cannot resolve its processor falls through to static; a script handler that cannot resolve its pool hard-fails 503.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Target form</th><th>Protocol to the backend</th></tr></thead>
+        <tbody>
+          <tr><td><code>host:port</code>, <code>ip:port</code>, <code>uds:///path</code>, <code>http://…</code></td><td>HTTP/1.1 with keep-alive pools</td></tr>
+          <tr><td><code>https://…</code></td><td>HTTP/1.1 over TLS; backend certificate verified; optional client cert (<code>clientCertFile</code>/<code>clientKeyFile</code>)</td></tr>
+          <tr><td><code>h2://host:port</code> <span class="badge hj">httpjet</span></td><td>HTTP/2 prior knowledge (cleartext); multiplexes requests on one backend connection</td></tr>
+          <tr><td><code>h2s://host[:443]</code> <span class="badge hj">httpjet</span></td><td>HTTP/2 over TLS, ALPN fail-closed</td></tr>
+        </tbody></table></div>
+      <p>Pool keys are scheme-scoped, so an h1 and an h2 target at the same address never share a connection. Forwarded requests to h2 upstreams are re-absolutized (the h2 client derives <code>:scheme</code>/<code>:authority</code> from the URI). Proxied <em>responses</em> may not assert <code>X-LiteSpeed-Purge</code>/<code>-Cache-Control</code>/<code>-Vary</code> — those are stripped so a remote backend cannot inject cache policy. Named upstreams receive a W3C <code>traceparent</code> when <a href="observability.html#otel">tracing</a> is on.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">[P] targets are screened</span><p>Since 2026-09-16 a rewrite <code>[P]</code> URL that resolves (after DNS — <code>/etc/hosts</code> pins cannot bypass the screen) to loopback, link-local or a Unix socket is refused unless it matches an operator-configured extProcessor address. This closes the class where a <code>.htaccess</code> author reaches the local trust plane (metrics, admin, purge endpoints) through the server.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="groups">Upstream groups &amp; selection</h2>
+      <p>An <code>extProcessor</code> with several <code>&lt;address&gt;</code> children is a group. Without the options below it keeps <strong>ordered primary/failover</strong> behavior with a passive circuit breaker (3 consecutive dial failures mark a peer bad; one successful dial clears it — nginx <code>max_fails</code> semantics). With them it becomes a load-balanced group:</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>httpd_config.xml</b> · a weighted group with active probes</span></div><pre><code>&lt;extProcessor&gt;
+  &lt;name&gt;application&lt;/name&gt;
+  &lt;type&gt;proxy&lt;/type&gt;
+  &lt;address&gt;127.0.0.1:9001&lt;/address&gt;
+  &lt;address&gt;127.0.0.1:9002&lt;/address&gt;
+  &lt;loadBalancePolicy&gt;weighted-round-robin&lt;/loadBalancePolicy&gt;
+  <span class="t-c">&lt;!-- primary-first (default) | weighted-round-robin | weighted-least-active --&gt;</span>
+  &lt;addressWeights&gt;2,1&lt;/addressWeights&gt;        <span class="t-c">&lt;!-- one integer 1..1000 per address --&gt;</span>
+  &lt;healthCheck&gt;
+    &lt;mode&gt;GET&lt;/mode&gt;                    <span class="t-c">&lt;!-- connect | GET | HEAD (default connect) --&gt;</span>
+    &lt;path&gt;/ready&lt;/path&gt;                 &lt;host&gt;application.internal&lt;/host&gt;
+    &lt;interval&gt;10&lt;/interval&gt;             &lt;timeout&gt;2&lt;/timeout&gt;      <span class="t-c">&lt;!-- 1..3600 s; timeout ≤ interval --&gt;</span>
+    &lt;rise&gt;2&lt;/rise&gt;                      &lt;fall&gt;3&lt;/fall&gt;            <span class="t-c">&lt;!-- 1..100 --&gt;</span>
+    &lt;expectedStatus&gt;200&lt;/expectedStatus&gt;       <span class="t-c">&lt;!-- 200..599 --&gt;</span>
+  &lt;/healthCheck&gt;
+&lt;/extProcessor&gt;</code></pre></div>
+      <!--diagram:proxy-selection|<strong>Selection.</strong> Eligibility is the intersection of active health and the passive breaker; the policy then picks among eligible peers. A pre-head dial failure marks the peer and moves to the next eligible one; nothing replays a request body that has already been sent.-->
+      <!--diagram:upstream-health|<strong>Peer states.</strong> A health-enabled peer starts <em>cold</em> (ineligible) until <code>rise</code> consecutive successes; <code>fall</code> failures take it down; probe success restores it without user traffic. Passive breaker state is independent. All-ineligible → 503.-->
+      <ul>
+        <li><strong>Policies:</strong> <code>primary-first</code> (default), <code>weighted-round-robin</code> (smooth WRR), <code>weighted-least-active</code> (active ÷ weight, smooth-WRR tie-break). These options on non-proxy processors, unknown policies and invalid health settings fail config loading rather than silently falling back.</li>
+        <li><strong>Probes:</strong> <code>connect</code> tests transport only; <code>GET</code>/<code>HEAD</code> use the configured protocol, validate TLS, bound the response head, compare the status exactly, follow no redirects, consume no body, and carry no cookies, authorization or body. Dedicated connections, a process-wide cap of 16 concurrent probes, skipped missed ticks; they never consume application pool permits.</li>
+        <li><strong>All peers in a group share a protocol</strong>; do not put credentials, paths or queries in group authorities. A <code>Host</code> override does not override TLS identity.</li>
+        <li><strong>Reloads:</strong> candidate generations start no probe tasks; publication starts the new scheduler and retires the old one. Unchanged identities keep their group state; changed endpoints, weights, policies or TLS identities start fresh. Server- and vhost-scoped processors are distinct.</li>
+        <li><strong>Reservations</strong> survive the response head: streaming bodies and WebSocket relays release the peer's active count on completion, error or drop.</li>
+      </ul>
+      <p>Per-peer metrics carry scope, group name and ordinal labels (never URLs or credentials): <code>httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total}</code>, plus <code>httpjet_proxy_failover_total</code> and the <code>httpjet_phase_upstream_seconds</code> latency histogram. The read-only <a href="admin-api.html#read">status API</a> exposes the same peer health.</p>
+    </section>
+
+    <section>
+      <h2 id="streaming">Streaming, SSE and timeouts</h2>
+      <p>Upstream responses are <strong>never buffered</strong> (<code>respBuffer</code> is parsed but always streams — <code>check</code> warns). Server-sent events therefore stay real-time through compression (the per-chunk <code>CompressStream</code>) and through H1, H2 and H3 alike. A backend connect timeout is <code>initTimeout</code>; the response-head deadline is the processor's default or a context's <code>responseTimeout</code> override; a backend timeout is a 504. Request bodies stream to h1/h2 upstreams; a context <code>maxReqBodySize</code> is enforced before dispatch.</p>
+    </section>
+
+    <section>
+      <h2 id="websocket">WebSocket relay</h2>
+      <p>A <code>&lt;websocketList&gt;&lt;websocket&gt;</code> map (<code>uri</code> → <code>address</code>) or an upgrade request on a proxy context performs the HTTP/1 handshake with the backend and then relays raw frames both ways. The relay supports <strong>plain TCP HTTP/1 upstreams only</strong> — not TLS, H2 or Unix-socket targets. Maps carry a stable <code>websocket:&lt;uri&gt;</code> target identity scoped to their vhost, so named-target trace propagation applies; the client span covers the handshake, not the potentially unbounded relay. TCP keepalive keeps a vanished peer from pinning fds and permits forever.</p>
+    </section>
+
+    <section>
+      <h2 id="fastcgi">FastCGI gateway <span class="badge ok">opt-in</span></h2>
+      <p>An external processor declared <code>&lt;type&gt;fcgi&lt;/type&gt;</code> or <code>fastcgi</code> is an <code>ExtKind::FastCgi</code> — never silently converted into an HTTP proxy or an LSAPI worker. Only an explicit <code>cgi</code> script handler whose named processor is FastCGI dispatches through the gateway; a <code>cgi</code> mapping with a missing or different processor <strong>fails closed</strong> and is never served as static source. httpjet does not spawn the application: it connects to the configured TCP or Unix endpoint of an independently supervised process.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>vhost XML</b> · FastCGI suffix routing</span></div><pre><code>&lt;extProcessor&gt;
+  &lt;name&gt;my_fcgi&lt;/name&gt;
+  &lt;type&gt;fcgi&lt;/type&gt;
+  &lt;address&gt;uds:///run/my-app/fcgi.sock&lt;/address&gt;
+  &lt;maxConns&gt;32&lt;/maxConns&gt;
+  &lt;initTimeout&gt;5&lt;/initTimeout&gt;
+  &lt;pcKeepAliveTimeout&gt;30&lt;/pcKeepAliveTimeout&gt;
+&lt;/extProcessor&gt;
+
+&lt;scriptHandler&gt;
+  &lt;suffix&gt;fcgi&lt;/suffix&gt;
+  &lt;type&gt;cgi&lt;/type&gt;
+  &lt;handler&gt;my_fcgi&lt;/handler&gt;
+&lt;/scriptHandler&gt;</code></pre></div>
+      <!--diagram:fastcgi-flow|<strong>One request through hj-fastcgi.</strong> The pipeline hands over an already-validated script target; the gateway never derives an executable path from the URI. Connections are poisoned by default and only a clean, exact <code>END_REQUEST</code> makes one reusable. Multiplexing request ids on one connection is disabled.-->
+      <ul>
+        <li><strong>Wire bounds:</strong> FastCGI version 1, nonzero request id, known record types, the protocol's 65,535-byte record limit; PARAMS lengths are rejected before allocation when either the field bound or the configured aggregate cap would be exceeded.</li>
+        <li><strong>Pool:</strong> caps all sockets including idle and in-progress dials under one acquisition deadline; poison/drop releases capacity immediately; clean idle sockets expire oldest-first.</li>
+        <li><strong>CGI variables</strong> are server-derived; request headers become <code>HTTP_*</code> after validation; processor <code>env</code> cannot override protected identity/routing variables (<code>SCRIPT_FILENAME</code>, <code>DOCUMENT_ROOT</code>, <code>REMOTE_ADDR</code>, <code>SERVER_NAME</code>, <code>CONTENT_LENGTH</code>, <code>HTTP_AUTHORIZATION</code>, …). The same deny-list applies to <code>.htaccess</code> <code>[E=]</code> for LSAPI.</li>
+        <li><strong>Bodies</strong> are buffered under the shared budget so the exact STDIN length is known; declared underflow/overflow, framing errors and cancellation poison the connection.</li>
+        <li><strong>Responses:</strong> strict CRLF head, repeated end-to-end headers preserved, one valid <code>Status</code>, CGI <code>Location</code> default, folding/hop-by-hop rejected; STDERR byte-capped and control-escaped into the error log, never the client.</li>
+      </ul>
+      <p class="mini">Known follow-ups: explicit CGI context-directory routing (today: script-handler suffix mappings only), a codec fragmentation corpus, and a maintained real-application interoperability fixture.</p>
+    </section>
+
+    <section>
+      <h2 id="cgi">Conventional CGI and uWSGI <span class="badge no">not routable</span></h2>
+      <p>Both remain disabled by design until a demonstrated workload exists. Existing <code>type=cgi</code>, <code>rails</code>, <code>appserver</code> and unknown processor types never activate either; <code>check --strict</code> keeps warning for configured CGI contexts. The design contracts are strict on purpose: CGI would require an absolute execution root distinct from the docroot, a fixed non-root identity, wall/CPU/memory/process/output limits, an executable allowlist, direct <code>execve</code> with no shell or PATH lookup, inode pinning, and bounded pipes with process-group termination; uWSGI would be a separate crate over an explicit endpoint with modifier-0 packets only, no multiplexing, and no connection reuse until a maintained responder proves the response boundary. Proposed identities are <code>type=cgi-exec</code> and <code>type=uwsgi</code>.</p>
+    </section>
+
+    <section>
+      <h2 id="checks">Reproducible checks</h2>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>tests</b> · loopback fixtures only</span></div><pre><code>cargo test --locked -p hj-config -p hj-proxy
+cargo test --locked -p hj-proxy --test upstream_groups     <span class="t-c"># h1/h2 weighted distribution, cold start, down/recovery, all-down 503</span>
+cargo test -p hj-fastcgi                                    <span class="t-c"># synthetic loopback responder + clean-connection reuse</span>
+cargo test -p httpjet --bin httpjet</code></pre></div>
+      <p>To return a group to legacy selection, remove <code>loadBalancePolicy</code>, <code>addressWeights</code> and <code>healthCheck</code> and reload; removing only the health check keeps the configured policy.</p>
+    </section>

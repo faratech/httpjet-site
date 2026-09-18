@@ -1,0 +1,19 @@
+sequenceDiagram
+  autonumber
+  participant J as httpjet<br/>acme manager
+  participant S as PrivateStore
+  participant D as DNS controller<br/>(operator webhook, Bearer auth)
+  participant CA as ACME CA
+  J->>S: journal cleanup intent {name, value} BEFORE any DNS change
+  J->>D: POST {"version":1,"operation":"present","name":"_acme-challenge.example.test","value":"<43-char digest>"}
+  D-->>J: {"ok":true}
+  loop bounded polling
+    J->>D: POST operation "ready"
+    D-->>J: {"ok":true,"ready":false|true}
+  end
+  J->>CA: ready → finalize → poll (inside the 120 s attempt)
+  CA-->>J: certificate (apex and/or *.zone — one leftmost label)
+  J->>D: POST operation "cleanup" (removes only that value — idempotent)
+  D-->>J: {"ok":true}
+  J->>S: clear journal entry, commit certificate snapshot
+  Note over J,D: a failed cleanup keeps the journal entry: new issuance blocks until replayed (also at startup and shutdown)

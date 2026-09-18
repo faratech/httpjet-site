@@ -1,0 +1,19 @@
+sequenceDiagram
+  autonumber
+  participant Op as operator
+  participant API as admin write API<br/>127.0.0.1:9092 (token file)
+  participant Co as Coordinator<br/>(incarnation + generation = revision)
+  participant St as serving generation
+  Op->>API: GET /v1/revision
+  API-->>Op: {"revision": "<incarnation>:<generation>"}
+  Op->>API: POST /v1/config/validate  If-Match: "<revision>"  {server_xml, vhosts[], mime}
+  API->>Co: build candidate (bounded: 1 MiB, ≤128 vhosts, ≤64 nesting, no DTD)
+  Co-->>API: redacted verdict (nothing published)
+  Op->>API: PUT /v1/config  If-Match: "<revision>"
+  API->>Co: writer lock (≤5 s) · build candidate state with inactive background work
+  Co->>Co: classify: reloadable · constrained TCP trust · restart_required
+  Co->>Co: recheck exact revision under the publication boundary
+  Co->>St: publish generation (ArcSwap) — in-flight requests keep the old one
+  Co->>Co: transfer health-check ownership · notify bridge admission · retire old listener group if trust changed
+  API-->>Op: {"revision": next, "persistence": "volatile"}
+  Note over Co,St: SIGHUP is just another writer through the same coordinator

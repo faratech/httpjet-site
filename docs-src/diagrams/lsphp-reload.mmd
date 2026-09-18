@@ -1,0 +1,17 @@
+sequenceDiagram
+  autonumber
+  participant O as operator<br/>systemctl reload httpjet-lsphp
+  participant SV as httpjet lsphp<br/>(supervisor, Type=notify)
+  participant L as LSAPI listener<br/>(systemd-owned socket, backlog 8192)
+  participant G as generation file<br/>/run/httpjet/lsphp.generation (16 B)
+  participant W as httpjet serve<br/>(web tier, --lsphp-external)
+  O->>SV: lsphp-reload over root-only control socket (timeout 90 s)
+  SV->>SV: spawn CANDIDATE family (new marker LSAPI_Z_HTTPJET_GENERATION_MARKER)
+  SV->>L: candidate workers accept on the SAME listener fd
+  SV->>SV: require one real, marker-attributed LSAPI response
+  SV->>G: advance epoch + promoted marker (atomic 16-byte write)
+  W->>G: observe new epoch (mmap)
+  W->>W: drop idle pooled sockets — never re-pool checked-out ones
+  W->>W: attribute each in-flight socket's worker (UNIX_DIAG + /proc) — retire stale worker via pinned pidfd AFTER its response completes
+  SV->>SV: drain old family, bounded forced cleanup (pidfds retained through every exit path)
+  SV-->>O: done — listener never closed, queued dials preserved

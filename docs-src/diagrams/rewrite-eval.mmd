@@ -1,0 +1,20 @@
+flowchart TB
+  classDef out fill:#13203a,stroke:#818cf8,color:#fff
+  classDef bad fill:#2a1420,stroke:#e879f9,color:#fff
+  A["request path (original URI kept aside)"] --> B["inline &lt;rewrite&gt; rules (vhost XML)"]
+  B --> C["HtaccessCache: load chain docroot → dir<br/>mtime-invalidated · depth ≤ 64 · unreadable file ⇒ deny-all sentinel"]
+  C --> D["SetEnvIf / SetEnvIfNoCase<br/>(lazy header access)"]
+  D --> E["pre-rewrite access<br/>Order/Allow/Deny · Require · scoped auth"]
+  E --> F["dense-DFA prefilter<br/>which RewriteRules could match?"]
+  F --> G["evaluate candidates<br/>linear regex_automata, fancy-regex only for lookaround/backrefs"]
+  G --> H("outcome")
+  H --> R1["Rewritten<br/>(front controller: REQUEST_URI preserved)"]:::out
+  H --> R2["Redirect [R]"]:::out
+  H --> R3["Proxy [P]<br/>(loopback/link-local/unix targets screened)"]:::out
+  H --> R4["Forbidden [F]"]:::bad
+  H --> R5["Gone [G]"]:::bad
+  H --> R6["Unchanged → suffix routing"]:::out
+  R1 -- "crossed a directory" --> C
+  click C "rewrite.html#loading"
+  click F "rewrite.html#prefilter"
+  click E "rewrite.html#access-control"

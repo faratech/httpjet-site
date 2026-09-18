@@ -1,0 +1,115 @@
+    <h1>Protocol stacks</h1>
+    <p class="lede">httpjet speaks <strong>HTTP/1.1</strong>, a <strong>from-scratch native HTTP/2</strong> stack, and <strong>HTTP/3 over QUIC</strong> through one unconditional <strong>io_uring / monoio</strong> transport. TCP and QUIC converge behind one rustls configuration, every protocol hands requests to the same pipeline, and file bodies leave over <code>sendfile(2)</code> where the kernel allows it.</p>
+
+    <div class="rail locator" role="img" aria-label="You are here: transport and TLS touch the resolve, acl, and dispatch stages."><div class="rail__track"><span class="stage on"><span class="k">resolve</span></span><span class="stage on"><span class="k">acl</span></span><span class="stage"><span class="k">rewrite</span></span><span class="stage"><span class="k">cache</span></span><span class="stage on"><span class="k">dispatch</span></span><span class="stage"><span class="k">finalize</span></span><span class="stage"><span class="k">store</span></span></div></div>
+
+    <section>
+      <h2 id="overview">Overview</h2>
+      <p>All serving lives in the binary's <code>uring/</code> module. HTTP/1.1 is a custom monoio + <code>httparse</code> codec; HTTP/2 and cleartext h2c use the native <code>hj-h2</code> stack through its monoio serve path; HTTP/3 is <code>uring/h3.rs</code>, a <code>quinn-proto</code> QUIC loop over io_uring UDP with <code>quinn-udp</code> socket metadata (GSO/GRO). Protocol selection happens at the connection boundary: ALPN over TLS, a non-destructive preface sniff in cleartext, and QUIC on the UDP listener.</p>
+      <!--diagram:connection-lifecycle|<strong>A TCP connection's life.</strong> PROXY-protocol stripping (if the listener opts in) happens before the TLS handshake or the cleartext sniff, so every later stage sees the proxied client as the peer. ALPN picks the TLS stack; the 24-byte h2 preface picks the cleartext one. H2 connections drain with GOAWAY on shutdown.-->
+      <div class="chips">
+        <span class="chip"><span class="dot"></span>HTTP/1.1 · custom monoio codec</span>
+        <span class="chip"><span class="dot"></span>HTTP/2 · native <code>hj-h2</code></span>
+        <span class="chip"><span class="dot"></span>h2c · prior-knowledge sniff</span>
+        <span class="chip"><span class="dot"></span>HTTP/3 · <code>quinn-proto</code> on io_uring</span>
+        <span class="chip"><span class="dot"></span>HPACK · RFC 7541, zero-alloc</span>
+        <span class="chip"><span class="dot"></span>TLS · rustls / aws-lc-rs · optional kTLS</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="frontdoors">Connection front doors</h2>
+      <p>Two per-listener features sit before protocol detection. Both are httpjet-native — LiteSpeed has no listener-level equivalent — and both change <em>who httpjet thinks the client is</em>.</p>
+      <h3 id="proxy-protocol">PROXY protocol v2 / v1</h3>
+      <p>A listener with <code>&lt;proxyProtocol&gt;1&lt;/proxyProtocol&gt;</code> requires every connection to open with a PROXY header. The header is consumed and the claimed client address installed before the TLS handshake on secure listeners and before the H1/h2c discriminator on plain ones. Missing header → the connection is closed (fail-closed both ways). Since 2026-09-16 a header that claims a loopback or unspecified source is <strong>refused at the parser</strong>: those addresses feed the mTLS exemption and the loopback purge gate, so accepting them would let a proxy hop forge local trust.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">The listener opt-in is the trust decision</span><p>Unlike OpenLiteSpeed's server-level trusted-peer ACL, httpjet binds PROXY trust to the listener (nginx/HAProxy semantics). Enabling it on an internet-facing bind lets anyone forge their client address; <code>check</code> warns on wildcard or public binds. Point such a listener only at your load balancer or a local hop.</p></div></div>
+      <h3 id="uds">HTTP over Unix sockets</h3>
+      <p>A listener whose address is <code>unix:/path/sock</code> (or <code>uds:</code>), or the <code>--http-uds</code> flag, serves plain HTTP over a Unix-domain socket: H1 and h2c prior knowledge, one accept core (SO_REUSEPORT does not exist for AF_UNIX), socket mode 0600 group-writable, socket-activated fds adopted by path. A stale socket file is unlinked only after a <code>connect(2)</code> proves it dead, and cleanup is bound to the owned directory and socket identity. Peers have no address: ACLs, the per-IP throttle and <code>REMOTE_ADDR</code> see a fabricated loopback value and the access log renders <code>unix:</code>. TLS over UDS is unsupported and linted.</p>
+    </section>
+
+    <section>
+      <h2 id="http1">HTTP/1.1 &amp; h2c detection</h2>
+      <p>The H1 codec parses with <code>httparse</code>, enforces strict framing (single <code>Content-Length</code>, conflicting-length rejection, bounded incomplete reads), supports keep-alive and pipelining, honors <code>maxKeepAliveReq</code> (0 = unlimited), decodes chunked bodies, and streams large responses from the bridge without buffering.</p>
+      <p>Cleartext HTTP/2 by prior knowledge has no upgrade handshake — the client simply sends the connection preface. httpjet detects it <em>non-destructively</em>: the bytes already read are handed to whichever stack wins, so h1 and h2 both parse the connection as if no router sat in front.</p>
+      <div class="codeframe">
+        <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>uring</b> · ALPN + cleartext routing</span></div>
+        <pre><code><span class="t-c">// over TLS: ALPN decides the TCP stack</span>
+<span class="t-k">match</span> alpn {
+    b"h2"       =&gt; hj_h2::server::serve_local_with_prefix(io, prefix, service, cfg).<span class="t-k">await</span>,
+    _           =&gt; handle_h1_bridged(io, prefix, service).<span class="t-k">await</span>,   <span class="t-c">// http/1.1 or none</span>
+}
+
+<span class="t-c">// cleartext: sniff the 24-byte preface, pass the observed bytes along</span>
+<span class="t-k">match</span> sniff_cleartext(&amp;<span class="t-k">mut</span> stream).<span class="t-k">await</span>? {
+    Proto::Http2(prefix) =&gt; hj_h2::server::serve_local_with_prefix(stream, prefix, service, cfg).<span class="t-k">await</span>,
+    Proto::Http1(prefix) =&gt; handle_h1_bridged(stream, prefix, service).<span class="t-k">await</span>,
+}</code></pre>
+      </div>
+      <p>Beyond framing, the H1 path implements the newer semantics end to end:</p>
+      <ul>
+        <li><strong>103 Early Hints</strong> — the same preload/preconnect <code>Link</code> matcher the h2 stack uses emits an interim <code>103</code> on h1; <code>101</code> upgrades bypass it; canonical/alternate links are excluded.</li>
+        <li><strong>Ranges, single and multipart</strong> — RFC 9110 multi-range sets are parsed, clamped, coalesced and framed as <code>multipart/byteranges</code>, capped at 8 ranges / 8 MiB of part bytes with a full-200 fallback. An invalid component poisons the whole header (→ 200); an unsatisfiable set is 416.</li>
+        <li><strong>Request decompression</strong> — gzip bodies decode by default; brotli/zstd opt in with <code>--request-decompression-extra</code>. Bounded and buffered; see <a href="compression.html#request">Compression</a>.</li>
+        <li><strong>Bandwidth pacing</strong> — a per-connection token bucket (burst 2× rate) paces <code>Body::Full</code> as 64 KiB slices and streams per chunk when <code>bandwidthLimit</code> is set; a matched context overrides the server-wide rate.</li>
+        <li><strong>Explicit <code>CONNECT</code> rejection</strong> (405) and stalled-sendfile backoff with a 60 s zero-progress bound.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 id="http2">Native HTTP/2</h2>
+      <p><code>hj-h2</code> is httpjet's own HTTP/2 server. Every h2 connection — ALPN <code>h2</code> over TLS and cleartext h2c — lands here through the monoio local serve path. The design targets the CDN→origin shape: few long-lived connections, many concurrent streams, so it optimizes one connection's multiplexing rather than spreading work across many.</p>
+      <figure class="figure">
+        <svg viewBox="0 0 880 300" role="img" aria-label="The HTTP/2 single-task model: one connection task multiplexes all streams via FuturesUnordered, doing one vectored write per wake.">
+          <defs><linearGradient id="brandgrad2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".5" stop-color="#818cf8"/><stop offset="1" stop-color="#e879f9"/></linearGradient><marker id="ar2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2c3856"/></marker></defs>
+          <g><rect class="node-box" x="20" y="118" width="146" height="52" rx="10"/><text class="node-t" x="93" y="140" text-anchor="middle">TLS conn</text><text class="node-d" x="93" y="155" text-anchor="middle">ALPN h2 / h2c</text></g>
+          <path class="edge" d="M166,144 L214,144" marker-end="url(#ar2)"/>
+          <g><rect class="node-core" x="216" y="40" width="432" height="222" rx="12"/><text class="node-d" x="236" y="64" fill="#8b95ad">ONE connection task</text>
+            <text class="node-d" x="236" y="92">FuturesUnordered⟨stream⟩</text>
+            <rect x="236" y="98" width="182" height="30" rx="6" fill="#13203a" stroke="#2c3856"/><text class="node-t" x="327" y="118" text-anchor="middle" font-size="10.5">stream 1 · handler</text>
+            <rect x="236" y="134" width="182" height="30" rx="6" fill="#13203a" stroke="#2c3856"/><text class="node-t" x="327" y="154" text-anchor="middle" font-size="10.5">stream 2 · handler</text>
+            <text class="node-d" x="327" y="186" text-anchor="middle">… stream N</text>
+            <rect x="438" y="98" width="192" height="30" rx="6" fill="#0d1526" stroke="#243049"/><text class="node-t" x="534" y="118" text-anchor="middle" font-size="10.5">HPACK enc / dec</text>
+            <rect x="438" y="134" width="192" height="30" rx="6" fill="#0d1526" stroke="#243049"/><text class="node-t" x="534" y="154" text-anchor="middle" font-size="10.5">send flow control · deadlines</text>
+            <text class="node-d" x="534" y="210" text-anchor="middle">one vectored writev / wake</text>
+          </g>
+          <path d="M648,144 L716,144" stroke="url(#brandgrad2)" stroke-width="1.6" fill="none"/>
+          <g><rect x="718" y="118" width="142" height="52" rx="10" fill="#13203a" stroke="url(#brandgrad2)" stroke-width="1.6"/><text class="node-t" x="789" y="140" text-anchor="middle" fill="#fff">wire</text><text class="node-d" x="789" y="155" text-anchor="middle">zero-copy Bytes</text></g>
+          <path class="edge" d="M432,262 L432,288" marker-end="url(#ar2)" stroke-dasharray="3 3"/>
+          <text class="node-d" x="444" y="284">bridge dispatch → shared pipeline → monoio writes</text>
+        </svg>
+        <figcaption>One connection task multiplexes every stream and emits a single vectored write per wake. Handlers cross the bridge into the shared pipeline; framing stays on the monoio core.</figcaption>
+      </figure>
+      <ul>
+        <li><strong>One task per connection.</strong> All streams multiplex through <code>FuturesUnordered</code>; a 100-stream connection costs one task.</li>
+        <li><strong>Send-side flow control</strong> honors per-stream and connection windows; <strong>frame and body deadlines</strong> are enforced on the monoio loop (parity with the tokio loop landed 2026-09-16).</li>
+        <li><strong>Streaming bodies</strong> — LSAPI, proxy, SSE and async file bodies stream without buffering; the response-completion hook keeps <a href="observability.html#otel">spans</a> open through the final flush.</li>
+        <li><strong>One vectored write per wake</strong>; large bodies are zero-copy from page-cache <code>Bytes</code>. The vendored <code>monoio-rustls</code> fork adds a real <code>writev</code> so the flush lands in rustls with one plaintext copy.</li>
+        <li><strong>Inbound RFC 9113 validation</strong> with graceful GOAWAY drain; <code>CONTINUATION</code> without an open header block and stream-id reuse are connection errors; the HTTP/2 Bomb pattern (CVE-2026-49975) and no-forward-progress cases are bounded.</li>
+        <li><strong>Egress pacing</strong> is per connection at the OutQueue flush with the server-wide rate (a per-response override is ill-defined under multiplexing). HTTP/3 is not paced.</li>
+      </ul>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>The native stack passes <strong>146 of 146</strong> h2spec 2.6.0 cases over TLS (three consecutive runs is the gate). h2c is informative-only: generic §3.5/2 is structurally unsatisfiable on a port that also sniffs HTTP/1.1, so it records 145/146 with that one documented exception.</p><span class="regime">scripts/h2spec_check.sh · scripts/ci-h2spec.py</span></div></div>
+    </section>
+
+    <section>
+      <h2 id="hpack">HPACK</h2>
+      <p>Header compression is RFC 7541 HPACK, implemented as the <code>hpack</code> submodule of <code>hj-h2</code> (once a standalone crate, folded in so the codec and the connection state evolve together). It is <strong>zero-allocation</strong> — fields are decoded and encoded by slicing frame bytes in place — and pure safe Rust with <code>#![forbid(unsafe_op_in_unsafe_fn)]</code>. Both the decoder and the round-trip are fuzz targets (<a href="conformance.html#fuzz">Conformance</a>).</p>
+    </section>
+
+    <section>
+      <h2 id="http3">HTTP/3 &amp; QUIC</h2>
+      <p>HTTP/3 is <code>uring/h3.rs</code>: <code>quinn-proto</code> for QUIC state, <code>quinn-udp</code> for socket metadata, UDP driven from monoio/io_uring, QPACK encode/decode, and the same bridge into the pipeline. Small, cached and sub-threshold bodies are buffered and sent whole; large, SSE and proxy bodies stream — HEADERS goes out immediately and DATA follows as the backend produces it, with backpressured writeback. Retained response memory is bounded per connection (2026-09-06).</p>
+      <p>Discovery is via <strong>Alt-Svc</strong> on TLS responses (the last response transform), so an h2 client learns it can upgrade to QUIC. Connection migration is disabled because listener steering does not yet preserve ownership across an address change. Each connection pins its trust generation and mTLS requirement at acceptance; a <a href="admin-api.html#reload">trust reload</a> replaces quinn's server configuration only for future handshakes while the bound UDP workers and established connection IDs survive.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Publish UDP too</span><p>The same numeric HTTPS port must be reachable over TCP (h1/h2) <em>and</em> UDP (h3). Publishing <code>8443/tcp</code> alone means no HTTP/3, and the Alt-Svc header will advertise a port clients cannot reach.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="sendfile">File egress: sendfile &amp; kTLS</h2>
+      <p>An uncached <code>Body::File</code> keeps its pinned inode and byte range across the tokio→monoio bridge. On <strong>plain TCP HTTP/1</strong> it is sent with bounded nonblocking <code>sendfile(2)</code>; unsupported descriptor/filesystem combinations resume at the exact offset with positional io_uring reads, and short files or client aborts close the connection rather than completing an incorrect <code>Content-Length</code>. A stalled sendfile backs off exponentially and gives up after 60 s of zero progress.</p>
+      <p>A <code>--features ktls</code> build extends this to <strong>TLS 1.3 H1</strong>: after the rustls handshake the socket is upgraded to kernel TLS, so the same sendfile writer feeds ciphertext without a userspace AEAD copy. A peer KeyUpdate queued during a transfer is applied before the next response writes, fencing TX rekey from sendfile. Policy is <code>--ktls=auto|on|off</code>: <code>auto</code> (default in feature builds) resolves the IPv4 default-route interface, reads its driver and features via ethtool ioctls, refuses known virtual NICs, and enables kTLS only when <code>tls-hw-tx-offload</code> is active — otherwise it logs one reason and stays on rustls. TLS 1.2, H2, H3 and UDS keep their userspace paths.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Plaintext sendfile: 5,000 × 1 MiB at c=50 → <strong>4,852 req/s</strong>, 10.08 ms mean, zero failures. Software kTLS on a virtual GVE NIC (offload <code>off [fixed]</code>): <strong>2,999.7 req/s off vs 2,944.9 on</strong> — the expected-negative result that is why <code>auto</code> refuses virtual NICs.</p><span class="regime">loopback · 2026-09-09 · <code>bench-results/httpjet-sendfile-*.csv</code>, <code>httpjet-ktls-sendfile-*.csv</code></span></div></div>
+    </section>
+
+    <section>
+      <h2 id="tls">TLS in one paragraph</h2>
+      <p><code>hj-tls</code> builds <strong>one</strong> <code>rustls::ServerConfig</code> for TCP and QUIC with aws-lc-rs as the crypto provider. SNI maps directly to configured chains (no cert-name-match, like OLS), with dual ECDSA+RSA chains per name; client verification is optional mTLS against the <em>listener</em> CA with CRL enforcement; TLS 1.3 offers exactly <code>TLS_AES_128_GCM_SHA256</code>; resumption uses single-use tickets with 0-RTT off. Certificates, ACME and OCSP have their own page: <a href="certificates.html">TLS, ACME &amp; OCSP</a>.</p>
+    </section>

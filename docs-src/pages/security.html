@@ -1,0 +1,104 @@
+    <h1>Security &amp; access control</h1>
+    <p class="lede">Everything that decides <strong>who the client is</strong> and <strong>who may ask</strong>: the trusted-proxy identity model, network ACLs, the opt-in per-IP throttle, GeoIP/ASN rules from an offline source, PROXY-protocol trust, the mTLS boundary, request-body and decompression budgets, the WAF sidecar seam, and the fail-closed PHP jail. The recurring rule is <strong>fail closed</strong>: a control that cannot evaluate acts restrictive, never permissive.</p>
+
+    <div class="rail locator" role="img" aria-label="You are here: resolve and acl."><div class="rail__track"><span class="stage on"><span class="k">resolve</span></span><span class="stage on"><span class="k">acl</span></span><span class="stage"><span class="k">rewrite</span></span><span class="stage"><span class="k">cache</span></span><span class="stage"><span class="k">dispatch</span></span><span class="stage"><span class="k">finalize</span></span><span class="stage"><span class="k">store</span></span></div></div>
+
+    <section>
+      <h2 id="identity">Client identity</h2>
+      <p>Every decision that depends on "the client's IP" starts from one resolved value, produced at connection admission and stored in <code>ReqCtx.client_ip</code>:</p>
+      <!--diagram:client-ip|<strong>From socket peer to client identity.</strong> Forwarded headers are evidence, not identity: they count only from a peer an <code>allow</code> rule marks <code>T</code>; from anyone else they are attacker-controlled data and ignored. Every later gate — ACL, geo, throttle, mTLS exemption, logs, the cache key — reads the resolved value.-->
+      <div class="tablewrap"><table>
+        <thead><tr><th><code>useIpInProxyHeader</code></th><th>Forwarded headers are believed…</th></tr></thead>
+        <tbody>
+          <tr><td>0</td><td>never</td></tr>
+          <tr><td>1 / 4</td><td>always (only safe when nothing but your proxy can reach the listener)</td></tr>
+          <tr><td>2 (default)</td><td>only from trusted peers (<code>allow … T</code>); <code>CF-Connecting-IP</code> recognized on that path</td></tr>
+          <tr><td>3</td><td>as 2, for IP purposes only</td></tr>
+        </tbody></table></div>
+      <p>The admin write API classifies <code>useIpInProxyHeader</code> and the whole <code>&lt;security&gt;</code> block as <strong>restart-required</strong>: trust must not change under a running generation without a listener transaction.</p>
+    </section>
+
+    <section>
+      <h2 id="network-acls">Network ACLs</h2>
+      <p><code>&lt;security&gt;&lt;accessControl&gt;</code> evaluates <code>allow</code>/<code>deny</code> CIDR lists most-specific-wins; a trailing <code>T</code> on an <em>allow</em> rule marks a trusted proxy. <code>&lt;accessDenyDir&gt;</code> globs are never served, and a malformed glob is a hard start/reload error rather than a warn-and-skip. <code>&lt;fileAccessControl&gt;&lt;followSymbolLink&gt;</code> mode <code>2</code> (owner-restricted) fails closed to never-follow. Static opens use <code>openat2(RESOLVE_BENEATH)</code> — plus <code>RESOLVE_NO_SYMLINKS</code> when policy denies symlinks — and refuse non-regular files so a planted FIFO cannot park an executor thread; a kernel without <code>openat2</code> fails closed to 404.</p>
+    </section>
+
+    <section>
+      <h2 id="throttle">Per-client-IP throttle</h2>
+      <p><code>&lt;tuning&gt;&lt;perIpRate&gt;</code> (or <code>--per-ip-rate</code>) caps requests per client IP per fixed window (<code>perIpRateWindowSecs</code>, default 1 s); excess requests get 429. The implementation is a sharded fixed-window counter — 64 shards, 4096 tracked IPs per shard — counted exactly once per request at the fast-path serve points and at dispatch.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Off by default, and fail-open</span><p>Default 0 (disabled): a shared NAT egress aggregates many real visitors behind one address, so limits are strictly opt-in. Under internal state pressure (a distinct-IP flood) the throttle evicts expired windows and then <em>admits untracked</em> — degrading fairness, never availability. <code>httpjet_throttle_{allowed,rejected}_total</code> show what it does.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="geo">GeoIP / ASN rules</h2>
+      <p>Country and network membership come from <code>hj-geo</code>, which has no runtime network access: point <code>&lt;security&gt;&lt;geoipDBFile&gt;</code> at a CidrList text file and refresh it on your own schedule. Ranges load into sorted, merged interval sets queried by binary search; IPv4-mapped IPv6 addresses are judged in v4 space.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>geo source</b> · CidrList format</span></div><pre><code># country &lt;ISO-3166 alpha-2&gt; &lt;CIDR…&gt;
+country US 203.0.113.0/24 198.51.100.0/24
+country DE 2001:db8::/32
+# asn &lt;number&gt; &lt;CIDR…&gt;
+asn 13335 203.0.113.0/24</code></pre></div>
+      <p><code>geoAllow</code>/<code>geoDeny</code> (ISO-2 labels) and <code>asnAllow</code>/<code>asnDeny</code> resolve to CIDR sets at state build: <strong>deny first</strong>; an allow list with no deny list is a <strong>fail-closed whitelist</strong>; an unknown label or a missing database is a hard build error, not a silent no-op; <code>check</code> warns on geo lists without a database. Both funnels (on-core and bridged) judge the <em>resolved</em> client IP, so CDN-fronted visitors are evaluated by their real address.</p>
+    </section>
+
+    <section>
+      <h2 id="proxy-protocol">PROXY protocol trust</h2>
+      <p>A listener with <code>proxyProtocol=1</code> requires a PROXY v2/v1 header on every connection, consumed before TLS or the h1/h2c sniff. The listener opt-in <em>is</em> the trust decision — never enable it on a public bind (<code>check</code> warns). Headers claiming a loopback or unspecified source are refused at the parser (2026-09-16), because those addresses would otherwise unlock the mTLS exemption and the loopback purge/ready endpoints. Details: <a href="protocols.html#frontdoors">Protocol stacks</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="tls">TLS &amp; mTLS</h2>
+      <ul>
+        <li><strong>mTLS</strong> — <code>clientVerify</code> 1–3 attaches a webpki verifier to the <em>listener</em> CA; level 2 requires a client certificate (e.g. Cloudflare Authenticated Origin Pulls). A plaintext request for an mTLS vhost is refused unless from loopback. <code>--no-mtls</code> is for local testing only — always confirm the live flags with <code>systemctl show -p ExecStart</code> before reasoning about the boundary.</li>
+        <li><strong>Revocation</strong> — <code>crlFile</code> adds PEM CRL enforcement; absent means none, stated plainly.</li>
+        <li><strong>Cipher and resumption discipline</strong> — one TLS 1.3 suite, single-use tickets, 0-RTT off; resumption disabled when OCSP is on. TLS stream splitting was made memory-safe in the 2026-09-06 round.</li>
+        <li><strong>One config, two transports</strong> — a certificate, verifier or CRL change cannot land on TCP and miss QUIC. See <a href="certificates.html">TLS, ACME &amp; OCSP</a>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 id="limits">Request limits &amp; resource fences</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Fence</th><th>Enforcement</th></tr></thead>
+        <tbody>
+          <tr><td>Header and URL size, connection counts, timeouts</td><td>From <code>&lt;tuning&gt;</code>: <code>maxReqURLLen</code>, <code>maxReqHeaderSize</code>, <code>maxConnections</code>, <code>connTimeout</code>, <code>keepAliveTimeout</code>, <code>maxKeepAliveReq</code>. Incomplete request reads are bounded (2026-09-06); h2 frame/body deadlines apply on both loops.</td></tr>
+          <tr><td>Body size</td><td><code>maxReqBodySize</code> server-wide, per-context override; 413 on every terminal. Chunked/decoded growth is reserved before allocation.</td></tr>
+          <tr><td>Body budget</td><td>A process-wide byte budget with owned leases attached to the allocation (including cloned/sliced <code>Bytes</code>), released on completion or connection teardown. <code>httpjet_body_buffer_{bytes,capacity_bytes,rejected_total}</code>.</td></tr>
+          <tr><td>Request decompression</td><td>Gzip by default; br/zstd opt-in. Decoded ceiling 16 MiB, 17 MiB codec workspace reservation, zstd window ≤ 2<sup>24</sup>, one coding only; 503 when the reservation fails, 413 past <code>maxReqBodySize</code>. <a href="compression.html#request">→</a></td></tr>
+          <tr><td>Egress bandwidth</td><td>Per-connection token bucket (<code>bandwidthLimit</code>, context override); H2 paces per connection; H3 unpaced.</td></tr>
+          <tr><td>Ranges · sub_filter · <code>.htaccess</code> depth</td><td>8 ranges / 8 MiB; 4 MiB buffer then raw pass-through; 64 levels then deny-all.</td></tr>
+          <tr><td>H2 / H3 memory</td><td>Stream and connection limits, HTTP/2 Bomb mitigation, bounded H3 retained response memory, body-reservation leases released on reset/EOF/error.</td></tr>
+          <tr><td>Page cache</td><td>100 MiB object cap; index/file/hot budgets; identity guard; integrity-keyed persistent containers (key created <code>O_EXCL</code> 0600); purge endpoint loopback-only.</td></tr>
+          <tr><td>Reload safety</td><td>A broken config on SIGHUP keeps the old generation; out-of-range isolation modes are hard errors; the write API rejects rather than partially applies.</td></tr>
+          <tr><td>Worker pinning</td><td>Core indices clamped to <code>CPU_SETSIZE</code>.</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="waf">WAF inspection seam</h2>
+      <p>httpjet embeds no rules engine. <code>--waf-sidecar-addr</code> enables a bounded loopback HTTP inspection call that runs after URI normalization and body limits but <strong>before</strong> rewrite, cache lookup, WebSocket/proxy dispatch, LSAPI, FastCGI and static serving — so a warm cache hit is still inspected. The default failure policy is <strong>closed</strong> (503); <code>--waf-fail-open</code> must be chosen explicitly and logs every bypass. The full contract is on <a href="extensions.html#waf">Extending httpjet</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="jail">The PHP jail</h2>
+      <p>suEXEC (<code>&lt;suexec&gt;</code>, off by default, <code>uidMin</code>/<code>gidMin</code> floors; uid 0 always rejected), chroot (<code>chrootMode</code> 0–2) and optional namespaces (<code>pid</code> accepted but not honored). A configured jail that turns out unsafe disables PHP for that vhost with a 503 — never unjailed, never falling through to static. Workers never run as root and a setuid <code>lsphp</code> is refused. See <a href="lsapi.html#jail">LSAPI &amp; PHP</a>.</p>
+    </section>
+
+    <section>
+      <h2 id="control-surfaces">Control surfaces</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Surface</th><th>Guard</th></tr></thead>
+        <tbody>
+          <tr><td><code>/__hj_cache_purge</code>, <code>/__hj_cache_ready</code> (main listeners)</td><td>Raw TCP peer must be loopback — no shared secret; CDN-relayed or LAN peers get 404. PROXY headers cannot claim loopback.</td></tr>
+          <tr><td><code>--metrics-addr</code> (<code>/metrics</code>, <code>/cache-entries</code>, <code>/__mimalloc-stats</code>, <code>/debug/pprof/profile</code>)</td><td>Loopback-only by default; profiling needs a build feature and optional <code>--profile-token</code>. Do not reverse-proxy it.</td></tr>
+          <tr><td><code>--admin-addr</code> (read-only <code>/v1/status</code>)</td><td>Loopback TCP only (argument parsing rejects anything else); Host must be a loopback authority; Origin headers and bodies rejected; no secrets in the schema.</td></tr>
+          <tr><td><code>--admin-write-addr</code> (<code>/v1/revision</code>, <code>/v1/config[/validate]</code>)</td><td>Loopback + bearer token from a 0400/0600 single-link file (constant-time compare) + exact <code>If-Match</code> revision + explicit resource roots for any filesystem reference.</td></tr>
+          <tr><td>LSAPI control and generation files</td><td>Root-only control socket; generation file mmap'd read-only by web pools; non-group-writable parent directory required.</td></tr>
+          <tr><td>ACME store · DNS token · integrity key · admin token</td><td>Owner and mode checks on the descriptor, no symlink following, bounded reads.</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="audit">Audit posture</h2>
+      <p>Three whole-codebase review rounds have landed on top of the August hardening pass: <strong>2026-08-30</strong> (issues #362–#368: no exploitable High, five low/informational fixes), <strong>2026-09-06</strong> (five confirmed medium/low findings: H2/H3 body-reservation leaks, retained-body and gzip-expansion accounting, scoped Basic-auth merging, public caching of authenticated static responses, UA-classification memo dependencies), and <strong>2026-09-16</strong> (twelve fixes: h2 monoio deadlines, sendfile stall bounds, unreadable <code>.htaccess</code> fail-closed, PROXY loopback claims, <code>[P]</code> target screening, CGI-var deny-list, never-root and setuid refusal, isolation-mode hard errors, restart-required trust fields, seccomp ptrace gating, Origin-varied cache entries, CPU_SETSIZE clamp and single Content-Length). Each round's regressions are in the tree; gates re-run after each: full workspace suite, fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Reporting</span><p>Security issues: use private responsible disclosure per <code>SECURITY.md</code> in the repository, not a public issue. Findings are reconciled against source and regression tests; none of this is evidence of production exploitation or a proof of absence of other vulnerabilities.</p></div></div>
+    </section>

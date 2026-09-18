@@ -1,0 +1,119 @@
+    <h1>LSAPI &amp; PHP</h1>
+    <p class="lede">httpjet speaks the <strong>native LSAPI wire protocol</strong> to an operator-configured <code>lsphp</code> executable — no FastCGI shim, no translation layer. <code>hj-lsapi</code> holds the wire codec, a generation-aware UDS client pool, the <code>lsphp</code> supervisor, the CGI environment builder, and a fail-closed jail. The production shape is a <strong>persistent external pool</strong> so the web tier restarts without cold-starting PHP.</p>
+
+    <div class="rail locator" role="img" aria-label="You are here: the dispatch stage, where PHP requests are routed to lsphp over LSAPI."><div class="rail__track"><span class="stage"><span class="k">resolve</span></span><span class="stage"><span class="k">acl</span></span><span class="stage"><span class="k">rewrite</span></span><span class="stage"><span class="k">cache</span></span><span class="stage on"><span class="k">dispatch</span></span><span class="stage"><span class="k">finalize</span></span><span class="stage"><span class="k">store</span></span></div></div>
+
+    <section>
+      <h2 id="overview">Overview</h2>
+      <p>When suffix routing maps a request to a PHP handler (<code>&lt;phpConfig&gt;</code> or an <code>lsapi</code> <code>extProcessor</code> bound by a <code>scriptHandler</code>, or a <code>.htaccess</code> <code>SetHandler application/x-httpd-php</code>), httpjet talks LSAPI directly to <code>lsphp</code>. PHP is optional: static, proxy and FastCGI deployments need no LSAPI executable.</p>
+      <figure class="figure">
+        <svg viewBox="0 0 880 210" role="img" aria-label="LSAPI request flow: a client request reaches the httpjet LSAPI handler, which sends a native LSAPI BEGIN_REQUEST frame over a Unix socket to the lsphp worker pool, and streams the response back.">
+          <defs><linearGradient id="brandgrad3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".5" stop-color="#818cf8"/><stop offset="1" stop-color="#e879f9"/></linearGradient><marker id="ar3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2c3856"/></marker></defs>
+          <g><rect class="node-box" x="24" y="60" width="118" height="48" rx="10"/><text class="node-t" x="83" y="82" text-anchor="middle">client</text><text class="node-d" x="83" y="97" text-anchor="middle">HTTP/1·2·3</text></g>
+          <path class="edge" d="M142,84 L214,84" marker-end="url(#ar3)"/><text class="node-d" x="160" y="76">HTTP</text>
+          <g><rect class="node-core" x="216" y="56" width="180" height="56" rx="10"/><text class="node-t" x="306" y="80" text-anchor="middle" fill="#fff">httpjet</text><text class="node-d" x="306" y="96" text-anchor="middle">LSAPI handler · CGI env</text></g>
+          <path d="M396,84 L470,84" stroke="url(#brandgrad3)" stroke-width="1.6" fill="none"/><text class="node-d" x="402" y="76">LSAPI · UDS</text>
+          <g><rect class="node-box" x="472" y="38" width="384" height="92" rx="10"/><text class="node-d" x="488" y="58" fill="#8b95ad">lsphp pool — capped by --php-children / maxConns</text>
+            <rect x="492" y="72" width="78" height="40" rx="7" fill="#13203a" stroke="#2c3856"/><text class="node-t" x="531" y="96" text-anchor="middle" font-size="11">php #1</text>
+            <rect x="582" y="72" width="78" height="40" rx="7" fill="#13203a" stroke="#2c3856"/><text class="node-t" x="621" y="96" text-anchor="middle" font-size="11">php #2</text>
+            <text class="node-d" x="686" y="96">…</text>
+            <rect x="742" y="72" width="94" height="40" rx="7" fill="#13203a" stroke="#2c3856"/><text class="node-t" x="789" y="96" text-anchor="middle" font-size="11">php #N</text>
+          </g>
+          <path class="edge" d="M600,130 C600,182 83,182 83,108" marker-end="url(#ar3)" fill="none"/>
+          <text class="node-d" x="340" y="178">streamed response · php-slow log · lsapi_ttfb histogram</text>
+        </svg>
+        <figcaption>Native LSAPI over a Unix socket. The pool may be owned by the web process (spawn mode) or run as a separate <code>httpjet lsphp</code> process (external mode, the production shape).</figcaption>
+      </figure>
+      <div class="chips">
+        <span class="chip"><span class="dot"></span>Native LSAPI · vendored <code>lsapidef.h</code></span>
+        <span class="chip"><span class="dot"></span>Operator-supplied <code>lsphp</code></span>
+        <span class="chip"><span class="dot"></span>Generation-tracked UDS pool</span>
+        <span class="chip"><span class="dot"></span>Candidate-first zero-downtime reload</span>
+        <span class="chip"><span class="dot"></span>Fail-closed jail</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="codec">The LSAPI wire codec</h2>
+      <p><code>proto/{frame,builder}</code> implement the protocol straight from the vendored php-src <code>lsapidef.h</code> constants (BSD-3-Clause), so frames match byte-for-byte what <code>lsphp</code> reads. One sharp edge deserves stating precisely: every env key/value and known header value is length-prefixed with a big-endian <code>u16</code> that <strong>includes the trailing NUL</strong>, so the largest safe field is <code>u16::MAX − 1</code> bytes. A longer field would wrap the prefix and desync <code>lsphp</code>'s parser for every subsequent frame; the builder rejects it.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>proto</b> · the NUL-inclusive length prefix</span></div><pre><code><span class="t-c">// each env/header field:  [u16 BE = byte_len + 1] [bytes…] [0x00]</span>
+<span class="t-k">const</span> MAX_FIELD: usize = (u16::MAX <span class="t-k">as</span> usize) - 1;   <span class="t-c">// 65534</span></code></pre></div>
+      <p>The response-header parser is one of the five fuzz targets (<code>lsapi_resp_header</code>). Inbound tracing context reaches PHP as <code>HTTP_TRACEPARENT</code> in the unknown-header table when <a href="observability.html#otel">OpenTelemetry</a> is on.</p>
+    </section>
+
+    <section>
+      <h2 id="pool">The UDS connection pool</h2>
+      <p>Requests reach <code>lsphp</code> over a Unix-domain socket fronted by a pool that carries a <strong>generation epoch</strong>. In owned mode the epoch is process-local; in external mode it is the 16-byte generation file below, mapped read-only. A bodyless idempotent request whose pooled connection dies before the send gets one transparent retry on a <em>fresh</em> dial, bounded by the processor's <code>retryTimeout</code>. A fresh-dial <code>EAGAIN</code> under backlog pressure is retried and counted (<code>httpjet_lsapi_eagain_*</code>). Accepted connections keep TCP keepalive so a vanished client cannot pin pool permits.</p>
+      <p>Attribution is what makes generation retirement safe: for every connection the pool identifies the accepting worker through <code>UNIX_DIAG</code> peer-inode lookup plus <code>/proc</code>, pins it with a pidfd, and — after the response completes — retires a stale-generation worker through that pidfd rather than by pid (workers call <code>setsid()</code> and are not reliably in the master's tree). Failures to attribute are counted, never guessed.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Metric</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>httpjet_lsapi_generation_advances_total</code></td><td>Epoch advances this web process observed.</td></tr>
+          <tr><td><code>httpjet_lsapi_stale_idle_drops_total</code> / <code>_stale_checked_out_drops_total</code></td><td>Idle sockets discarded / checked-out sockets refused re-pooling after an advance.</td></tr>
+          <tr><td><code>httpjet_lsapi_stale_worker_retire_signals_total</code> / <code>_failures_total</code></td><td>Old-generation workers retired via pinned pidfd after their response completed / signals that failed.</td></tr>
+          <tr><td><code>httpjet_lsapi_worker_attribution_failures_total</code></td><td>Connections whose worker could not be pinned.</td></tr>
+          <tr><td><code>httpjet_lsapi_acquire_seconds</code> · <code>_dispatch_seconds</code> · <code>_ttfb_seconds</code></td><td>Pool contention · backend call time · request-committed-to-first-byte (worker pickup + render start).</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="supervisor">The lsphp supervisor</h2>
+      <p>In spawn mode (<code>serve</code> without <code>--lsphp-external</code>) <code>hj-lsapi</code> spawns and supervises <code>lsphp</code> itself: the listen socket is passed on <strong>fd 0</strong>, <code>PR_SET_PDEATHSIG</code> ties a worker's life to its parent, and the <code>pre_exec</code> closure between fork and exec calls only async-signal-safe syscalls. The process is a subreaper and tracks each generation family by an injected <code>LSAPI_Z_HTTPJET_GENERATION_MARKER</code> plus pidfds. The config's <code>LSAPI_CHILDREN</code> env is stripped so <code>--php-children</code> / <code>maxConns</code> is the only cap (values below 2 normalize to 2).</p>
+      <p>Two refusals are unconditional (2026-09-16): the supervisor <strong>never runs workers as root</strong> (resolve_credentials rejects uid/gid 0 even if suEXEC would compute it) and <strong>refuses to spawn a setuid <code>lsphp</code> binary</strong>.</p>
+      <p><code>--php-max-process-time-ms</code> sets a total per-request deadline: exceeded → 504. In spawn mode the monitor also kills and restarts the worker; under <code>--lsphp-external</code> there is no monitor in the web process, so only the 504 applies and a wedged worker is not auto-reclaimed here — keep the value conservative.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Packaging boundary</span><p>httpjet ships no PHP runtime. The executable, its extensions, <code>php.ini</code>, opcache settings and writable application paths are operator-managed. The unit sandboxing of the pool process is likewise an operator decision.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="zero-downtime">Zero-downtime deploys: the external pool</h2>
+      <p>Spawn mode couples PHP's lifetime to the web process — a binary deploy cold-starts opcache. The <code>httpjet lsphp</code> subcommand instead runs a <strong>persistent pool as its own systemd unit</strong> (<code>httpjet-lsphp.service</code>, <code>Type=notify</code>, socket-activated through <code>httpjet-lsphp.socket</code>); the web tier dials it with <code>serve --lsphp-external &lt;socket&gt; --lsphp-generation-file &lt;file&gt;</code> and never spawns workers itself. Both halves then deploy independently:</p>
+      <div class="two">
+        <div><h4>Web tier deploy</h4><ul><li><code>systemctl restart httpjet</code></li><li>systemd holds the :80/:443 fds — no RST for new or queued connections</li><li>PHP workers and opcache stay warm</li></ul></div>
+        <div><h4>PHP recycle</h4><ul><li><code>systemctl reload httpjet-lsphp</code> → <code>httpjet lsphp-reload</code></li><li>candidate-first: a new family must answer a real, marker-attributed LSAPI request before promotion</li><li>the systemd-owned listener is never closed; queued dials survive</li></ul></div>
+      </div>
+      <!--diagram:lsphp-reload|<strong>Candidate-first generation reload.</strong> The supervisor promotes a new family only after a marker-attributed response, then advances the shared 16-byte epoch. Web pools observe the epoch, drop idle sockets, and retire each in-flight stale worker only after its response completes, through a pidfd pinned before the epoch moved. The old family is drained with bounded forced cleanup.-->
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">external pool wiring (see <a href="operations.html#php">Operations</a> for the units)</span></div><pre><code><span class="t-c"># the PHP half — its own unit, its own identity</span>
+httpjet --root /abs/root lsphp --php-socket /run/httpjet/php.sock --php-children 256 \
+  --control-socket /run/httpjet/lsphp-control.sock \
+  --generation-file /run/httpjet/lsphp.generation
+
+<span class="t-c"># the serving half — dial, never spawn; restart freely</span>
+httpjet --root /abs/root serve … --lsphp-external /run/httpjet/php.sock \
+  --lsphp-generation-file /run/httpjet/lsphp.generation
+
+<span class="t-c"># opcache/PHP recycle without dropping the listener</span>
+httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-secs 90</code></pre></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">The generation file is the trust anchor</span><p>The 16-byte file (epoch + promoted-family marker fingerprint) is how a web tier tells <em>its</em> pool from a foreign one. Supplying <code>--lsphp-generation-file</code> is fail-closed: startup aborts if it is missing or malformed. Its parent directory must not be group/other-writable. Test pools default their control and generation files <em>beside their own socket</em> so they can never advance the production epoch — which would drop the live web tier's pooled connections and retire its workers against a foreign marker.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Never restart the socket unit during a reload</span><p><code>httpjet-lsphp.socket</code> is the continuity boundary: keeping it open preserves the listener inode and its 8192-deep accept queue. Replace the supervisor by restarting only <code>httpjet-lsphp.service</code>; it reapplies the XML backlog to the inherited fd with <code>listen(2)</code>. Verify with <code>stat</code> of the socket inode before/after, a 16-byte generation file, and <code>ss -xln</code> Send-Q = 8192; <code>LIVE=1 scripts/lsphp-reload-test.sh</code> is the live gate.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="cgi-env">The CGI environment</h2>
+      <p>The env builder assembles the CGI/LSAPI environment per request. The load-bearing split is <em>what was requested</em> vs <em>what runs</em>: the <code>LsapiScript</code> request extension pins a resolved <code>SCRIPT_FILENAME</code> while the <strong>original</strong> <code>REQUEST_URI</code> is kept, with <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> pushed into <code>ctx.env</code> and upserted over the builder's defaults. That is what makes front-controller routing (every page → <code>/index.php</code>) correct.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Variable</th><th>What it holds</th></tr></thead>
+        <tbody>
+          <tr><td><code>REQUEST_URI</code></td><td>The original request URI, preserved through rewrites.</td></tr>
+          <tr><td><code>SCRIPT_FILENAME</code> / <code>SCRIPT_NAME</code></td><td>The resolved on-disk script and its URI-space name.</td></tr>
+          <tr><td><code>REMOTE_ADDR</code>, <code>SERVER_NAME</code>, <code>HTTPS</code>, <code>CONTENT_LENGTH</code>, <code>HTTP_AUTHORIZATION</code>, …</td><td>Server-computed. Since 2026-09-16 a <code>.htaccess</code> <code>[E=…]</code> or processor <code>env</code> entry that names one of these is <strong>denied</strong> (shared deny-list with FastCGI) — a directory cannot override the server's view of the client.</td></tr>
+          <tr><td><code>HTTP_*</code></td><td>Request headers after name/value validation; <code>HTTP_TRACEPARENT</code> when OTel is enabled.</td></tr>
+          <tr><td><code>REMOTE_USER</code></td><td>Set by a successful <a href="rewrite.html#basic-auth">Basic auth</a> realm.</td></tr>
+          <tr><td>special-env section</td><td><code>php_value</code> / <code>php_admin_value</code> / <code>php_flag</code> / <code>php_admin_flag</code> from <code>.htaccess</code>, carried on the LSAPI special-env wire path with the right permission level — plain <code>lsphp</code> ignores a regular CGI <code>PHP_VALUE</code>.</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section>
+      <h2 id="jail">The jail</h2>
+      <p>PHP execution is fenced by a config-gated jail — suEXEC (<code>&lt;suexec&gt;</code> with <code>uidMin</code>/<code>gidMin</code> floors), chroot (<code>chrootMode</code> 0–2, per-vhost <code>chrootPath</code>) and optional Linux namespaces (<code>mount</code>, <code>net</code>, <code>uts</code>, <code>ipc</code>; <code>pid</code> is accepted but deliberately not honored). Resolution has two outcomes and no third:</p>
+      <ul>
+        <li>suEXEC off, non-root process, or no per-vhost isolation → the <strong>all-None</strong> case: the default <code>"php"</code> pool, single-pool behavior preserved byte-for-byte.</li>
+        <li>A configured jail that turns out unsafe — uid 0, a uid below the floor, a bad chroot, an out-of-range <code>setUIDMode</code>/<code>chrootMode</code> (hard error since 2026-09-16) → httpjet <strong>disables PHP for that vhost and returns 503</strong>. It never runs unjailed, and it never falls through to the static handler.</li>
+      </ul>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Source-disclosure guard</span><p>A script that resolves to a PHP handler is identified as PHP even when no pool can serve it. Falling through to static would hand back the raw <code>.php</code> source, so an unavailable pool is a 503, always. Operators sharing one pool across vhosts should read the "shared PHP trust boundary" note in the repository's security docs: workers in one pool share credentials, so per-vhost isolation is a suEXEC decision, not a default.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="bodies">Request bodies</h2>
+      <p>LSAPI needs a concrete <code>m_reqBodyLen</code> before the body is sent, so chunked / no-<code>Content-Length</code> uploads are collected first. <code>collect_to_cap</code> enforces the effective <code>maxReqBodySize</code> <em>as frames arrive</em> — the instant the accumulated size would exceed the cap it returns <code>PayloadTooLarge</code> (413) — and every buffered byte is charged to the process-wide body budget through an owned lease that is released on completion or on connection teardown (H2/H3 teardown leaks were closed in the 2026-09-06 review).</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>PHP/LSAPI over HTTP/1.1: <strong>~44.8k req/s vs LiteSpeed's ~38.5k at c=40</strong> on the same hardware (LiteSpeed's best, ~41.2k, needed c=60). In production the render inside PHP is ~90% of request wall time; pool acquire is p99.9 &lt; 1 ms.</p><span class="regime">loopback · PGO · 2026-06 · production telemetry 2026-08-30</span></div></div>
+    </section>
