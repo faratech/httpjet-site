@@ -6,9 +6,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `/web/httpjet` is the **public website for httpjet.net** — a static marketing teaser plus a multi-page documentation site. It is *not* the httpjet web-server source code; the Rust server lives in a separate repo (`github.com/faratech/httpjet`). Nothing here is server code — only HTML/CSS/JS for the public site.
 
-This directory is **not tracked in the `/web` monorepo git** (`git ls-files` returns nothing for it; it is untracked, not ignored). It is a standalone deployable that happens to live on the production filesystem. Do not expect `/web` git history or commits to cover changes here.
+This directory is tracked as a Git submodule mapped to **`github.com/faratech/httpjet-site`** (`branch = main`).
 
-The site is dogfooded: per `/web/CLAUDE.md` the httpjet Rust server is what serves production `:80`/`:443`, and it honors `.htaccess` — so this site is served by the very server it documents.
+### Cloudflare Pages Hosting
+
+Production public traffic for `httpjet.net` and `www.httpjet.net` is served directly via **Cloudflare Pages** (project: `httpjet-site`, custom domains `httpjet.net` & `www.httpjet.net` CNAME'd to `httpjet-site.pages.dev`). Edge routing, 404 handling, and caching rules are declared in:
+- `_headers`: Caching headers (`max-age=31536000, immutable` for static assets, 1 hour for HTML) and CSP headers.
+- `_redirects`: Canonical redirects (e.g. `/docs/index.html` -> `/docs/ 301`).
+- `.htaccess`: Maintained locally for backward-compatibility with local Apache/LiteSpeed/httpjet servers.
+
+### Deployment
+
+Deploying changes to Cloudflare Pages can be done either via Git push to `faratech/httpjet-site` or via Wrangler CLI:
+
+```bash
+cd /web/httpjet
+# After rebuilding docs:
+source /web/.env
+CLOUDFLARE_API_KEY="$CLOUDFLARE_GLOBAL_TOKEN" \
+CLOUDFLARE_EMAIL="$CLOUDFLARE_EMAIL" \
+npx wrangler pages deploy . --project-name httpjet-site --branch main
+```
+
 
 ## Two surfaces, two build models
 
