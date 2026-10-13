@@ -10,9 +10,15 @@ Options:
       --workers <WORKERS>
           Number of accept-loop workers (SO_REUSEPORT sockets). Defaults to CPUs
       --no-mtls
-          Local testing / explicit rollback only: drop the mandatory Cloudflare client-cert requirement so TLS content can be tested locally without a Cloudflare-issued client cert. Without this flag, clientVerify=2 is enforced (handshakes without a valid client cert are rejected — the production fail-closed behavior)
+          Local testing / explicit rollback only: drop the mandatory Cloudflare client-cert requirement so TLS content can be tested locally without a Cloudflare-issued client cert. Without this flag, clientVerify=2 validates every presented certificate during TLS. A peer that presents none completes the handshake, then the request pipeline rejects it before dispatch (except the loopback exemption)
       --no-core-pinning
           (#296) Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the machine's CPU count; this flag is the kill switch if pinned placement worsens tail latency
+      --trusted-proxy-idle-secs <TRUSTED_PROXY_IDLE_SECS>
+          (#486) Idle window in seconds for connections whose peer presented a VERIFIED client certificate (in prod, only Cloudflare's authenticated-origin-pull cert). Cloudflare never resumes TLS to the origin, so closing a connection it would have reused costs a full TCP + TLS + mTLS handshake. 0 (default) keeps the normal 90 s floor for everyone; uncertified peers always keep it [default: 0]
+      --trusted-proxy-idle-max-conns <TRUSTED_PROXY_IDLE_MAX_CONNS>
+          Above this many open connections, certified connections fall back to the normal idle floor (bounds idle state during a connection surge) [default: 6000]
+      --tls-session-tickets <TLS_SESSION_TICKETS>
+          TLS 1.3 session tickets issued per full handshake (rustls default 2). 0 stops minting them and shrinks the session cache to TLS 1.2 session IDs: Cloudflare's origin pull never resumes (httpjet_tls_handshakes_resumed_total stays 0), so the tickets only cost two records per handshake plus a cached copy of its client-cert chain [default: 2]
       --uring-ring <URING_RING>
           (#330) io_uring ring setup for the per-core transport runtimes. `legacy` (default) = flagless rings — the A/B measured `coop` (COOP_TASKRUN + SUBMIT_ALL) as noise and `defer` (+SINGLE_ISSUER + DEFER_TASKRUN) as a consistent ~-2% on this virtualized guest; both stay available for other hardware. Ring size always stays default — ring memory is memlock-charged and bigger rings under the prod unit's LimitMEMLOCK bankrupt late runtimes (2026-08-27 crash-loop). Unsupported flags fall back to plain rings per-thread with a warning [default: legacy] [possible values: legacy, coop, defer]
       --no-multishot-accept
@@ -43,16 +49,28 @@ Options:
           Directory for the PERSISTENT tmpfs file tier. The default is "none": bodies stay in the in-process RAM cache and flush on restart. Pass an explicit directory such as /dev/shm/jetcache to opt into the LiteSpeed-Enterprise-style store where bodies live as files and the cache survives restarts via a boot-time warm scan. The LiteSpeed config's cacheStorePath is intentionally NOT used [default: none]
       --page-cache-integrity-key <INTEGRITY_KEY>
           Integrity key used for persistent cache containers [default: /usr/local/httpjet/conf/.jetcache.key]
+      --page-cache-integrity-required
+          Refuse to start the file tier when the integrity key cannot be installed, instead of running with untagged containers
       --page-cache-hot-mem <HOT_MEM>
           Byte cap of the in-RAM hot tier in front of the file store (zero-syscall zero-copy serves for the hottest bodies). Only meaningful with --page-cache-store-path. Default 192 MiB [default: 201326592]
       --page-cache-dict <DICT>
           (dedup) Path to a shared zstd dictionary used to store cached bodies far smaller. CMS pages share ~60%+ of their bytes as position-shifted boilerplate that only a dictionary captures; with this set, `cache_store` dict-compresses the stored body (the SERVED bytes stay standard zstd/br/gzip — browsers/CF can't decode a private dict). Absent/empty/unreadable ⇒ bodies are stored as plain identity (today's behaviour). Build one from a reviewed local corpus with scripts/train-pagecache-dict-from-files.sh [default: ""]
       --page-cache-dict-vhost <DICT_VHOST>
           Comma-separated `vhost=path` pairs: a PER-VHOST zstd dictionary, trained on that vhost's own content (train one local corpus per vhost). A shared dictionary trained on one site's boilerplate does little for a differently templated site, so each vhost compresses against its own. A vhost not listed here falls back to --page-cache-dict if set, else stores identity (today's behaviour). Example: `forum.example=conf/pagecache-forum.dict,moon.example=conf/pagecache-moon.dict` [default: ""]
+      --page-cache-dict-level <DICT_LEVEL>
+          Comma-separated `vhost=level` pairs overriding the internal zstd level (1-19, default 12) of that vhost's dictionary. A vhost whose compressed bodies round to the same 4 KiB tmpfs pages at a cheaper level gains nothing from 12: moontimenow's pages cost 5x less at level 3 with no footprint change (measured 2026-09-22). A malformed pair aborts startup [default: ""]
+      --page-cache-opt-in-status <OPT_IN_STATUS>
+          Comma-separated extra statuses (from 303, 404, 410) cached only when the app sends an explicit `X-LiteSpeed-Cache-Control: public`, with the TTL capped at 300 s and no stale windows. Empty = off (only 200/301 are cached) [default: ""]
+      --page-cache-303-prefixes <OPT_IN_303_PREFIXES>
+          Comma-separated request-path prefixes under which an opted-in 303 may be stored (e.g. `/whats-new/`). A 303 anywhere else is never stored [default: ""]
+      --page-cache-stream-fill-vhosts <STREAM_FILL_VHOSTS>
+          Comma-separated vhost names whose cacheable page-cache misses WITHOUT a Content-Length (progressive template output, e.g. moontimenow) are sent to the client as the backend writes them and stored once the backend finishes, instead of being buffered whole first. Only identity-encoded public 200s; a body that errors, is cut short or grows past the object cap is served but never stored. Empty = off [default: ""]
       --page-cache-admit-threshold <ADMIT_THRESHOLD>
           (W-TinyLFU) Base admission bar: minimum frequency a cacheable response must show before it is STORED. 2 = store on the 2nd sighting (miss-miss-hit; rejects the long-tail of one-hit-wonders — the default). 1 = store on the 1st sighting (miss-hit; cache everything — now cheap with --page-cache-dict, with the store's byte LRU protecting the hot set). Size-weighting adds +1 per 256 KiB on top. Watch httpjet_cache_hit_ratio_real to tune [default: 2]
       --page-cache-vary-cookies <VARY_COOKIES>
           Comma-separated public-vary cookie names: a cacheable public response may declare `X-LiteSpeed-Vary: cookie=NAME,...` and the entry is keyed by these cookies' values (shared, non-sensitive prefs). Default matches the XenForo style/language set [default: xf_style_variation,xf_style_id,xf_language_id]
+      --page-cache-vary-default <VARY_DEFAULTS>
+          Comma-separated `name=value` pairs: a vary cookie carrying this value is keyed like no cookie (the app treats the default the same way). E.g. `xf_style_id=50` [default: ""]
       --page-cache-private-cookies <PRIVATE_COOKIES>
           Comma-separated cookie names that forbid public caching if a public response tries to Set-Cookie them (session guard). Default: XenForo [default: xf_session,xf_user]
       --page-cache-private
@@ -91,6 +109,8 @@ Options:
           Allow explicitly-marked member-cookie requests to receive public-shell capsules
       --xf-capsule-member-canary-percent <MEMBER_CANARY_PERCENT>
           Deterministic percentage of eligible member-cookie requests that may receive capsules [default: 0]
+      --xf-capsule-dedicated-store
+          Also store every capsule-capable page under a DEDICATED (admission-exempt) key. Off by default since 2026-10-04: members are served from the shell-capable PUBLIC entry, which keeps one copy per page and lets the admission gate govern every store
       --cf-send-zstd
           (CF_SEND_ZSTD) Compress responses to a trusted-proxy (Cloudflare) peer as zstd, ignoring the forwarded Accept-Encoding. CF asks the origin for br/gzip but decodes an origin `Content-Encoding: zstd` and re-encodes per browser at its edge — so this hands CF the cheapest-to-produce form (zstd ≪ brotli to compress) without changing what browsers receive. Officially unsupported CF↔origin; opt-in, default off. Never applies to untrusted (direct) clients. Off ⇒ byte-identical to today
       --metrics-addr <METRICS_ADDR>
@@ -132,9 +152,13 @@ Options:
       --mimalloc-trim-secs <MIMALLOC_TRIM_SECS>
           (mem) Interval (seconds) for the background mimalloc OS-trim that calls mi_collect(force) to hand retained/cold arena pages back to the OS (counters the swap retention seen in prod after a burst). 0 = disable [default: 120]
       --mimalloc-trim-threshold-mib <MIMALLOC_TRIM_THRESHOLD_MIB>
-          (mem) Only run the mimalloc trim when process RSS+swap (read from /proc/self/status) is at least this many MiB; 0 = always. Lets a small, healthy process skip the collect entirely. Default 768: well above the measured healthy steady-state (x86 ~360 MiB, ARM ~240 MiB) so a process at rest never pays the force-collect cost, while genuine post-burst arena retention still trips the safety-net reclaim [default: 768]
+          (mem) Only run the mimalloc trim (periodic and after a connection close) when process RSS+swap (read from /proc/self/status) is at least this many MiB; 0 = always. Lets a healthy process skip the collect entirely. Default 768: above a cache-less steady state (~360 MiB). Size it above the deployment's healthy peak (a large page cache holds 1-2 GiB) so only genuine post-burst arena retention trips the safety-net reclaim [default: 768]
       --profile-token <PROFILE_TOKEN>
-          (profiling) Optional shared token guarding the /debug/pprof/profile endpoint (only built with `--features profiling`; loopback-only regardless). Empty = no token (loopback is the only guard) [default: ""]
+          Bearer secret required for profiling and sensitive metrics diagnostics. Empty disables those routes; ordinary metrics scraping stays available. Visible in /proc/*/cmdline; prefer --profile-token-file [default: ""]
+      --auth-user-file-roots <AUTH_USER_FILE_ROOTS>
+          Extra directories (comma-separated) where a `.htaccess` AuthUserFile may live, besides the vhost docroot [default: ""]
+      --profile-token-file <PROFILE_TOKEN_FILE>
+          File holding the --profile-token secret (single-link regular file owned by root or the serving user, no group/other permissions)
       --rewrite-outcome-ttl-ms <REWRITE_OUTCOME_TTL_MS>
           (rewrite) TTL in milliseconds for the rewrite-outcome cache (memoized rewrite decisions for `path_cacheable` chains, keyed by vhost/scheme/ method/host/path/query + any keyable header vars). 0 disables the cache entirely. The default (1000 ms) matches the historical hard-coded TTL — it bounds `-f`/`-d` filesystem staleness exactly like the StatCache and lets `.htaccess` edits take effect within ~1 s [default: 1000]
       --rewrite-ua-classify

@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/observability.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260917b">
-<script defer src="assets/docs-head.min.js?v=20260917b"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
+<script defer src="assets/docs-head.min.js?v=20261013a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -46,7 +46,7 @@
 
     <section>
       <h2 id="metrics">Prometheus metrics</h2>
-      <p><code>--metrics-addr</code> (default <code>127.0.0.1:9090</code>; empty disables) serves <code>/metrics</code> in the Prometheus text format. Around 120 series today; the families that matter, grouped:</p>
+      <p><code>--metrics-addr</code> (default <code>127.0.0.1:9090</code>; empty disables) serves <code>/metrics</code> in the Prometheus text format. Over 130 series today; the families that matter, grouped:</p>
       <div class="filterbar" data-filter="metrictable"><input type="search" placeholder="filter metrics…" aria-label="Filter metrics"><span class="count"></span></div>
       <div class="tablewrap"><table id="metrictable" class="flagtable"><colgroup><col class="c-key"><col class="c-mid"><col class="c-txt"></colgroup><thead><tr><th>Metric</th><th>Type</th><th>Meaning</th></tr></thead>
         <tbody>
@@ -64,11 +64,11 @@
           <tr data-group="fast"><th>httpjet_fast_cookie_{none,member_session,benign_only}_total</th><td>counter</td><td class="wrap">Cookie shape of fast-path GET/HEADs.</td></tr>
           <tr data-group="fast"><th>httpjet_rewrite_outcome_{hits,misses,uncacheable}_total · httpjet_rewrite_ua_classify_entries</th><td>counter / gauge</td><td class="wrap">Rewrite-outcome cache and UA-classification table size.</td></tr>
           <tr class="grouphead" data-group="cache"><td colspan="3">Page cache</td></tr>
-          <tr data-group="cache"><th>httpjet_pagecache_{hits,misses,stores,purges,purges_received,store_purge_rejections,expired_misses}_total · httpjet_pagecache_hit_ratio · httpjet_cache_hit_ratio_real</th><td>counter / gauge</td><td class="wrap">Core activity; <code>_real</code> excludes loopback probes. Telemetry twins <code>httpjet_cache_{hits,misses,bypass,stale_serves,sie_serves,admitted,rejected}</code> and <code>httpjet_disp_*</code> (why a response was or wasn't stored) plus <code>httpjet_cache_admit_ratio</code>.</td></tr>
+          <tr data-group="cache"><th>httpjet_pagecache_{hits,misses,stores,purges,purges_received,store_purge_rejections,expired_misses}_total · httpjet_pagecache_hit_ratio · httpjet_cache_hit_ratio_real</th><td>counter / gauge</td><td class="wrap">Core activity; <code>_real</code> excludes loopback probes; <code>httpjet_cache_{hits,misses}_by_vhost{vhost}</code> split it per vhost and <code>httpjet_pagecache_evictions_total</code> counts size/TTL teardowns. Telemetry twins <code>httpjet_cache_{hits,misses,bypass,stale_serves,sie_serves,admitted,rejected}</code> and <code>httpjet_disp_*</code> (why a response was or wasn't stored) plus <code>httpjet_cache_admit_ratio</code>.</td></tr>
           <tr data-group="cache"><th>httpjet_pagecache_entries · _memory_bytes · _hot_bytes · _decoded_entries · _meta_{raw,compressed}_bytes · _tag_{keys,memberships,index_bytes} · _tag_purge_{tombstones,floor_milliseconds}</th><td>gauge</td><td class="wrap">Exact RAM accounting of the index and tag indexes.</td></tr>
           <tr data-group="cache"><th>httpjet_pagecache_disk_{bytes,max_bytes} · _disk_evictions_total · _disk_evict_age_{lt_1h,1h_6h,6h_24h,ge_24h}_total · _swept_expired_total</th><td>gauge / counter</td><td class="wrap">File-tier footprint vs budget, LRU evictions by entry age, proactive expiry sweeps.</td></tr>
-          <tr data-group="cache"><th>httpjet_pagecache_disk_{read,write,full}_errors_total · _missing_file_invalidations_total · _orphan_{reclaimed,deferred}_total · _meta_decode_errors_total · _key_id_collisions_total · _poisoned_locks_total</th><td>counter</td><td class="wrap">Health: every one of these should be flat. Poisoned locks nonzero = indexes may be inconsistent.</td></tr>
-          <tr data-group="cache"><th>httpjet_pagecache_dict_recompress_total · _dict_recompress_bytes_total · httpjet_pagecache_refresh_inflight</th><td>counter / gauge</td><td class="wrap">Lazy dictionary recompressions; stale-while-revalidate refreshes in flight.</td></tr>
+          <tr data-group="cache"><th>httpjet_pagecache_disk_{read,write,full}_errors_total · _missing_file_invalidations_total · _orphan_{reclaimed,deferred}_total · _meta_decode_errors_total · _key_id_collisions_total · _poisoned_locks_total</th><td>counter</td><td class="wrap">Health: every one of these should be flat. Poisoned locks nonzero = indexes may be inconsistent. <code>httpjet_pagecache_integrity_active</code> = 1 once the file-tier integrity key is installed.</td></tr>
+          <tr data-group="cache"><th>httpjet_pagecache_dict_recompress_total · _dict_recompress_bytes_total · httpjet_pagecache_refresh_inflight</th><td>counter / gauge</td><td class="wrap">Store-time dictionary recompressions (bounded background pool); stale-while-revalidate refreshes in flight.</td></tr>
           <tr data-group="cache"><th>httpjet_pagecache_shared_path_{public_routes,canary_skipped}_total · _shared_paths_{matchers,canary_percent}</th><td>counter / gauge</td><td class="wrap">Shared-paths routing.</td></tr>
           <tr data-group="cache"><th>httpjet_xf_capsule_{hits,misses,stale_hits,dedicated_stores,canary_filtered}_total · _hits_by_class_total · _shell_age_secs</th><td>counter / histogram</td><td class="wrap">XenForo capsule tier.</td></tr>
           <tr data-group="cache"><th>httpjet_process_rss_bytes · httpjet_process_rss_anon_bytes · httpjet_pagecache_unaccounted_rss_anon_bytes</th><td>gauge</td><td class="wrap">Process RSS and the part the cache accounting cannot explain.</td></tr>
@@ -167,9 +167,9 @@ httpjet --root /abs/root serve …</code></pre></div>
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="operations.html"><div class="dir">← Prev</div><div class="ttl">Operations</div></a><a class="next" href="admin-api.html"><div class="dir">Next →</div><div class="ttl">Admin API &amp; reload</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-09-17 (v0.0.1).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260917b"></script>
-<script defer src="assets/docs.min.js?v=20260917b"></script>
+<script defer src="assets/search-index.min.js?v=20261013a"></script>
+<script defer src="assets/docs.min.js?v=20261013a"></script>
 </body>
 </html>

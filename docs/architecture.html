@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/architecture.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260917b">
-<script defer src="assets/docs-head.min.js?v=20260917b"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
+<script defer src="assets/docs-head.min.js?v=20261013a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -42,16 +42,16 @@
 <p class="crumbs"><a href="./">Docs</a><span>/</span>Architecture</p>
 <p class="eyebrow">Guide</p>
 <h1>Architecture</h1>
-    <p class="lede">httpjet is a Cargo workspace: <strong>one binary crate</strong> (<code>httpjet</code>) over <strong>nineteen <code>hj-*</code> library crates</strong>. The graph is acyclic, <code>hj-config</code> is the root, and <code>hj-core</code> is the small frozen seam every handler programs against. Two crates (<code>hj-acme</code>, <code>hj-ocsp</code>) only link in behind build features. Roughly 1,900 test functions span the workspace.</p>
+    <p class="lede">httpjet is a Cargo workspace: <strong>one binary crate</strong> (<code>httpjet</code>) over <strong>nineteen <code>hj-*</code> library crates</strong>. The graph is acyclic, <code>hj-config</code> is the root, and <code>hj-core</code> is the small frozen seam every handler programs against. Two crates (<code>hj-acme</code>, <code>hj-ocsp</code>) only link in behind build features. Roughly 2,000 test functions span the workspace (2,028 green at v0.0.5).</p>
 
     <section>
       <h2 id="workspace">Workspace shape</h2>
       <p>Responsibilities are split so the contract a handler depends on stays tiny while transports, protocols, gateways and the cache evolve behind it. Four libraries are deliberately isolated — <code>hj-rewrite</code>, <code>hj-log</code>, <code>hj-geo</code> and <code>hj-cache</code> take no <code>hj-*</code> dependency, so their logic is portable and testable on its own. <code>hj-pagecache</code> is transport-agnostic and builds on <code>hj-cache</code>'s sharded LRU; its request-aware glue lives in the binary.</p>
       <div class="chips">
         <span class="chip"><span class="dot"></span>1 binary + 19 libraries</span>
-        <span class="chip"><span class="dot"></span>Rust 1.98 · edition 2024 · v0.0.1</span>
+        <span class="chip"><span class="dot"></span>Rust 1.99 · edition 2024 · v0.0.5</span>
         <span class="chip"><span class="dot"></span>Acyclic; hj-config at the root</span>
-        <span class="chip"><span class="dot"></span>≈1,900 test functions</span>
+        <span class="chip"><span class="dot"></span>≈2,000 test functions</span>
         <span class="chip"><span class="dot"></span>Vendored forks: monoio, monoio-rustls (real writev), dashmap, pprof</span>
       </div>
     </section>
@@ -249,9 +249,9 @@
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="quickstart.html"><div class="dir">← Prev</div><div class="ttl">Quickstart</div></a><a class="next" href="capabilities.html"><div class="dir">Next →</div><div class="ttl">Capabilities &amp; limits</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-09-17 (v0.0.1).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260917b"></script>
-<script defer src="assets/docs.min.js?v=20260917b"></script>
+<script defer src="assets/search-index.min.js?v=20261013a"></script>
+<script defer src="assets/docs.min.js?v=20261013a"></script>
 </body>
 </html>

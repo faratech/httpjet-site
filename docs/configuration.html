@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/configuration.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260917b">
-<script defer src="assets/docs-head.min.js?v=20260917b"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
+<script defer src="assets/docs-head.min.js?v=20261013a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -203,7 +203,7 @@
       <h2 id="checking">Checking a configuration</h2>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>check</b></span></div><pre><code>httpjet --root /abs/root check            <span class="t-c"># summary: listeners, vhost map, fast-memo verdicts, warnings</span>
 httpjet --root /abs/root check --strict   <span class="t-c"># + topology lint, missing docroots, vhost-map-fingerprint; non-zero on findings</span></code></pre></div>
-      <p>Run the check under the intended service identity as well as as root: readable-by-root is not proof the runtime user can read certificates or write logs and sockets. The same normalization runs for the <a href="admin-api.html#write">write API</a>'s in-memory bundle (<code>parse_bundle</code>), which additionally refuses DTDs, more than 64 nesting levels, more than 128 vhosts, and 1 MiB of XML.</p>
+      <p>Run the check under the intended service identity as well as as root: readable-by-root is not proof the runtime user can read certificates or write logs and sockets. The same normalization runs for the <a href="admin-api.html#write">write API</a>'s in-memory bundle (<code>parse_bundle</code>), which additionally refuses DTDs, more than 64 nesting levels, more than 128 vhosts, and 1 MiB of XML. A config file read from disk is capped at 16 MiB per file (<code>ConfigError::TooLarge</code>, 2026-10-06) — a bound on all readers, <code>check</code> included.</p>
     </section>
 
     <section>
@@ -212,9 +212,9 @@ httpjet --root /abs/root check --strict   <span class="t-c"># + topology lint, m
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="compression.html"><div class="dir">← Prev</div><div class="ttl">Compression</div></a><a class="next" href="cli.html"><div class="dir">Next →</div><div class="ttl">CLI reference</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-09-17 (v0.0.1).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260917b"></script>
-<script defer src="assets/docs.min.js?v=20260917b"></script>
+<script defer src="assets/search-index.min.js?v=20261013a"></script>
+<script defer src="assets/docs.min.js?v=20261013a"></script>
 </body>
 </html>

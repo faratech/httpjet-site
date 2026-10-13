@@ -77,7 +77,7 @@ RewriteRule ^/expensive/ - [E=no-cache:1]      <span class="t-c"># [E=no-cache] 
 AuthName "Staging"
 AuthUserFile /srv/example.test/conf/htpasswd
 Require valid-user</code></pre></div>
-      <p>htpasswd hashes: <strong>bcrypt</strong> (<code>$2y$</code>/<code>$2b$</code>/<code>$2a$</code>, <code>htpasswd -B</code>) and <code>{SHA}</code>, verified in constant time. <code>$apr1$</code> and <code>crypt()</code> hashes verify <em>false</em> with a parse-time warning. Authenticated static responses get <code>Cache-Control: private, no-store</code> from automatic expiry when no explicit policy exists (#414).</p>
+      <p>htpasswd hashes: <strong>bcrypt</strong> (<code>$2y$</code>/<code>$2b$</code>/<code>$2a$</code>, <code>htpasswd -B</code>, cost capped at 14 — a higher cost is refused before hashing) and <code>{SHA}</code>, verified in constant time; an unknown user pays one bcrypt at the file's recorded cost, so user enumeration costs nothing. Plaintext entries, <code>$apr1$</code> and <code>crypt()</code> hashes verify <em>false</em> (matching Apache on Unix; legacy schemes get a parse-time warning). The <code>AuthUserFile</code> must resolve <strong>inside the vhost docroot</strong> — or a directory listed in <code>--auth-user-file-roots</code> — checked on the opened descriptor's real path (symlinks followed, <code>.</code>/<code>..</code> rejected in relative paths, read capped at 1 MiB, a planted FIFO cannot block the open); an unreadable or out-of-root file is a 500 with an error-log entry, never a silent 401, and <code>check</code> warns about out-of-root paths. Authenticated static responses get <code>Cache-Control: private, no-store</code> from automatic expiry when no explicit policy exists (#414).</p>
     </section>
 
     <section>

@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/rewrite.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260917b">
-<script defer src="assets/docs-head.min.js?v=20260917b"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
+<script defer src="assets/docs-head.min.js?v=20261013a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -150,7 +150,7 @@ RewriteRule ^/expensive/ - [E=no-cache:1]      <span class="t-c"># [E=no-cache] 
 AuthName "Staging"
 AuthUserFile /srv/example.test/conf/htpasswd
 Require valid-user</code></pre></div>
-      <p>htpasswd hashes: <strong>bcrypt</strong> (<code>$2y$</code>/<code>$2b$</code>/<code>$2a$</code>, <code>htpasswd -B</code>) and <code>{SHA}</code>, verified in constant time. <code>$apr1$</code> and <code>crypt()</code> hashes verify <em>false</em> with a parse-time warning. Authenticated static responses get <code>Cache-Control: private, no-store</code> from automatic expiry when no explicit policy exists (#414).</p>
+      <p>htpasswd hashes: <strong>bcrypt</strong> (<code>$2y$</code>/<code>$2b$</code>/<code>$2a$</code>, <code>htpasswd -B</code>, cost capped at 14 — a higher cost is refused before hashing) and <code>{SHA}</code>, verified in constant time; an unknown user pays one bcrypt at the file's recorded cost, so user enumeration costs nothing. Plaintext entries, <code>$apr1$</code> and <code>crypt()</code> hashes verify <em>false</em> (matching Apache on Unix; legacy schemes get a parse-time warning). The <code>AuthUserFile</code> must resolve <strong>inside the vhost docroot</strong> — or a directory listed in <code>--auth-user-file-roots</code> — checked on the opened descriptor's real path (symlinks followed, <code>.</code>/<code>..</code> rejected in relative paths, read capped at 1 MiB, a planted FIFO cannot block the open); an unreadable or out-of-root file is a 500 with an error-log entry, never a silent 401, and <code>check</code> warns about out-of-root paths. Authenticated static responses get <code>Cache-Control: private, no-store</code> from automatic expiry when no explicit policy exists (#414).</p>
     </section>
 
     <section>
@@ -199,9 +199,9 @@ bash scripts/fast_memo_parity_test.sh                      <span class="t-c"># m
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="gateways.html"><div class="dir">← Prev</div><div class="ttl">Proxy &amp; gateways</div></a><a class="next" href="security.html"><div class="dir">Next →</div><div class="ttl">Security &amp; access control</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-09-17 (v0.0.1).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260917b"></script>
-<script defer src="assets/docs.min.js?v=20260917b"></script>
+<script defer src="assets/search-index.min.js?v=20261013a"></script>
+<script defer src="assets/docs.min.js?v=20261013a"></script>
 </body>
 </html>

@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20260917b'
+VERSION = '20261013a'
 GA = 'G-ZR4WV214JT'
 
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; "
@@ -219,7 +219,7 @@ def pager(i):
         out += f'<a class="next" href="{href}"{" style=\"margin-left:auto\"" if not prev else ""}><div class="dir">Next →</div><div class="ttl">{nxt[1]}</div></a>'
     return out + '</nav>'
 
-FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-09-17 (v0.0.1).<br>'
+FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>'
         'Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>')
 
 def build_page(i, entry):

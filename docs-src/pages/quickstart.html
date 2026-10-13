@@ -7,7 +7,7 @@
         <thead><tr><th>Requirement</th><th>Why</th></tr></thead>
         <tbody>
           <tr><td>Linux with <strong>io_uring</strong></td><td>The monoio/io_uring transport is the only transport. Container runtimes must allow <code>io_uring_setup</code>/<code>io_uring_enter</code>/<code>io_uring_register</code> (see <a href="operations.html#oci">OCI</a>).</td></tr>
-          <tr><td><strong>Rust 1.98+</strong>, edition 2024</td><td>The workspace MSRV. A C toolchain is needed for the aws-lc-rs crypto backend and mimalloc.</td></tr>
+          <tr><td><strong>Rust 1.99+</strong>, edition 2024</td><td>The workspace MSRV. A C toolchain is needed for the aws-lc-rs crypto backend and mimalloc.</td></tr>
           <tr><td>OpenSSL 3.x headers + pkg-config</td><td>Only for <code>--features ocsp</code>.</td></tr>
           <tr><td>An LSAPI-capable <code>lsphp</code></td><td>Only for PHP. Static, proxy and FastCGI deployments need no PHP and no LiteSpeed installation.</td></tr>
         </tbody></table></div>

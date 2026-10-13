@@ -31,7 +31,7 @@
           <tr><td>Rewrites &amp; <code>.htaccess</code></td><td><span class="badge part">partial</span></td><td>Common rewrite, access, auth, header, expiry, cache and env directives. <code>Header</code> is a tested subset; <code>RequestHeader</code> is ignored. Run <code>check --strict</code>. <a href="rewrite.html#directives">→</a></td></tr>
           <tr><td>Compression</td><td><span class="badge ok">supported</span></td><td>Dynamic gzip/brotli/zstd + precompressed siblings. Gzip <em>request</em> decoding on by default; brotli/zstd request decoding opt-in and bounded. <a href="compression.html">→</a></td></tr>
           <tr><td>Origin page cache</td><td><span class="badge ok">supported</span> opt-in</td><td>Public/private tiers, vary, purge tags, stale policies, single flight, admission, RAM/file tiers, dictionaries, restart scan, generation-scoped keys. A first-class route-level <em>microcache policy</em> is specified, not implemented. <a href="page-cache.html">→</a></td></tr>
-          <tr><td>Access controls</td><td><span class="badge ok">supported</span></td><td>Peer ACLs, trusted-proxy client IP, GeoIP/ASN CIDR rules, per-IP rate limit, body limits, Basic auth (bcrypt/SHA htpasswd). <a href="security.html">→</a></td></tr>
+          <tr><td>Access controls</td><td><span class="badge ok">supported</span></td><td>Peer ACLs, trusted-proxy client IP, GeoIP/ASN CIDR rules, per-IP rate limit, body limits, Basic auth (bcrypt/SHA htpasswd; bcrypt cost capped at 14, files confined to the docroot). <a href="security.html">→</a></td></tr>
           <tr><td>WAF</td><td><span class="badge opt">external</span> opt-in</td><td>Bounded loopback inspection sidecar, fail-closed by default. No embedded ModSecurity/CRS engine. <a href="extensions.html#waf">→</a></td></tr>
           <tr><td>Logs and metrics</td><td><span class="badge ok">supported</span></td><td>Combined or JSON access logs, text or JSON error logs with redaction, syslog tap, Prometheus text metrics, request ids, telemetry TSV, PHP slow log. <a href="observability.html">→</a></td></tr>
           <tr><td>OpenTelemetry</td><td><span class="badge opt">optional</span></td><td>OTLP traces and metrics behind <code>--features otel</code> + <code>HTTPJET_OTEL=1</code>. Bounded queues; no payload export. <a href="observability.html#otel">→</a></td></tr>
@@ -52,7 +52,7 @@
         <li><strong>No epoll/tokio transport fallback</strong>, no Windows/macOS. Linux io_uring is mandatory.</li>
         <li><strong>No native dynamic-module ABI.</strong> Untrusted inspection belongs behind the bounded sidecar contract.</li>
         <li><strong>LiteSpeed anti-abuse elements</strong> (<code>lsrecaptcha</code>, <code>censorshipControl</code>, permission masks, <code>cgiRlimit</code>) are parsed and warned about, never enforced.</li>
-        <li><strong>Legacy htpasswd schemes</strong> (APR1 <code>$apr1$</code>, <code>crypt()</code>) verify <em>false</em> with a parse-time warning — re-hash with <code>htpasswd -B</code>.</li>
+        <li><strong>Legacy htpasswd schemes</strong> (APR1 <code>$apr1$</code>, <code>crypt()</code>, and plaintext entries) verify <em>false</em> with a parse-time warning — re-hash with <code>htpasswd -B</code>.</li>
         <li><strong>Cross-node cache peers</strong> (<code>--cache-peer</code>, peer fill/purge fan-out) were removed in August 2026; the loopback purge and readiness endpoints remain.</li>
         <li><strong>Multipath QUIC</strong> was assessed and deferred (June 2026).</li>
       </ul>
@@ -80,7 +80,7 @@
         <thead><tr><th>Bound</th><th>Value</th></tr></thead>
         <tbody>
           <tr><td>Page-cache single object</td><td>100 MiB — larger responses serve uncached</td></tr>
-          <tr><td>Page-cache budgets</td><td>Independent index (<code>--page-cache-mem</code>), file tier (<code>--page-cache-disk-mem</code>), hot tier (<code>--page-cache-hot-mem</code>), object TTL and stale-window caps; persistent files need an integrity key (<code>--page-cache-integrity-key</code>, created <code>O_EXCL</code> 0600)</td></tr>
+          <tr><td>Page-cache budgets</td><td>Independent index (<code>--page-cache-mem</code>), file tier (<code>--page-cache-disk-mem</code>), hot tier (<code>--page-cache-hot-mem</code>), object TTL and stale-window caps; persistent files need an integrity key (<code>--page-cache-integrity-key</code>; loaded through a private-file validator — single link, owner root or the serving uid, no group/other bits — with <code>--page-cache-integrity-required</code> to refuse booting the file tier without one)</td></tr>
           <tr><td>Bridge buffering</td><td>Bodies ≤ 256 KiB buffered, larger streamed (H1/H2/H3)</td></tr>
           <tr><td>Request body budget</td><td>Process-wide byte budget with leases; usage, capacity and rejections exported as <code>httpjet_body_buffer_*</code></td></tr>
           <tr><td>Request decompression</td><td>16 MiB decoded ceiling; 17 MiB codec workspace reservation for br/zstd; zstd window ≤ 2<sup>24</sup></td></tr>

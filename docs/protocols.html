@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/protocols.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20260917b">
-<script defer src="assets/docs-head.min.js?v=20260917b"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
+<script defer src="assets/docs-head.min.js?v=20261013a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -89,7 +89,7 @@
 
     <section>
       <h2 id="http1">HTTP/1.1 &amp; h2c detection</h2>
-      <p>The H1 codec parses with <code>httparse</code>, enforces strict framing (single <code>Content-Length</code>, conflicting-length rejection, bounded incomplete reads), supports keep-alive and pipelining, honors <code>maxKeepAliveReq</code> (0 = unlimited), decodes chunked bodies, and streams large responses from the bridge without buffering.</p>
+      <p>The H1 codec parses with <code>httparse</code>, enforces strict framing (single <code>Content-Length</code>, conflicting-length rejection, bounded incomplete reads), supports keep-alive and pipelining, honors <code>maxKeepAliveReq</code> (0 = unlimited), decodes chunked bodies, and streams large responses from the bridge without buffering. Since the 2026-10-06 review it also enforces the RFC 9112 request-target and Host rules at intake: only origin-form targets (plus <code>*</code> for OPTIONS) and http/https absolute-form (reduced to origin-form, its authority replacing <code>Host</code>); <code>CONNECT</code> answers <strong>405</strong>, authority-form and a raw <code>#</code> answer 400. HTTP/1.1 <strong>requires <code>Host</code></strong>, and any Host must be UTF-8 and pass the same authority validation the h2/h3 <code>:authority</code> rule uses (HTTP/1.0 may omit it). A header line terminated by a bare LF is rejected 400 before the head is materialized.</p>
       <p>Cleartext HTTP/2 by prior knowledge has no upgrade handshake — the client simply sends the connection preface. httpjet detects it <em>non-destructively</em>: the bytes already read are handed to whichever stack wins, so h1 and h2 both parse the connection as if no router sat in front.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>uring</b> · ALPN + cleartext routing</span></div>
@@ -157,7 +157,7 @@
 
     <section>
       <h2 id="http3">HTTP/3 &amp; QUIC</h2>
-      <p>HTTP/3 is <code>uring/h3.rs</code>: <code>quinn-proto</code> for QUIC state, <code>quinn-udp</code> for socket metadata, UDP driven from monoio/io_uring, QPACK encode/decode, and the same bridge into the pipeline. Small, cached and sub-threshold bodies are buffered and sent whole; large, SSE and proxy bodies stream — HEADERS goes out immediately and DATA follows as the backend produces it, with backpressured writeback. Retained response memory is bounded per connection (2026-09-06).</p>
+      <p>HTTP/3 is <code>uring/h3.rs</code>: <code>quinn-proto</code> for QUIC state, <code>quinn-udp</code> for socket metadata, UDP driven from monoio/io_uring, QPACK encode/decode, and the same bridge into the pipeline. Small, cached and sub-threshold bodies are buffered and sent whole; large, SSE and proxy bodies stream — HEADERS goes out immediately and DATA follows as the backend produces it, with backpressured writeback. Retained response memory is bounded per connection (2026-09-06). The process-wide connection budget (shared with TCP accepts) is charged at <code>Connected</code> — after address validation — so spoofed Initials cannot hold budget for the idle timeout; until then a connection costs only one of 256 per-core handshake slots, and once 64 connections on a core are handshaking an unvalidated Initial receives a stateless <strong>Retry</strong> (token-bearing Initials are still accepted). A full budget closes with <code>H3_EXCESSIVE_LOAD</code>; handshakes are closed after 10 s.</p>
       <p>Discovery is via <strong>Alt-Svc</strong> on TLS responses (the last response transform), so an h2 client learns it can upgrade to QUIC. Connection migration is disabled because listener steering does not yet preserve ownership across an address change. Each connection pins its trust generation and mTLS requirement at acceptance; a <a href="admin-api.html#reload">trust reload</a> replaces quinn's server configuration only for future handshakes while the bound UDP workers and established connection IDs survive.</p>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Publish UDP too</span><p>The same numeric HTTPS port must be reachable over TCP (h1/h2) <em>and</em> UDP (h3). Publishing <code>8443/tcp</code> alone means no HTTP/3, and the Alt-Svc header will advertise a port clients cannot reach.</p></div></div>
     </section>
@@ -175,9 +175,9 @@
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="capabilities.html"><div class="dir">← Prev</div><div class="ttl">Capabilities &amp; limits</div></a><a class="next" href="certificates.html"><div class="dir">Next →</div><div class="ttl">TLS, ACME &amp; OCSP</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-09-17 (v0.0.1).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20260917b"></script>
-<script defer src="assets/docs.min.js?v=20260917b"></script>
+<script defer src="assets/search-index.min.js?v=20261013a"></script>
+<script defer src="assets/docs.min.js?v=20261013a"></script>
 </body>
 </html>
