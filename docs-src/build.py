@@ -16,6 +16,30 @@ ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
 VERSION = '20261024m'
 GA = 'G-ZR4WV214JT'
+SITE = 'https://httpjet.net'
+ROOT = '/web/httpjet'
+STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
+INDEXNOW_KEY = '7b3e5c1a9d4f48e2a6c0b8d1e3f5a79c'      # public by design (served at /<key>.txt)
+import hashlib, datetime
+STATE = {}  # url -> {hash, lastmod, submitted}
+
+def load_state():
+    global STATE
+    try:
+        STATE = json.load(open(STATE_PATH))
+    except Exception:
+        STATE = {}
+
+def touch(url, content):
+    """Record a content hash; lastmod only moves when the hash does. Returns lastmod."""
+    h = hashlib.sha256(content.encode('utf-8')).hexdigest()
+    e = STATE.get(url)
+    today = datetime.date.today().isoformat()
+    if not e:
+        STATE[url] = {'hash': h, 'lastmod': today, 'submitted': None}
+    elif e['hash'] != h:
+        e.update(hash=h, lastmod=today)
+    return STATE[url]['lastmod']
 
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; "
        "script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; "
@@ -161,7 +185,7 @@ def chart(m):
     out.append('</tbody></table></div></details></div>')
     return ''.join(out)
 
-def head(slug, title_suffix, desc, nav_title, docs_min_css):
+def head(slug, title_suffix, desc, nav_title, docs_min_css, lastmod):
     url = 'https://httpjet.net/docs/' + ('' if slug == 'index' else slug)
     nt = unesc(nav_title)
     if slug == 'index':
@@ -171,7 +195,7 @@ def head(slug, title_suffix, desc, nav_title, docs_min_css):
     else:
         ts = title_suffix[:1].upper() + title_suffix[1:]
         t = f'{nt} — httpjet {ts}'
-    today = f'{VERSION[:4]}-{VERSION[4:6]}-{VERSION[6:8]}'
+    today = lastmod
     crumbs_ld = [
         {"@type": "ListItem", "position": 1, "name": "httpjet", "item": "https://httpjet.net/"},
         {"@type": "ListItem", "position": 2, "name": "Docs", "item": "https://httpjet.net/docs/"}
@@ -424,7 +448,9 @@ def build_page(i, entry, docs_min_css):
         f'<a class="mdraw" href="{slug}.md" target="_blank" rel="noopener" title="View raw Markdown (.md)">Raw .md</a>'
         f'</div></div>\n'
     )
-    out = head(slug, suffix, unesc(desc), nav_title, docs_min_css)
+    page_url = SITE + '/docs/' + ('' if slug == 'index' else slug)
+    lastmod = touch(page_url, nav_title + '\0' + desc + '\0' + body)
+    out = head(slug, suffix, unesc(desc), nav_title, docs_min_css, lastmod)
     out += HEADER_HTML + '\n<div class="shell">\n' + sidebar_html(slug) + '\n<main class="content" id="main-content">\n' + page_bar + body.strip() + '\n\n' + pager(i) + '\n' + FOOT + '\n</main>\n' + TOC_HTML + '\n</div>\n' + SEARCH_OV_HTML + '\n'
     out += f'<script defer src="assets/docs.min.js?v={VERSION}"></script>\n</body>\n</html>\n'
     with open(os.path.join(DOCS, slug + '.html'), 'w', encoding='utf-8') as f:
@@ -501,6 +527,7 @@ def headings(body):
     return hs
 
 def main():
+    load_state()
     # minify docs.css first so we can inline docs.min.css into every page <head>
     subprocess.run([ESBUILD, os.path.join(ASSETS, 'docs.css'), '--minify', '--log-level=warning', '--outfile=' + os.path.join(ASSETS, 'docs.min.css')], check=True)
     docs_min_css = read(os.path.join(ASSETS, 'docs.min.css')).strip()
@@ -529,18 +556,24 @@ def main():
         s404 = re.sub(r'docs\.min\.css\?v=[^"]+', 'docs.min.css?v=' + VERSION, read(p404))
         with open(p404, 'w', encoding='utf-8') as f:
             f.write(s404)
-    # generate clean canonical sitemap.xml (zero .html 308 redirects)
-    today = f'{VERSION[:4]}-{VERSION[4:6]}-{VERSION[6:8]}'
-    high_pri = {'quickstart', 'architecture', 'capabilities', 'page-cache', 'configuration', 'cli', 'performance', 'migration'}
+    # landing page: hash index.html with cache-bust queries stripped so a pure version bump is not a "change"
+    landing = re.sub(r'\?v=\w+', '', read(os.path.join(ROOT, 'index.html')))
+    touch(SITE + '/', landing)
+    # generate canonical sitemap.xml: lastmod = real content-change date (not build date)
     smap = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    smap.append(f'  <url>\n    <loc>https://httpjet.net/</loc>\n    <lastmod>{today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>')
-    for slug, _, _, _ in ORDER:
-        loc = 'https://httpjet.net/docs/' if slug == 'index' else f'https://httpjet.net/docs/{slug}'
-        pri = '0.9' if slug == 'index' else ('0.8' if slug in high_pri else '0.7')
-        smap.append(f'  <url>\n    <loc>{loc}</loc>\n    <lastmod>{today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>{pri}</priority>\n  </url>')
+    urls = [SITE + '/'] + [SITE + '/docs/' + ('' if slug == 'index' else slug) for slug, _, _, _ in ORDER]
+    for loc in urls:
+        smap.append(f'  <url>\n    <loc>{loc}</loc>\n    <lastmod>{STATE[loc]["lastmod"]}</lastmod>\n  </url>')
     smap.append('</urlset>\n')
-    with open('/web/httpjet/sitemap.xml', 'w', encoding='utf-8') as f:
+    with open(os.path.join(ROOT, 'sitemap.xml'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(smap))
+    # IndexNow key file (must live at /<key>.txt on the host) + persist state
+    with open(os.path.join(ROOT, INDEXNOW_KEY + '.txt'), 'w') as f:
+        f.write(INDEXNOW_KEY)
+    for k in [k for k in STATE if k not in urls]:
+        del STATE[k]
+    with open(STATE_PATH, 'w') as f:
+        json.dump(STATE, f, indent=1, sort_keys=True)
     # generate /llms.txt and /llms-full.txt for AI search engines
     llms = [
         '# httpjet',
@@ -598,7 +631,7 @@ def main():
         shutil.rmtree(dist)
     os.makedirs(os.path.join(dist, 'assets', 'logos'), exist_ok=True)
     os.makedirs(os.path.join(dist, 'docs', 'assets'), exist_ok=True)
-    for rf in ('index.html', '404.html', 'index.min.css', 'index.min.js', 'og.jpg', 'robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'site.webmanifest', '_headers', '_redirects'):
+    for rf in ('index.html', '404.html', 'index.min.css', 'index.min.js', 'og.jpg', 'robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'site.webmanifest', INDEXNOW_KEY + '.txt', '_headers', '_redirects'):
         src_p = os.path.join('/web/httpjet', rf)
         if os.path.exists(src_p):
             shutil.copy2(src_p, os.path.join(dist, rf))
