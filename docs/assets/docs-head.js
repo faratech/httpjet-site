@@ -83,7 +83,7 @@
   const top = document.createDocumentFragment();
   appendNodes(top, toNodes(header));
   body.insertBefore(top, shell);
-  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20261024e"]') || body.querySelector('script[src="assets/docs.min.js?v=20261024e"]');
+  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20261024g"]') || body.querySelector('script[src="assets/docs.min.js?v=20261024g"]');
   if (searchSlot) {
     const fragment = document.createDocumentFragment();
     appendNodes(fragment, toNodes(searchOverlay));
@@ -92,8 +92,11 @@
     appendNodes(body, toNodes(searchOverlay));
   }
 
-  const current = location.pathname.split('/').pop() || 'index.html';
-  const slug = current.endsWith('.html') ? current : 'index.html';
+  const cleanPath = location.pathname.replace(/\/+$/, '');
+  const lastSeg = cleanPath.split('/').pop() || '';
+  const slug = (!lastSeg || lastSeg === 'docs' || lastSeg === 'index' || lastSeg === 'index.html')
+    ? 'index.html'
+    : (lastSeg.endsWith('.html') ? lastSeg : lastSeg + '.html');
   const links = shell.querySelectorAll('.nav-link');
   for (const link of links) {
     if ((slug === 'index.html' && link.getAttribute('href') === './') || link.getAttribute('href') === slug) {

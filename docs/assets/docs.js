@@ -1209,6 +1209,7 @@
         if (jEl) {
           curIdx = parseInt(jEl.getAttribute("data-cjump"), 10);
           curMode = "deck";
+          if (activeExpanded === curveBox) setExpanded(curveBox, false);
           renderCurve();
           if (renderExplorer) renderExplorer();
           bexp.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -1247,6 +1248,7 @@
   function attachExpandButtons(root) {
     var targets = Array.prototype.slice.call((root || doc).querySelectorAll(".figure, .chart, .bexp"));
     targets.forEach(function (el) {
+      if (el.parentElement && el.parentElement.closest(".bexp")) return;
       if (el.querySelector(":scope > .expbtn")) return;
       var btn = doc.createElement("button");
       btn.type = "button";
@@ -1263,18 +1265,10 @@
     });
   }
   attachExpandButtons(doc);
-  if (bexp) {
-    bexp.addEventListener("click", function () { setTimeout(function () { attachExpandButtons(bexp); }, 0); });
-    bexp.addEventListener("change", function () { setTimeout(function () { attachExpandButtons(bexp); }, 0); });
-  }
-  var cbox = doc.getElementById("all-builds-curve");
-  if (cbox) {
-    cbox.addEventListener("click", function () { setTimeout(function () { attachExpandButtons(cbox); }, 0); });
-  }
   doc.addEventListener("dblclick", function (e) {
     var fig = e.target.closest(".figure svg, .chart svg");
     if (!fig) return;
-    var box = fig.closest(".figure, .chart");
+    var box = fig.closest(".bexp") || fig.closest(".figure, .chart");
     if (box) setExpanded(box, !box.classList.contains("is-expanded"));
   });
 
@@ -1288,9 +1282,15 @@
   var index = (window.DOCS_INDEX && window.DOCS_INDEX.length) ? window.DOCS_INDEX : null, sel = -1;
 
   var lastFocus = null;
+  var cleanCurPath = (window.location.pathname || "").replace(/\/+$/, "");
+  var lastCurSeg = cleanCurPath.split("/").pop() || "";
+  var curPageUrl = (!lastCurSeg || lastCurSeg === "docs" || lastCurSeg === "index" || lastCurSeg === "index.html")
+    ? "./"
+    : (lastCurSeg.endsWith(".html") ? lastCurSeg : lastCurSeg + ".html");
 
   function openSearch() {
     if (!ov) return;
+    if (activeExpanded) setExpanded(activeExpanded, false);
     if (!index && window.DOCS_INDEX) index = window.DOCS_INDEX;
     lastFocus = doc.activeElement;
     ov.classList.add("open");
@@ -1336,7 +1336,11 @@
     /* build with DOM nodes (textContent) — no innerHTML, no XSS surface */
     results.textContent = "";
     out.forEach(function (r) {
-      var a = doc.createElement("a"); a.href = safeRel(r.url);
+      var href = safeRel(r.url);
+      if (href.indexOf(curPageUrl + "#") === 0) {
+        href = href.slice(curPageUrl.length);
+      }
+      var a = doc.createElement("a"); a.href = href;
       var p = doc.createElement("span"); p.className = "p"; p.textContent = r.page; a.appendChild(p);
       var t = doc.createElement("div"); t.className = "t"; t.textContent = r.title; a.appendChild(t);
       if (r.x) { var x = doc.createElement("div"); x.className = "x"; x.textContent = r.x; a.appendChild(x); }
@@ -1347,7 +1351,12 @@
   if (sbtn) sbtn.addEventListener("click", openSearch);
   if (input) input.addEventListener("input", function () { render(input.value); });
   if (ov) ov.addEventListener("click", function (e) { if (e.target === ov) closeSearch(true); });
-  if (results) results.addEventListener("mousemove", function () { /* allow hover selection */ });
+  if (results) {
+    results.addEventListener("mousemove", function () { /* allow hover selection */ });
+    results.addEventListener("click", function (e) {
+      if (e.target.closest("a")) closeSearch(false);
+    });
+  }
 
   function shouldOpenSearchFromUrl() {
     if (window.location.hash === "#search") return true;
@@ -1379,7 +1388,12 @@
     var items = results ? Array.prototype.slice.call(results.querySelectorAll("a")) : [];
     if (e.key === "ArrowDown") { e.preventDefault(); sel = Math.min(sel + 1, items.length - 1); }
     else if (e.key === "ArrowUp") { e.preventDefault(); sel = Math.max(sel - 1, 0); }
-    else if (e.key === "Enter" && sel > -1 && items[sel]) { window.location.href = items[sel].getAttribute("href"); return; }
+    else if (e.key === "Enter" && sel > -1 && items[sel]) {
+      var targetHref = items[sel].getAttribute("href");
+      closeSearch(false);
+      window.location.href = targetHref;
+      return;
+    }
     items.forEach(function (a, i) { a.classList.toggle("sel", i === sel); if (i === sel) a.scrollIntoView({ block: "nearest" }); });
   });
 })();
