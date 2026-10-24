@@ -27,8 +27,8 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","@id":"https://httpjet.net/docs/compression#article","headline":"Compression — httpjet Documentation (Rust Web Server)","name":"Compression","articleSection":"Internals","description":"Response compression with gzip, brotli and zstd, server-priority negotiation, streaming encoders, precompressed siblings, and bounded request decompression.","url":"https://httpjet.net/docs/compression","datePublished":"2026-06-01","dateModified":"2026-10-24","inLanguage":"en-US","proficiencyLevel":"Expert","author":{"@type":"Organization","name":"httpjet","url":"https://httpjet.net/"},"publisher":{"@type":"Organization","name":"httpjet","url":"https://httpjet.net/"},"isPartOf":{"@id":"https://httpjet.net/#website"},"about":{"@id":"https://httpjet.net/#software"},"image":"https://httpjet.net/og.jpg"},{"@type":"BreadcrumbList","@id":"https://httpjet.net/docs/compression#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"httpjet","item":"https://httpjet.net/"},{"@type":"ListItem","position":2,"name":"Docs","item":"https://httpjet.net/docs/"},{"@type":"ListItem","position":3,"name":"Compression","item":"https://httpjet.net/docs/compression"}]}]}</script>
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261024i">
-<script defer src="assets/docs-head.min.js?v=20261024i"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024j">
+<script defer src="assets/docs-head.min.js?v=20261024j"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -52,9 +52,29 @@
     <a href="performance.html" class="hide-sm">Performance</a>
     <a href="https://httpjet.net/" class="ext repo">httpjet.net</a>
   </nav>
+  <div class="hdr-audio" id="epicPlayer" style="--track-progress:0%" role="group" aria-label="Synth soundtrack player">
+    <button class="abtn nav" id="audioPrev" type="button" aria-label="Previous epic track" title="Previous epic track">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM10 12l8-7v14z"/></svg>
+    </button>
+    <button class="abtn main" id="audio" type="button" aria-label="Play epic music" aria-pressed="false" title="Epic mode synth soundtrack">
+      <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    </button>
+    <button class="abtn nav" id="audioNext" type="button" aria-label="Next epic track" title="Next epic track">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM6 5l8 7-8 7z"/></svg>
+    </button>
+    <div class="audio-meta">
+      <span class="track" id="audioTrack">10-track sequence</span>
+      <span class="time" id="audioTime">2-5 min synths</span>
+    </div>
+    <label class="volume" title="Volume">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.1-3.8v7.6a4.5 4.5 0 0 0 2.1-3.8z"/></svg>
+      <input id="audioVolume" type="range" min="0" max="6" step="0.1" value="6" aria-label="Volume">
+    </label>
+  </div>
   <button class="searchbtn" aria-label="Search docs">search <kbd>/</kbd></button>
   <button class="menubtn" aria-label="Menu" aria-expanded="false">☰</button>
 </header>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="scrim" aria-hidden="true"></div>
 <div class="shell">
 <nav class="sidebar" aria-label="Documentation sections"><div class="nav-group"><span class="nav-eyebrow">Guide</span><a class="nav-link" href="./">Overview</a><div class="nav-sub"></div><a class="nav-link" href="quickstart.html">Quickstart</a><div class="nav-sub"></div><a class="nav-link" href="architecture.html">Architecture</a><div class="nav-sub"></div><a class="nav-link" href="capabilities.html">Capabilities &amp; limits</a><div class="nav-sub"></div></div><div class="nav-group"><span class="nav-eyebrow">Internals</span><a class="nav-link" href="protocols.html">Protocol stacks</a><div class="nav-sub"></div><a class="nav-link" href="certificates.html">TLS, ACME &amp; OCSP</a><div class="nav-sub"></div><a class="nav-link" href="lsapi.html">LSAPI &amp; PHP</a><div class="nav-sub"></div><a class="nav-link" href="gateways.html">Proxy &amp; gateways</a><div class="nav-sub"></div><a class="nav-link" href="rewrite.html">Rewrite &amp; .htaccess</a><div class="nav-sub"></div><a class="nav-link" href="security.html">Security &amp; access control</a><div class="nav-sub"></div><a class="nav-link" href="page-cache.html">Page cache</a><div class="nav-sub"></div><a class="nav-link active" href="compression.html">Compression</a><div class="nav-sub"></div></div><div class="nav-group"><span class="nav-eyebrow">Running it</span><a class="nav-link" href="configuration.html">Configuration</a><div class="nav-sub"></div><a class="nav-link" href="cli.html">CLI reference</a><div class="nav-sub"></div><a class="nav-link" href="operations.html">Operations</a><div class="nav-sub"></div><a class="nav-link" href="observability.html">Observability</a><div class="nav-sub"></div><a class="nav-link" href="admin-api.html">Admin API &amp; reload</a><div class="nav-sub"></div><a class="nav-link" href="extensions.html">Extending httpjet</a><div class="nav-sub"></div><a class="nav-link" href="performance.html">Performance</a><div class="nav-sub"></div><a class="nav-link" href="conformance.html">Conformance &amp; testing</a><div class="nav-sub"></div><a class="nav-link" href="migration.html">Migrating from LiteSpeed</a><div class="nav-sub"></div></div></nav>
@@ -154,7 +174,7 @@
     <div class="search-res"></div>
   </div>
 </div>
-<script defer src="assets/search-index.min.js?v=20261024i"></script>
-<script defer src="assets/docs.min.js?v=20261024i"></script>
+<script defer src="assets/search-index.min.js?v=20261024j"></script>
+<script defer src="assets/docs.min.js?v=20261024j"></script>
 </body>
 </html>

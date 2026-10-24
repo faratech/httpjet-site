@@ -89,6 +89,66 @@ hr{border:0;border-top:1px solid var(--line);margin:34px 0}
 .searchbtn kbd{font-family:var(--mono);font-size:10.5px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--muted)}
 .menubtn{display:none;padding:0 10px}
 
+/* ---------- header epic-mode synth mini-player ---------- */
+.hdr-audio{
+  position:relative;display:inline-flex;align-items:center;gap:5px;height:34px;
+  padding:2px 9px 4px 5px;border-radius:999px;border:1px solid var(--line-2);
+  background:linear-gradient(135deg,rgba(14,20,36,.92),rgba(20,27,46,.85));
+  overflow:hidden;flex:none;
+}
+.hdr-audio::after{
+  content:"";position:absolute;left:10px;right:10px;bottom:2px;height:2px;border-radius:999px;
+  background:linear-gradient(90deg,var(--c1),var(--c3)) 0/var(--track-progress,0%) 100% no-repeat,rgba(255,255,255,.12);
+}
+.hdr-audio .abtn{
+  width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;
+  display:grid;place-items:center;color:var(--ink-dim);background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.15);flex:none;transition:border-color .15s,color .15s,background .15s;
+}
+.hdr-audio .abtn:hover{border-color:var(--c2);color:#fff;background:rgba(129,140,248,.16)}
+.hdr-audio .abtn:disabled{cursor:not-allowed;opacity:.45}
+.hdr-audio .abtn.nav{width:20px;height:20px}
+.hdr-audio .abtn svg{width:11px!important;height:11px!important;fill:currentColor;display:block}
+.hdr-audio .abtn .eq{display:flex;gap:2px;align-items:center;height:12px}
+.hdr-audio .abtn .eq i{width:2px;height:4px;border-radius:1px;background:linear-gradient(var(--c1),var(--c3))}
+.hdr-audio .abtn.main:not(.playing) .eq{display:none}
+.hdr-audio .abtn.main:not(.playing)::before{
+  content:"";width:0;height:0;margin-left:2px;border-style:solid;
+  border-width:4.5px 0 4.5px 7.5px;border-color:transparent transparent transparent var(--ink);
+}
+.hdr-audio .abtn.main.playing{border-color:rgba(34,211,238,.55);background:rgba(34,211,238,.12)}
+.hdr-audio .abtn.main.playing .eq i{animation:hdr-eq .85s ease-in-out infinite}
+.hdr-audio .abtn.main.playing .eq i:nth-child(2){animation-delay:.18s}
+.hdr-audio .abtn.main.playing .eq i:nth-child(3){animation-delay:.36s}
+.hdr-audio .abtn.main.playing .eq i:nth-child(4){animation-delay:.12s}
+@keyframes hdr-eq{0%,to{height:3px}50%{height:12px}}
+.hdr-audio .audio-meta{min-width:86px;max-width:124px;display:flex;flex-direction:column;gap:1px;padding:0 2px;line-height:1.08}
+.hdr-audio .track{display:block;max-width:124px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);font-size:10.5px;font-weight:600}
+.hdr-audio .time{font-family:var(--mono);font-size:9px;color:var(--muted);white-space:nowrap}
+.hdr-audio .volume{display:flex;align-items:center;gap:4px;color:var(--muted);padding-right:2px}
+.hdr-audio .volume svg{flex:none;width:12px!important;height:12px!important;fill:currentColor}
+.hdr-audio .volume input{width:48px;height:14px;margin:0;cursor:pointer;accent-color:var(--c3);background:transparent;-webkit-appearance:none;appearance:none}
+.hdr-audio .volume input::-webkit-slider-runnable-track{height:3px;border-radius:999px;background:linear-gradient(90deg,var(--c1),var(--c3))}
+.hdr-audio .volume input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:11px;height:11px;border-radius:50%;margin-top:-4px;background:#f2f6ff;border:1px solid rgba(129,140,248,.65)}
+.hdr-audio .volume input::-moz-range-track{height:3px;border-radius:999px;background:linear-gradient(90deg,var(--c1),var(--c3))}
+.hdr-audio .volume input::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:#f2f6ff;border:1px solid rgba(129,140,248,.65)}
+.toast{
+  position:fixed;right:20px;bottom:20px;z-index:140;max-width:260px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--ink);
+  background:rgba(14,20,36,.92);border:1px solid rgba(129,140,248,.45);border-radius:10px;
+  padding:8px 12px;backdrop-filter:blur(8px);box-shadow:var(--shadow);
+  opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .35s ease;pointer-events:none;
+}
+.toast.show{opacity:1;transform:none}
+@media (max-width:1280px){.hdr-audio .volume{display:none}}
+@media (max-width:1080px){.hdr-audio .audio-meta{display:none}.hdr-audio{padding:2px 5px 4px}}
+@media (max-width:560px){
+  .hdr-audio .abtn.nav{display:none}
+  .hdr-audio{padding:2px 4px;height:32px}
+  .hdr-audio::after{display:none}
+  .toast{right:12px;left:12px;max-width:none;text-align:center}
+}
+
 /* ---------- layout shell ---------- */
 .shell{
   display:grid;grid-template-columns:var(--sb) minmax(0,1fr) var(--toc);

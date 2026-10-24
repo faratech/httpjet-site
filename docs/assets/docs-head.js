@@ -31,9 +31,29 @@
     <a href="performance.html" class="hide-sm">Performance</a>
     <a href="https://httpjet.net/" class="ext repo">httpjet.net</a>
   </nav>
+  <div class="hdr-audio" id="epicPlayer" style="--track-progress:0%" role="group" aria-label="Synth soundtrack player">
+    <button class="abtn nav" id="audioPrev" type="button" aria-label="Previous epic track" title="Previous epic track">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM10 12l8-7v14z"/></svg>
+    </button>
+    <button class="abtn main" id="audio" type="button" aria-label="Play epic music" aria-pressed="false" title="Epic mode synth soundtrack">
+      <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    </button>
+    <button class="abtn nav" id="audioNext" type="button" aria-label="Next epic track" title="Next epic track">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM6 5l8 7-8 7z"/></svg>
+    </button>
+    <div class="audio-meta">
+      <span class="track" id="audioTrack">10-track sequence</span>
+      <span class="time" id="audioTime">2-5 min synths</span>
+    </div>
+    <label class="volume" title="Volume">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.1-3.8v7.6a4.5 4.5 0 0 0 2.1-3.8z"/></svg>
+      <input id="audioVolume" type="range" min="0" max="6" step="0.1" value="6" aria-label="Volume">
+    </label>
+  </div>
   <button class="searchbtn" aria-label="Search docs">search <kbd>/</kbd></button>
   <button class="menubtn" aria-label="Menu" aria-expanded="false">☰</button>
 </header>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="scrim" aria-hidden="true"></div>
 `;
 
@@ -83,7 +103,7 @@
   const top = document.createDocumentFragment();
   appendNodes(top, toNodes(header));
   body.insertBefore(top, shell);
-  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20261024i"]') || body.querySelector('script[src="assets/docs.min.js?v=20261024i"]');
+  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20261024j"]') || body.querySelector('script[src="assets/docs.min.js?v=20261024j"]');
   if (searchSlot) {
     const fragment = document.createDocumentFragment();
     appendNodes(fragment, toNodes(searchOverlay));
