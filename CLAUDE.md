@@ -86,7 +86,7 @@ The Content-Security-Policy is set in two independent places that must agree:
 1. A `<meta http-equiv="Content-Security-Policy">` in **every** HTML `<head>`.
 2. `Header always set Content-Security-Policy` in `.htaccess`.
 
-Both are enforced (browsers apply the intersection, so the stricter one wins per-directive). They currently diverge — e.g. the `.htaccess` policy omits `googletagmanager.com` from `script-src` while the meta tags include it. When touching analytics, third-party scripts, or CSP, update both copies together.
+Both are enforced (browsers apply the intersection, so the stricter one wins per-directive). Keep `<meta>`, `_headers`, and `.htaccess` CSP policies in sync whenever touching analytics, third-party scripts, or security headers.
 
 ## `.htaccess` behavior
 

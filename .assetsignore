@@ -1,0 +1,8 @@
+docs-src
+docs-src/**
+CLAUDE.md
+PERFORMANCE.md
+README.md
+.htaccess
+.git
+.gitignore

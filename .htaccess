@@ -1,4 +1,5 @@
 RewriteEngine On
+RewriteRule ^(?:docs-src(?:/|$)|(?:CLAUDE|PERFORMANCE|README)\.md$|\.assetsignore$) - [F,L]
 RewriteRule ^docs/index\.html$ /docs/ [R=301,L]
 
 ErrorDocument 404 /404.html

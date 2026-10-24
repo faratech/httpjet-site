@@ -1271,6 +1271,16 @@
     var box = fig.closest(".bexp") || fig.closest(".figure, .chart");
     if (box) setExpanded(box, !box.classList.contains("is-expanded"));
   });
+  doc.addEventListener("click", function (e) {
+    var svgLink = e.target.closest(".figure.diagram svg a");
+    if (!svgLink) return;
+    var rawHref = svgLink.getAttribute("href") || svgLink.getAttribute("xlink:href") || "";
+    if (activeExpanded) setExpanded(activeExpanded, false);
+    if (rawHref.indexOf(curPageUrl + "#") === 0) {
+      e.preventDefault();
+      window.location.hash = rawHref.slice(curPageUrl.length);
+    }
+  });
 
   /* ---------- client-side search ---------- */
   var ov = doc.querySelector(".search-ov"),
