@@ -22,7 +22,11 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) is recorded below with its exact regime, commit, and CSV receipt. Step through the <strong>13 build slides</strong> chronologically, switch to <strong>Workload Trajectories</strong> to trace a single metric across eras, or use <strong>Build-vs-Build Diff</strong> to compare any two builds side by side.</p>
+      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) is recorded below with its exact regime, commit, and CSV receipt. Use the <strong>All-Builds Curve vs LiteSpeed &amp; nginx</strong> below to see the full trajectory on one canvas, or step through the <strong>13 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
+
+      <div class="bexp" id="all-builds-curve" aria-label="All builds performance curve vs LiteSpeed, OpenLiteSpeed, and nginx">
+        <div class="bexp__curve"></div>
+      </div>
 
       <div class="bexp" id="build-explorer" tabindex="0" aria-label="Interactive performance across builds presentation">
         <div class="bexp__interactive"></div>

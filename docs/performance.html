@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/performance.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261024c">
-<script defer src="assets/docs-head.min.js?v=20261024c"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024d">
+<script defer src="assets/docs-head.min.js?v=20261024d"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -65,7 +65,11 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) is recorded below with its exact regime, commit, and CSV receipt. Step through the <strong>13 build slides</strong> chronologically, switch to <strong>Workload Trajectories</strong> to trace a single metric across eras, or use <strong>Build-vs-Build Diff</strong> to compare any two builds side by side.</p>
+      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) is recorded below with its exact regime, commit, and CSV receipt. Use the <strong>All-Builds Curve vs LiteSpeed &amp; nginx</strong> below to see the full trajectory on one canvas, or step through the <strong>13 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
+
+      <div class="bexp" id="all-builds-curve" aria-label="All builds performance curve vs LiteSpeed, OpenLiteSpeed, and nginx">
+        <div class="bexp__curve"></div>
+      </div>
 
       <div class="bexp" id="build-explorer" tabindex="0" aria-label="Interactive performance across builds presentation">
         <div class="bexp__interactive"></div>
@@ -221,7 +225,7 @@
 <nav class="pager" aria-label="Pagination"><a class="prev" href="extensions.html"><div class="dir">← Prev</div><div class="ttl">Extending httpjet</div></a><a class="next" href="conformance.html"><div class="dir">Next →</div><div class="ttl">Conformance &amp; testing</div></a></nav>
 <p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261024c"></script>
-<script defer src="assets/docs.min.js?v=20261024c"></script>
+<script defer src="assets/search-index.min.js?v=20261024d"></script>
+<script defer src="assets/docs.min.js?v=20261024d"></script>
 </body>
 </html>

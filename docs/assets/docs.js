@@ -759,8 +759,9 @@
     var cmpA = 0, cmpB = BUILDS.length - 1;
 
     var mount = bexp.querySelector(".bexp__interactive");
+    var renderExplorer = null;
     if (mount) {
-      function renderExplorer() {
+      renderExplorer = function () {
         var h = [];
         h.push('<div class="bexp__top">');
         h.push('<div class="bexp__modes" role="tablist" aria-label="Presentation view mode">');
@@ -883,6 +884,232 @@
 
       renderExplorer();
     }
+
+    /* ---------- unified all-builds performance curve vs LiteSpeed, OLS & nginx ---------- */
+    var curveBox = doc.getElementById("all-builds-curve");
+    var curveMount = curveBox ? curveBox.querySelector(".bexp__curve") : null;
+    if (curveMount) {
+      var CURVES = [
+        {
+          id: "c-rewrite",
+          name: "1 · Heavy .htaccess (H1 & H2 RPS)",
+          title: "All-Builds Speed Curve — Heavy .htaccess Static (/robots.txt) vs LiteSpeed, OpenLiteSpeed & nginx",
+          sub: "806/477-line forum .htaccess chain across all 13 builds + reference baselines · k req/s (click any node to inspect that build)",
+          unit: "k rps",
+          ymax: 320,
+          ystep: 80,
+          pts: [
+            { idx: 0, tag: "0.0.1", h2: 88.0, h1: 95.8, note: "Initial baseline" },
+            { idx: 1, tag: "Tier A", h2: 112.0, h1: 101.4, note: "StatCache + DFA" },
+            { idx: 2, tag: "B1–5", h2: 115.0, h1: 78.6, note: "OR-fold + zstd" },
+            { idx: 3, tag: "Batch 6", h2: 138.0, h1: 84.3, note: "PGO + mimalloc" },
+            { idx: 4, tag: "LSCache", h2: 165.9, h1: 87.3, note: "Single-flight fix" },
+            { idx: 5, tag: "io_uring", h2: 202.4, h1: 103.9, note: "monoio transport" },
+            { idx: 6, tag: "v0.0.1", h2: 298.0, h1: 168.7, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 298.5, h1: 169.0, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 302.3, h1: 171.1, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", h2: 308.0, h1: 174.5, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", h2: 309.5, h1: 175.0, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", h2: 314.0, h1: 178.0, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", h2: 316.0, h1: 179.2, note: "BODY_BUFS zero-fault" }
+          ],
+          series: [
+            { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
+            { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
+          ],
+          refs: [
+            { val: 283.3, label: "OpenLiteSpeed H2 (283.3k)", color: "#fbbf73" },
+            { val: 206.8, label: "LiteSpeed 6.3.5 H2 (206.8k)", color: "#e879f9" },
+            { val: 169.1, label: "OpenLiteSpeed H1 (169.1k)", color: "#34d399" },
+            { val: 145.6, label: "nginx H1 (145.6k) / H2 (125.4k)", color: "#8b95ad" },
+            { val: 84.3, label: "LiteSpeed 6.3.5 H1 (84.3k)", color: "#c2cadd" }
+          ],
+          foot: "June builds (0.0.1–LSCache) measured on shared host vs LSWS 6.3.5; v0.0.1+ measured on dedicated host with 806-line chain vs OLS & nginx (compare-rewrite-memo-vary-pgo.csv) + subsequent PGO A/B deltas."
+        },
+        {
+          id: "c-static",
+          name: "2 · H2 & H1 Static Small-Object (RPS)",
+          title: "All-Builds Speed Curve — HTTP/2 & HTTP/1.1 Static Throughput vs OpenLiteSpeed, LiteSpeed & nginx",
+          sub: "small-object static serving (empty / 1 KB, c=50..200) across all 13 builds + reference servers · k req/s",
+          unit: "k rps",
+          ymax: 1000,
+          ystep: 250,
+          pts: [
+            { idx: 0, tag: "0.0.1", h2: 128.0, h1: 88.0, note: "Initial baseline" },
+            { idx: 1, tag: "Tier A", h2: 145.0, h1: 90.5, note: "FileCache 1s TTL" },
+            { idx: 2, tag: "B1–5", h2: 148.0, h1: 91.2, note: "Lazy headers" },
+            { idx: 3, tag: "Batch 6", h2: 195.0, h1: 93.8, note: "PGO + mimalloc" },
+            { idx: 4, tag: "LSCache", h2: 266.9, h1: 96.9, note: "open_beneath memo" },
+            { idx: 5, tag: "io_uring", h2: 520.0, h1: 145.0, note: "monoio io_uring" },
+            { idx: 6, tag: "v0.0.1", h2: 937.0, h1: 202.1, note: "Dedicated 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 938.0, h1: 202.5, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 942.0, h1: 204.0, note: "openat2 hot path" },
+            { idx: 9, tag: "v0.0.9", h2: 948.0, h1: 206.0, note: "readlink skip" },
+            { idx: 10, tag: "v0.0.10", h2: 950.0, h1: 206.5, note: "TLS ticketless" },
+            { idx: 11, tag: "v0.1.2", h2: 962.0, h1: 209.0, note: "Recycled H2 tasks" },
+            { idx: 12, tag: "v0.1.5", h2: 965.0, h1: 210.0, note: "BODY_BUFS zero-fault" }
+          ],
+          series: [
+            { key: "h2", label: "httpjet HTTP/2 peak (k rps)", color: "#22d3ee" },
+            { key: "h1", label: "httpjet HTTP/1.1 peak (k rps)", color: "#818cf8" }
+          ],
+          refs: [
+            { val: 877.8, label: "OpenLiteSpeed H2 c=1000 (877.8k) / c=50 (792.8k)", color: "#fbbf73" },
+            { val: 244.5, label: "LiteSpeed 6.3.5 H2 shared-box (244.5k)", color: "#e879f9" },
+            { val: 183.4, label: "OpenLiteSpeed H1 (183.4k)", color: "#34d399" },
+            { val: 119.6, label: "nginx H2 c=1000 (119.6k)", color: "#8b95ad" }
+          ],
+          foot: "Source: httpjet-sweep-fixed.csv (June shared-box vs LSWS 6.3.5) and versus5-dedicated-final-20260827.csv (dedicated-host vs OLS & nginx)."
+        },
+        {
+          id: "c-php",
+          name: "3 · PHP/LSAPI & Origin Page Cache (RPS)",
+          title: "All-Builds Speed Curve — PHP/LSAPI & Origin Page Cache vs LiteSpeed 6.3.5",
+          sub: "PHP hello-world (H1 c=40) and 152 KB XenForo page-cache hits across all 13 builds · k req/s",
+          unit: "k rps",
+          ymax: 52,
+          ystep: 13,
+          pts: [
+            { idx: 0, tag: "0.0.1", php: 31.0, cache: 0.2, note: "Uncached PHP only" },
+            { idx: 1, tag: "Tier A", php: 31.1, cache: 0.2, note: "StatCache" },
+            { idx: 2, tag: "B1–5", php: 31.3, cache: 0.2, note: "Cow CGI env" },
+            { idx: 3, tag: "Batch 6", php: 39.4, cache: 0.2, note: "PGO + mimalloc" },
+            { idx: 4, tag: "LSCache", php: 44.8, cache: 19.9, note: "hj-pagecache live (101×)" },
+            { idx: 5, tag: "io_uring", php: 45.2, cache: 23.5, note: "On-core cache hit" },
+            { idx: 6, tag: "v0.0.1", php: 45.5, cache: 25.0, note: "Sharded hot+tmpfs" },
+            { idx: 7, tag: "v0.0.2", php: 45.5, cache: 25.4, note: "Dict L6 tuning" },
+            { idx: 8, tag: "v0.0.3", php: 45.8, cache: 28.7, note: "openat2 + H3 28.7k" },
+            { idx: 9, tag: "v0.0.9", php: 46.8, cache: 29.5, note: "Cookied early bridge" },
+            { idx: 10, tag: "v0.0.10", php: 47.0, cache: 30.1, note: "ARM dict L3 (5.3×)" },
+            { idx: 11, tag: "v0.1.2", php: 48.2, cache: 31.0, note: "LSAPI buf pools (+2.5%)" },
+            { idx: 12, tag: "v0.1.5", php: 48.6, cache: 31.8, note: "Zero-copy PacketReader" }
+          ],
+          series: [
+            { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
+            { key: "cache", label: "httpjet Origin Page Cache Hit (k rps)", color: "#34d399" }
+          ],
+          refs: [
+            { val: 41.2, label: "LiteSpeed 6.3.5 PHP best (c=60: 41.2k)", color: "#fbbf73" },
+            { val: 38.5, label: "LiteSpeed 6.3.5 PHP c=40 (38.5k)", color: "#e879f9" },
+            { val: 0.2, label: "Uncached XenForo DB-backed PHP (0.196k)", color: "#8b95ad" }
+          ],
+          foot: "Source: httpjet-php-fixed.csv, litespeed-php-run1.csv, httpjet-cache-run1.csv, httpjet-0.0.3-vs-previous-h3-20260927.csv, and PR #1157/#1163."
+        }
+      ];
+
+      var curCurve = 0;
+      function renderCurve() {
+        var c = CURVES[curCurve];
+        var W = 860, H = 370, padL = 64, padR = 235, padT = 24, padB = 58;
+        var plotW = W - padL - padR, plotH = H - padT - padB;
+        var n = c.pts.length;
+        function xOf(i) { return padL + (i / (n - 1)) * plotW; }
+        function yOf(v) { return padT + plotH - (Math.min(v, c.ymax) / c.ymax) * plotH; }
+
+        var h = [];
+        h.push('<div class="bexp__top">');
+        h.push('<div class="bexp__modes" role="tablist" aria-label="All-builds speed curve workload">');
+        CURVES.forEach(function (cv, idx) {
+          h.push('<button type="button" class="bexp__mode" role="tab" data-ccurve="' + idx + '" aria-selected="' + (idx === curCurve) + '">' + esc(cv.name) + '</button>');
+        });
+        h.push('</div>');
+        h.push('<span class="mini" style="font-family:var(--mono);font-size:11px">Click any build point to jump to its slide ↓</span>');
+        h.push('</div>');
+
+        h.push('<div class="chart" style="margin:6px 0 0">');
+        h.push('<p class="chart__title">' + esc(c.title) + '</p>');
+        h.push('<p class="chart__sub">' + esc(c.sub) + '</p>');
+        h.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(c.title) + '">');
+        h.push('<defs>');
+        h.push('<linearGradient id="cfill0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22d3ee" stop-opacity="0.22"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0.0"/></linearGradient>');
+        h.push('<linearGradient id="cfill1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#818cf8" stop-opacity="0.16"/><stop offset="1" stop-color="#818cf8" stop-opacity="0.0"/></linearGradient>');
+        h.push('</defs>');
+
+        /* horizontal y-axis gridlines */
+        for (var yv = 0; yv <= c.ymax; yv += c.ystep) {
+          var gy = yOf(yv);
+          h.push('<line class="grid" x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + gy.toFixed(1) + '"/>');
+          h.push('<text class="lbl" x="' + (padL - 8) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" style="font-size:10.5px;fill:#8b95ad">' + fmtVal(yv) + ' ' + esc(c.unit) + '</text>');
+        }
+        h.push('<line class="axis" x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (padT + plotH) + '"/>');
+        h.push('<line class="axis" x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (W - padR) + '" y2="' + (padT + plotH) + '"/>');
+
+        /* competitor reference horizontal dashed lines */
+        c.refs.forEach(function (rf) {
+          var ry = yOf(rf.val);
+          h.push('<line x1="' + padL + '" y1="' + ry.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + ry.toFixed(1) + '" stroke="' + rf.color + '" stroke-width="1.3" stroke-dasharray="5 4" opacity="0.85"/>');
+          h.push('<text x="' + (W - padR + 8) + '" y="' + (ry + 3.5).toFixed(1) + '" style="font-size:10px;fill:' + rf.color + ';font-family:var(--mono)">' + esc(rf.label) + '</text>');
+        });
+
+        /* vertical build guide ticks + x labels */
+        c.pts.forEach(function (pt, i) {
+          var px = xOf(i);
+          var isSel = (i === curIdx);
+          if (isSel) {
+            h.push('<line x1="' + px.toFixed(1) + '" y1="' + padT + '" x2="' + px.toFixed(1) + '" y2="' + (padT + plotH) + '" stroke="#22d3ee" stroke-width="1.2" opacity="0.45"/>');
+          }
+          h.push('<g style="cursor:pointer" data-cjump="' + pt.idx + '">');
+          h.push('<text x="' + px.toFixed(1) + '" y="' + (padT + plotH + 16) + '" text-anchor="end" transform="rotate(-32 ' + px.toFixed(1) + ' ' + (padT + plotH + 16) + ')" style="font-size:10.5px;fill:' + (isSel ? "#22d3ee" : "#c2cadd") + ';font-weight:' + (isSel ? "700" : "400") + '">' + esc(pt.tag) + '</text>');
+          h.push('</g>');
+        });
+
+        /* area + polyline + interactive circles per httpjet series */
+        c.series.forEach(function (sr, sIdx) {
+          var coords = c.pts.map(function (pt, i) { return [xOf(i), yOf(pt[sr.key]), pt[sr.key], pt]; });
+          var poly = coords.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+          var area = padL.toFixed(1) + "," + (padT + plotH).toFixed(1) + " " + poly + " " + (W - padR).toFixed(1) + "," + (padT + plotH).toFixed(1);
+          h.push('<polygon points="' + area + '" fill="url(#cfill' + (sIdx % 2) + ')"/>');
+          h.push('<polyline points="' + poly + '" fill="none" stroke="' + sr.color + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>');
+          coords.forEach(function (p, i) {
+            var isSel = (i === curIdx);
+            var r = isSel ? 5.5 : 3.8;
+            h.push('<g style="cursor:pointer" data-cjump="' + p[3].idx + '">');
+            h.push('<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + r + '" fill="' + (isSel ? "#fff" : sr.color) + '" stroke="' + sr.color + '" stroke-width="2"><title>' + esc(p[3].tag + " (" + p[3].note + ") · " + sr.label + ": " + p[2] + " " + c.unit) + '</title></circle>');
+            if (i === 0 || i === 4 || i === 6 || i === n - 1 || isSel) {
+              var dy = sIdx === 0 ? -9 : 14;
+              h.push('<text x="' + p[0].toFixed(1) + '" y="' + (p[1] + dy).toFixed(1) + '" text-anchor="middle" style="font-size:10px;font-weight:700;fill:#fff">' + fmtVal(p[2]) + '</text>');
+            }
+            h.push('</g>');
+          });
+        });
+
+        h.push('</svg>');
+        h.push('<div class="chart__legend">');
+        c.series.forEach(function (sr) {
+          h.push('<span><i style="display:inline-block;width:12px;height:3px;background:' + sr.color + ';vertical-align:middle;margin-right:6px"></i>' + esc(sr.label) + '</span>');
+        });
+        c.refs.forEach(function (rf) {
+          h.push('<span><i style="display:inline-block;width:12px;height:0;border-top:2px dashed ' + rf.color + ';vertical-align:middle;margin-right:6px"></i>' + esc(rf.label) + '</span>');
+        });
+        h.push('</div>');
+        h.push('<p class="chart__foot">' + esc(c.foot) + '</p>');
+        h.push('</div>');
+
+        curveMount.innerHTML = h.join("");
+      }
+
+      curveBox.addEventListener("click", function (e) {
+        var cBtn = e.target.closest("[data-ccurve]");
+        if (cBtn) {
+          curCurve = parseInt(cBtn.getAttribute("data-ccurve"), 10);
+          renderCurve();
+          return;
+        }
+        var jEl = e.target.closest("[data-cjump]");
+        if (jEl) {
+          curIdx = parseInt(jEl.getAttribute("data-cjump"), 10);
+          curMode = "deck";
+          renderCurve();
+          if (renderExplorer) renderExplorer();
+          bexp.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      });
+
+      /* keep the highlighted point on the curve synced when the user steps through the slide deck */
+      bexp.addEventListener("click", function () { setTimeout(renderCurve, 0); });
+      bexp.addEventListener("keydown", function () { setTimeout(renderCurve, 0); });
+      renderCurve();
+    }
   }
 
   /* ---------- fullscreen viewport expand / minimize for diagrams, charts & explorer ---------- */
@@ -929,6 +1156,10 @@
   if (bexp) {
     bexp.addEventListener("click", function () { setTimeout(function () { attachExpandButtons(bexp); }, 0); });
     bexp.addEventListener("change", function () { setTimeout(function () { attachExpandButtons(bexp); }, 0); });
+  }
+  var cbox = doc.getElementById("all-builds-curve");
+  if (cbox) {
+    cbox.addEventListener("click", function () { setTimeout(function () { attachExpandButtons(cbox); }, 0); });
   }
   doc.addEventListener("dblclick", function (e) {
     var fig = e.target.closest(".figure svg, .chart svg");
