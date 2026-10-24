@@ -1,0 +1,19 @@
+flowchart TB
+  classDef ok fill:#0f2a24,stroke:#34d399,color:#fff
+  classDef gate fill:#1a1f33,stroke:#fbbf73,color:#e8ecf6
+  classDef bad fill:#2a1420,stroke:#e879f9,color:#fff
+  classDef core fill:#13203a,stroke:#818cf8,color:#fff
+  U["UDP :443 datagram (quinn-udp GSO/GRO)"] --> P("existing QUIC connection ID?")
+  P -- "no (Initial packet)" --> H("per-core handshaking count ≥ 64?"):::gate
+  H -- "yes, no Retry token" --> R["send stateless QUIC Retry<br/>(anti-amplification: 3× bytes until validated)"]:::gate
+  H -- "no, or valid Retry token" --> S("per-core handshake slots < 256?"):::gate
+  S -- "full" --> D1["drop / close (10 s handshake deadline)"]:::bad
+  S -- "ok" --> TLS["TLS 1.3 handshake (rustls · ALPN h3 · optional mTLS)"]:::core
+  TLS --> C("Connected: charge process-wide maxConnections budget"):::gate
+  C -- "over budget" --> D2["CLOSE (H3_EXCESSIVE_LOAD)"]:::bad
+  C -- "admitted" --> Q["HTTP/3 stream loop · QPACK decode<br/>(charged to total_req_bytes + BodyBufferBudget)"]:::core
+  P -- "yes (established)" --> Q
+  Q --> F("on-core fast path<br/>(fast_memo · static · page-cache hit)")
+  F -- "hit" --> W["monoio UDP GSO transmit<br/>(16 KiB/window stall guard)"]:::ok
+  F -- "miss / dynamic" --> B["uring::bridge → tokio pipeline::handle()<br/>buffered ≤ 256 KiB · streamed above"]:::core
+  B --> W

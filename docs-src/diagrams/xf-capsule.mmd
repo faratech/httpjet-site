@@ -1,0 +1,14 @@
+flowchart TB
+  classDef pub fill:#0f2a24,stroke:#34d399,color:#fff
+  classDef priv fill:#13203a,stroke:#818cf8,color:#fff
+  classDef cap fill:#1a1f33,stroke:#22d3ee,color:#e8ecf6
+  classDef byp fill:#2a2314,stroke:#fbbf73,color:#fff
+  A["GET/HEAD request with --page-cache"] --> B("carries member cookie?<br/>(xf_user or session-only xf_session)")
+  B -- "no (guest)" --> PUB["PUBLIC tier<br/>key = vhost · scheme · host · orig URI · vary cookies"]:::pub
+  B -- "yes (logged-in member)" --> S("matches --page-cache-shared-paths?<br/>(visitor-invariant HMAC image proxy, sticky canary %)")
+  S -- "yes" --> PUB
+  S -- "no" --> C("--xf-capsule enabled for vhost + route<br/>and within member canary %?")
+  C -- "yes" --> CAP["CAPSULE shell hit (public entry)<br/>serves anonymized HTML shell; client JS hydrates member state<br/>(--xf-capsule-stale-secs = 3600)"]:::cap
+  C -- "no" --> P("--page-cache-private enabled?")
+  P -- "yes" --> PRIV["PRIVATE tier<br/>key = public key + xf_session cookie<br/>TTL ≤ 300 s · tag-purged on member POST"]:::priv
+  P -- "no" --> BYP["bypass → LSAPI PHP render"]:::byp

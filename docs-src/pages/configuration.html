@@ -17,6 +17,7 @@
 │   ├── mime.properties           <span class="t-c"># mime/type = ext1, ext2   (best-effort)</span>
 │   └── vhosts/example.test.xml   <span class="t-c"># &lt;virtualHostConfig&gt;: docroot, contexts, rewrite, vhssl, cache, logging</span>
 └── logs/</code></pre></div>
+      <!--diagram:config-inheritance|<strong>Configuration cascade and parse-time memo classification.</strong> Server-wide defaults in <code>httpd_config.xml</code> cascade into each <code>&lt;virtualHostConfig&gt;</code>, then into longest-prefix <code>&lt;context&gt;</code> overrides and the per-directory <code>.htaccess</code> chain, where static analysis computes the <code>MemoClass</code> eligibility verdict reported by <code>httpjet check</code>.-->
     </section>
 
     <section>

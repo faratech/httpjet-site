@@ -1,0 +1,19 @@
+flowchart TB
+  classDef srv fill:#13203a,stroke:#818cf8,color:#fff
+  classDef vh fill:#0e1424,stroke:#22d3ee,color:#e8ecf6
+  classDef ctx fill:#141b2e,stroke:#e879f9,color:#e8ecf6
+  classDef ht fill:#0f2a24,stroke:#34d399,color:#fff
+  S["httpd_config.xml (server root)<br/>tuning · security · listeners · extProcessorList · vhostMapList"]:::srv
+  V["vhosts/<name>.xml (virtualHostConfig)<br/>docRoot · vhssl · rewrite · cache · suEXEC · logging"]:::vh
+  C["<context> prefix match (longest prefix wins)<br/>type (static|proxy|lsapi|redirect) · maxReqBodySize · responseTimeout · bandwidthLimit · subFilter · cachePolicy"]:::ctx
+  H[".htaccess chain (docroot → target dir, depth ≤ 64)<br/>SetEnvIf · Order/Allow/Deny · Require · RewriteCond/Rule · Header · Expires* · CacheLookup"]:::ht
+  M["parse-time MemoClass verdict (httpjet check)<br/>eligible + vary-set (Origin, UA bitmap) vs ineligible (Remote_Addr, Cookie, IP ACL)"]:::srv
+  S -- "vhost defaults + allowSymbolLink fold" --> V
+  V -- "URI prefix routing" --> C
+  V -- "allowOverride = 1" --> H
+  H -- "static analysis at load" --> M
+  click S "configuration.html#server"
+  click V "configuration.html#vhosts"
+  click C "configuration.html#contexts"
+  click H "rewrite.html#loading"
+  click M "rewrite.html#memo"

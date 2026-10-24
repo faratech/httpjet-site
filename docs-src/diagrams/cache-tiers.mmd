@@ -3,12 +3,12 @@ flowchart LR
   classDef disk fill:#0e1424,stroke:#22d3ee,color:#e8ecf6
   subgraph RAM ["process RAM"]
     IDX["sharded index<br/>metadata · tags · variants · TTL heap<br/>--page-cache-mem (128 MiB)"]:::ram
-    HOT["hot tier<br/>hottest bodies, zero-syscall serve<br/>--page-cache-hot-mem (192 MiB)"]:::ram
+    HOT["hot tier (PooledBytes)<br/>hottest bodies, zero-syscall serve<br/>--page-cache-hot-mem (192 MiB)"]:::ram
   end
   subgraph TMPFS ["--page-cache-store-path (tmpfs, e.g. /dev/shm/jetcache)"]
-    F["one immutable HJPC file per body version<br/>self-describing · integrity key · survives restarts (boot scan, 8 threads)<br/>--page-cache-disk-mem (2 GiB) disk-LRU"]:::disk
+    F["one immutable HJPC v3 file per body version<br/>MAP_POPULATE read · per-vhost zstd dict (L3/L6/L12) · survives restarts<br/>--page-cache-disk-mem (2 GiB) disk-LRU"]:::disk
   end
   IDX -- "lookup" --> HOT
   HOT -- "cold" --> F
-  F -- "~µs read + decode" --> HOT
+  F -- "~µs MAP_POPULATE read + per-thread DCtx decode" --> HOT
   IDX -- "teardown (evict · expire · purge · replace)<br/>synchronous under the shard lock: index + file + hot + tags" --> F

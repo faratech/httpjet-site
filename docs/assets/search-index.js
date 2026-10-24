@@ -735,6 +735,10 @@ window.DOCS_INDEX = [
     "t": "Read the regime, not just the number"
    },
    {
+    "id": "timeline",
+    "t": "Performance across builds — interactive presentation"
+   },
+   {
     "id": "loopback",
     "t": "Loopback throughput"
    },
@@ -761,6 +765,10 @@ window.DOCS_INDEX = [
    {
     "id": "knobs",
     "t": "Knobs that actually move production"
+   },
+   {
+    "id": "build-ledger",
+    "t": "All builds & benchmark receipts ledger"
    }
   ]
  },

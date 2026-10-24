@@ -6,13 +6,13 @@ stateDiagram-v2
   Accepted --> Sniff: plain listener
   ProxyHeader --> Handshake: header valid (else close)
   ProxyHeader --> Sniff
-  Handshake --> ALPN: rustls (TLS 1.2 / 1.3, SNI, optional client cert)
-  ALPN --> H1: http/1.1
+  Handshake --> ALPN: rustls (TLS 1.2 / 1.3, SNI, optional mTLS · --tls-session-tickets)
+  ALPN --> H1: http/1.1 (optional kTLS)
   ALPN --> H2: h2
   Sniff --> H2: 24-byte h2c preface
   Sniff --> H1: anything else
   H1 --> H1: keep-alive ≤ maxKeepAliveReq
   H2 --> H2: streams multiplexed on one task
-  H1 --> Closed: Connection close · timeout · error
-  H2 --> Closed: GOAWAY drain · timeout
+  H1 --> Closed: Connection close · idle timeout (--trusted-proxy-idle-secs) · error
+  H2 --> Closed: GOAWAY drain · idle timeout (--trusted-proxy-idle-secs)
   Closed --> [*]

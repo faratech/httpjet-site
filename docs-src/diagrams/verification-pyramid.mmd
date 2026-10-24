@@ -1,0 +1,10 @@
+flowchart TB
+  classDef l1 fill:#0e1424,stroke:#22d3ee,color:#e8ecf6
+  classDef l2 fill:#13203a,stroke:#818cf8,color:#fff
+  classDef l3 fill:#1a1f33,stroke:#fbbf73,color:#e8ecf6
+  classDef l4 fill:#0f2a24,stroke:#34d399,color:#fff
+  U["1 · Unit & Property Tests (~3,019 tests across 20 crates)<br/>config parsing · HPACK · rewrite DFA · cache keys · jail invariants · ETag parity"]:::l1
+  F["2 · Bounded Corpus & Fuzzing (8 cargo-fuzz targets + 2,333 H1 corpus cases)<br/>h1_request_framing · hpack_decode · qpack_decode · lsapi_resp_header · proxy_protocol_parse"]:::l2
+  I["3 · Protocol & Interop Suites (CI per push)<br/>h2spec 2.6.0 (146/146 over TLS) · aioquic 1.3.0 H3 · Pebble ACME · OTel protobuf trace verification"]:::l3
+  G["4 · Live Loopback Deploy Gates (pre/post-cutover)<br/>cache_xurl · cache_scheme · cache_xhost · cache_private · cache_persist · cache_sie · fast_memo_parity"]:::l4
+  U --> F --> I --> G

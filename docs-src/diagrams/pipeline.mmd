@@ -5,10 +5,10 @@ flowchart TB
   A["resolve<br/>SNI / Host → vhost"] --> B["trust & identity<br/>mTLS gate · client IP · ACL · geo · throttle"]
   B --> W("WAF sidecar<br/>(opt-in)"):::gate
   W --> X["extension pre-handlers<br/>(compile-time, optional)"]
-  X --> C[".htaccess chain<br/>SetEnvIf · pre-rewrite access"]
+  X --> C[".htaccess chain<br/>SetEnvIf · memoized pre-rewrite access"]
   C --> D["rewrite<br/>inline rules, then .htaccess"]
   D --> E["access enforcement<br/>Basic auth · PATH_INFO deny"]
-  E --> F("page-cache lookup<br/>(--page-cache)"):::on
+  E --> F("page-cache lookup<br/>(--page-cache · public / private / shared / capsule)"):::on
   F -- hit --> K
   F -- miss / bypass --> G("dispatch")
   G --> G1[WebSocket]:::term
@@ -16,7 +16,7 @@ flowchart TB
   G --> G3["LSAPI / FastCGI<br/>suffix routing"]:::term
   G --> G4[static]:::term
   G1 & G2 & G3 & G4 --> H["finalize<br/>Header ops · ErrorDocument"]
-  H --> I["cache store"]:::on
+  H --> I["cache store<br/>(spawn_blocking variant/dict fills · --cf-send-zstd)"]:::on
   I --> K["response transforms<br/>promote small files · expires · sub_filter · compress · deny-CDN-cache · Alt-Svc"]
   K --> L["access log · metrics · spans"]
   click B "security.html"
