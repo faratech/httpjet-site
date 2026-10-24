@@ -218,6 +218,116 @@
     calc();
   }
 
+  /* ---------- widget: .htaccess & fast_memo readiness inspector ---------- */
+  var hi = doc.getElementById("htaccess-inspector");
+  if (hi) {
+    var hta = hi.querySelector("textarea[name=rules]"),
+        hout = hi.querySelector(".widget__out"),
+        hchips = Array.prototype.slice.call(hi.querySelectorAll("[data-preset]"));
+    var PRESETS = {
+      xf: 'RewriteEngine On\nSetEnvIfNoCase User-Agent "SemrushBot|AhrefsBot|MJ12bot" bad_bot=1\nRewriteCond %{ENV:bad_bot} =1\nRewriteRule ^ - [F,L]\n\nHeader always set Access-Control-Allow-Origin "https://windowsforum.com" env=CORS_OK\nRewriteCond %{HTTP:Origin} ^https://(www\\.)?windowsforum\\.com$ [NC]\nRewriteRule ^ - [E=CORS_OK:1]\n\nRewriteCond %{REQUEST_FILENAME} -f [OR]\nRewriteCond %{REQUEST_FILENAME} -d\nRewriteRule ^ - [L]\nRewriteRule ^ index.php [L]',
+      cookie: 'RewriteEngine On\n# Reading %{HTTP_COOKIE} or %{REMOTE_ADDR} blocks on-core fast_memo:\nRewriteCond %{HTTP_COOKIE} (?:^|;\\s*)xf_user=([^;]+)\nRewriteRule ^cached-landing\\.html$ /member-landing.php?u=%1 [L]\n\n# Backreference \\1 in pattern uses fancy-regex instead of linear DFA:\nRewriteCond %{QUERY_STRING} ^(\\w+)=\\1$\nRewriteRule ^echo$ /same.php [L]',
+      ip: 'Order Allow,Deny\nAllow from 10.0.0.0/8\nDeny from env=block_country\n\n# Ignored Apache header mutations (flagged by check --strict):\nRequestHeader set X-Forwarded-Proto "https"\nHeader edit Set-Cookie ^(.*)$ $1;HttpOnly;Secure\n\nCacheLookup on'
+    };
+    function escHt(s) { return String(s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+    function analyzeHtaccess() {
+      var raw = (hta ? hta.value : "") || "";
+      var lines = raw.split(/\r?\n/);
+      var blockers = [], vary = {}, uaClassify = false, linearRules = 0, fancyRules = 0, conds = 0, cacheDirs = [], ignoredDirs = [], authDirs = 0;
+      lines.forEach(function (line, idx) {
+        var s = line.trim();
+        if (!s || s.charAt(0) === "#") return;
+        var ln = "L" + (idx + 1);
+        /* check MemoClass blockers */
+        if (/%\{(?:HTTP_COOKIE|REMOTE_ADDR|REMOTE_PORT|SERVER_ADDR|TIME[^}]*|LA-[UF]:[^}]*)\}/i.test(s)) {
+          var mVar = s.match(/%\{(?:HTTP_COOKIE|REMOTE_ADDR|REMOTE_PORT|SERVER_ADDR|TIME[^}]*|LA-[UF]:[^}]*)\}/i);
+          blockers.push(ln + ": rewrite input " + mVar[0]);
+        }
+        if (/^SetEnvIf(?:NoCase)?\s+(?:Remote_Addr|Server_Addr|Request_Protocol|Cookie)\b/i.test(s)) {
+          blockers.push(ln + ": SetEnvIf on non-memoizable attribute (" + s.split(/\s+/)[1] + ")");
+        }
+        if (/^(?:Allow|Deny)\s+from\s+(?!all\b)(\S+)/i.test(s)) {
+          var op = RegExp.$1;
+          blockers.push(ln + ": IP/env/host access operand (" + s.split(/\s+/)[0] + " from " + op + ")");
+        }
+        if (/REDIRECT_STATUS/i.test(s)) {
+          blockers.push(ln + ": reads REDIRECT_STATUS");
+        }
+        if (/^Require\s+(?!all\s+granted\b)/i.test(s)) {
+          authDirs++;
+        }
+        /* check VARY-SET headers */
+        if (/%\{HTTP_USER_AGENT\}|%\{HTTP:User-Agent\}|^SetEnvIf(?:NoCase)?\s+User-Agent\b/i.test(s)) {
+          vary["User-Agent"] = "UA-cond bitmap (--rewrite-ua-classify) or raw User-Agent";
+          uaClassify = true;
+        }
+        var hMatch = s.match(/%\{HTTP:([A-Za-z0-9-]+)\}/g);
+        if (hMatch) {
+          hMatch.forEach(function (hm) {
+            var hName = hm.replace(/^%\{HTTP:|\}$/g, "");
+            if (/^cookie$/i.test(hName)) blockers.push(ln + ": rewrite input %{HTTP:Cookie}");
+            else if (!/^user-agent$/i.test(hName)) vary[hName] = "raw header";
+          });
+        }
+        if (/%\{HTTP_REFERER\}/i.test(s)) vary["Referer"] = "raw header";
+        if (/%\{HTTP_ACCEPT\}/i.test(s)) vary["Accept"] = "raw header";
+        var sei = s.match(/^SetEnvIf(?:NoCase)?\s+([A-Za-z0-9_-]+)\s+/i);
+        if (sei) {
+          var attr = sei[1];
+          if (!/^(?:Request_URI|Request_Method|Request_Protocol|Remote_Addr|Server_Addr|User-Agent|Cookie)$/i.test(attr)) {
+            vary[attr] = "raw header (SetEnvIf)";
+          }
+        }
+        /* regex engine classification */
+        if (/^RewriteRule\s+(\S+)/i.test(s)) {
+          var pat = RegExp.$1;
+          if (/\\[1-9]|\(\?[=!<]/.test(pat)) fancyRules++;
+          else linearRules++;
+          if (/\[[^\]]*\bE=no-cache:1\b/i.test(s)) cacheDirs.push(ln + " [E=no-cache:1]");
+        } else if (/^RewriteCond\s+\S+\s+(\S+)/i.test(s)) {
+          conds++;
+          var cpat = RegExp.$1;
+          if (/\\[1-9]|\(\?[=!<]/.test(cpat)) fancyRules++;
+        }
+        /* LSCache & unsupported directives */
+        if (/^(?:CacheLookup|CacheEnable|CacheDisable|CacheKeyModify)\b/i.test(s)) {
+          cacheDirs.push(ln + " " + s.split(/\s+/).slice(0, 2).join(" "));
+        }
+        if (/^(?:RequestHeader\b|Header\s+(?:edit\*?|note)\b|FileETag\b|H2EarlyHints\b|AddOutputFilterByType\b)/i.test(s)) {
+          ignoredDirs.push(ln + " (" + s.split(/\s+/).slice(0, 2).join(" ") + ")");
+        }
+      });
+      var out = [];
+      if (blockers.length === 0) {
+        var vkeys = Object.keys(vary);
+        out.push('fast_memo verdict : <span class="good">ELIGIBLE</span> — static 200 GETs memoize on-core (1 s TTL, 64 MiB/worker)');
+        out.push('memo VARY-SET     : <b>' + (vkeys.length ? escHt(vkeys.join(", ")) : "none (URI + Host + Accept-Encoding only)") + '</b>' + (uaClassify ? " · UA-cond bitmap eligible" : ""));
+      } else {
+        out.push('fast_memo verdict : <span class="bad">INELIGIBLE</span> (fail-closed parse-time MemoClass)');
+        out.push('blocking lines    : <span class="warn">' + escHt(blockers.join(" · ")) + '</span>');
+      }
+      out.push('rewrite rules     : <b>' + (linearRules + fancyRules) + '</b> rules (' + conds + ' RewriteConds) → <b>' + linearRules + '</b> linear dense-DFA/meta · ' + (fancyRules ? '<span class="warn">' + fancyRules + ' fancy-regex (backref/lookaround)</span>' : '<span class="good">0 backtracking</span>'));
+      if (cacheDirs.length) out.push('LSCache hooks     : <b>' + escHt(cacheDirs.join(", ")) + '</b>');
+      if (authDirs > 0) out.push('access / auth     : <b>' + authDirs + ' Require policy</b> (enforced before cache lookup; authenticated static gets private, no-store)');
+      if (ignoredDirs.length) out.push('compatibility     : <span class="warn">ignored by httpjet: ' + escHt(ignoredDirs.join(", ")) + '</span> (flagged in check --strict)');
+      else out.push('compatibility     : <span class="good">all parsed directives supported</span>');
+      hout.innerHTML = out.join("\n");
+    }
+    if (hta) hta.addEventListener("input", function () {
+      hchips.forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
+      analyzeHtaccess();
+    });
+    hchips.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var k = btn.getAttribute("data-preset");
+        if (hta && PRESETS[k]) hta.value = PRESETS[k];
+        hchips.forEach(function (c) { c.setAttribute("aria-pressed", c === btn ? "true" : "false"); });
+        analyzeHtaccess();
+      });
+    });
+    analyzeHtaccess();
+  }
+
   /* ---------- interactive build-by-build performance explorer ---------- */
   var bexp = doc.getElementById("build-explorer");
   if (bexp) {
@@ -1203,10 +1313,19 @@
     var out = [];
     if (q) {
       index.forEach(function (pg) {
-        if (pg.title.toLowerCase().indexOf(q) > -1)
+        if (pg.title.toLowerCase().indexOf(q) > -1 || (pg.blurb && pg.blurb.toLowerCase().indexOf(q) > -1))
           out.push({ url: pg.url, page: pg.section, title: pg.title, x: pg.blurb || "" });
         (pg.headings || []).forEach(function (h) {
-          if (h.t.toLowerCase().indexOf(q) > -1) out.push({ url: pg.url + "#" + h.id, page: pg.title, title: h.t, x: "" });
+          var tMatch = h.t.toLowerCase().indexOf(q) > -1;
+          var kwMatch = !tMatch && h.kw && h.kw.toLowerCase().indexOf(q) > -1;
+          if (tMatch || kwMatch) {
+            var snip = "";
+            if (kwMatch) {
+              var tok = h.kw.split(" ").filter(function (w) { return w.toLowerCase().indexOf(q) > -1; }).slice(0, 4).join(" · ");
+              snip = tok ? "matches: " + tok : "";
+            }
+            out.push({ url: pg.url + "#" + h.id, page: pg.title, title: h.t, x: snip });
+          }
         });
       });
     }

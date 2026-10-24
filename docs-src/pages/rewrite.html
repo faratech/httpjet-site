@@ -49,6 +49,33 @@ Outcome::Unchanged</code></pre></div>
       <p>The on-core <strong>finished-response memo</strong> (default on; <code>--no-fast-memo</code> / <code>HJ_FAST_MEMO=0</code>) serves repeat cookieless static GETs without running the pipeline at all — per thread, 1 s TTL, 64 MiB/worker, only for 200 full bodies without <code>Set-Cookie</code>, and only after each distinct key has passed the full pipeline once. Whether a docroot's chain is eligible is a <strong>parse-time verdict</strong> (<code>MemoClass</code>, fail-closed) that <code>httpjet check</code> prints per vhost.</p>
       <!--diagram:memo-eligibility|<strong>Memo eligibility.</strong> A chain that reads anything the memo key cannot carry — client/server addresses, protocol, IP/env/host access operands, <code>REDIRECT_STATUS</code>, <code>%{HTTP_COOKIE}</code>, <code>%{TIME*}</code> — is ineligible and pays the full pipeline every time. Eligible chains memoize with a VARY-SET of every header the chain reads (raw Origin, UA bitmap …), so an 800-line forum chain still memoizes.-->
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Same-binary A/B on the forum's 806-line docroot chain (<code>/robots.txt</code>, c=100): <strong>h2 137k → 248k req/s (+81%)</strong>, <strong>h1 107k → 153k (+43%)</strong>. The byte-identity gate <code>scripts/fast_memo_parity_test.sh</code> diffs a UA × Origin × Accept-Encoding × scheme matrix memo-on vs memo-off (192 cells, zero differences at the last three review rounds).</p><span class="regime">PGO · 2026-08-28 · parity re-run 2026-09-16</span></div></div>
+
+      <div class="widget" id="htaccess-inspector">
+        <p class="widget__title">Interactive · <code>.htaccess</code> &amp; <code>fast_memo</code> readiness inspector</p>
+        <div class="filterbar" style="margin:0 0 10px">
+          <span class="mini" style="margin-right:4px">Load preset:</span>
+          <button type="button" class="fchip" data-preset="xf" aria-pressed="true">XenForo + Bot Block (Eligible)</button>
+          <button type="button" class="fchip" data-preset="cookie" aria-pressed="false">%{HTTP_COOKIE} Rewrite (Ineligible)</button>
+          <button type="button" class="fchip" data-preset="ip" aria-pressed="false">IP Allow/Deny + Unsupported (Ineligible)</button>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:5px;font-family:var(--mono);font-size:12px;color:var(--muted)">Paste or edit an <code>.htaccess</code> snippet to inspect <code>MemoClass</code> eligibility, <code>VARY-SET</code> headers, regex engine split, and directive support:
+          <textarea name="rules" rows="9" spellcheck="false">RewriteEngine On
+SetEnvIfNoCase User-Agent "SemrushBot|AhrefsBot|MJ12bot" bad_bot=1
+RewriteCond %{ENV:bad_bot} =1
+RewriteRule ^ - [F,L]
+
+Header always set Access-Control-Allow-Origin "https://windowsforum.com" env=CORS_OK
+RewriteCond %{HTTP:Origin} ^https://(www\.)?windowsforum\.com$ [NC]
+RewriteRule ^ - [E=CORS_OK:1]
+
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+RewriteRule ^ index.php [L]</textarea>
+        </label>
+        <div class="widget__out" aria-live="polite"></div>
+        <p class="widget__hint">Mirrors the parse-time <code>MemoClass</code> analysis printed by <code>httpjet --root /usr/local/lsws check</code>.</p>
+      </div>
     </section>
 
     <section>

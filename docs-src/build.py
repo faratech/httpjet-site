@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261024d'
+VERSION = '20261024e'
 GA = 'G-ZR4WV214JT'
 
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; "
@@ -230,7 +230,7 @@ def build_page(i, entry):
     crumbs = '' if slug == 'index' else f'<p class="crumbs"><a href="./">Docs</a><span>/</span>{nav_title}</p>\n'
     eyebrow = '' if slug == 'index' else f'<p class="eyebrow">{EYEBROW[slug]}</p>\n'
     out = head(slug, suffix, unesc(desc), nav_title)
-    out += '\n<main class="content">\n' + NOTICE + '\n' + crumbs + eyebrow + body.strip() + '\n\n' + pager(i) + '\n' + FOOT + '\n</main>\n'
+    out += '\n<main class="content">\n' + crumbs + eyebrow + body.strip() + '\n\n' + pager(i) + '\n' + FOOT + '\n</main>\n'
     out += f'<script defer src="assets/search-index.min.js?v={VERSION}"></script>\n<script defer src="assets/docs.min.js?v={VERSION}"></script>\n</body>\n</html>\n'
     with open(os.path.join(DOCS, slug + '.html'), 'w', encoding='utf-8') as f:
         f.write(out)
@@ -238,9 +238,28 @@ def build_page(i, entry):
 
 def headings(body):
     hs = []
-    for m in re.finditer(r'<h([23]) id="([^"]+)">(.*?)</h\1>', body, flags=re.S):
+    matches = list(re.finditer(r'<h([23]) id="([^"]+)">(.*?)</h\1>', body, flags=re.S))
+    for idx, m in enumerate(matches):
         text = re.sub(r'<[^>]+>', '', m.group(3)).strip()
-        hs.append({'id': m.group(2), 't': unesc(text)})
+        start = m.end()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(body)
+        chunk = body[start:end]
+        # Extract code tokens (flags, directives, metrics, crates) from this section
+        seen = []
+        seen_set = set()
+        for cm in re.finditer(r'<code>(.*?)</code>', chunk, flags=re.S):
+            raw = unesc(re.sub(r'<[^>]+>', '', cm.group(1))).strip()
+            if not raw or len(raw) > 64 or '\n' in raw:
+                continue
+            for tok in re.findall(r'--[a-z0-9-]+|[A-Za-z_][A-Za-z0-9_.:-]{2,}', raw):
+                tl = tok.lower()
+                if tl not in seen_set:
+                    seen_set.add(tl)
+                    seen.append(tok)
+        entry = {'id': m.group(2), 't': unesc(text)}
+        if seen:
+            entry['kw'] = ' '.join(seen[:48])
+        hs.append(entry)
     return hs
 
 def main():
@@ -261,6 +280,18 @@ def main():
     dh = re.sub(r'\?v=\d{8}[a-z]', '?v=' + VERSION, dh)
     with open(os.path.join(ASSETS, 'docs-head.js'), 'w', encoding='utf-8') as f:
         f.write(dh)
+    # sync 404.html asset version and sitemap.xml lastmod
+    p404 = '/web/httpjet/404.html'
+    if os.path.exists(p404):
+        s404 = re.sub(r'docs\.min\.css\?v=[^"]+', 'docs.min.css?v=' + VERSION, read(p404))
+        with open(p404, 'w', encoding='utf-8') as f:
+            f.write(s404)
+    psite = '/web/httpjet/sitemap.xml'
+    if os.path.exists(psite):
+        today = f'{VERSION[:4]}-{VERSION[4:6]}-{VERSION[6:8]}'
+        ssite = re.sub(r'<lastmod>[^<]+</lastmod>', f'<lastmod>{today}</lastmod>', read(psite))
+        with open(psite, 'w', encoding='utf-8') as f:
+            f.write(ssite)
     # minify
     for src, dst, loader in [('docs.js', 'docs.min.js', 'js'), ('docs-head.js', 'docs-head.min.js', 'js'), ('search-index.js', 'search-index.min.js', 'js'), ('docs.css', 'docs.min.css', 'css')]:
         subprocess.run([ESBUILD, os.path.join(ASSETS, src), '--minify', '--log-level=warning', '--outfile=' + os.path.join(ASSETS, dst)], check=True)

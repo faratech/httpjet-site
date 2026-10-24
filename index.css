@@ -54,15 +54,16 @@
   .tag span{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     font-size:clamp(15px,2.4vw,22px); font-weight:500; color:#cdd3e4;
     opacity:0; transform:translateY(8px); transition:opacity .5s, transform .5s}
-  .tag span:first-child{opacity:1; transform:none}
   .tag span.on{opacity:1; transform:none}
   .sub{margin-top:1.5em; color:var(--muted); font-size:clamp(12px,1.7vw,15px);
     max-width:560px; line-height:1.6; opacity:0; animation:rise .9s .45s ease forwards}
   .chips{display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:1.8em;
     opacity:0; animation:rise .9s .6s ease forwards}
-  .chip{font-family:var(--mono); font-size:12px; color:#c8cee0;
+  .chip{font-family:var(--mono); font-size:12px; color:#c8cee0; text-decoration:none;
     border:1px solid rgba(255,255,255,.12); border-radius:999px;
-    padding:8px 14px; background:rgba(255,255,255,.03); backdrop-filter:blur(6px)}
+    padding:8px 14px; background:rgba(255,255,255,.03); backdrop-filter:blur(6px);
+    transition:border-color .2s, transform .2s, background .2s}
+  a.chip:hover{border-color:rgba(129,140,248,.55); background:rgba(255,255,255,.06); transform:translateY(-1px)}
   .chip b{color:#fff; font-weight:600}
   .chip i{font-style:normal; background:linear-gradient(90deg,var(--c1),var(--c3));
     -webkit-background-clip:text; background-clip:text; color:transparent}

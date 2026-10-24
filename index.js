@@ -4,13 +4,32 @@
 
   /* ---- rotating tagline ---- */
   const tags = [...document.querySelectorAll('#tag span')];
-  let ti = 0; tags[0].classList.add('on');
+  let ti = 0;
+  if (tags.length) {
+    tags[0].classList.add('on');
+    if (!reduce && tags.length > 1) {
+      setInterval(() => {
+        if (document.hidden) return;
+        tags[ti].classList.remove('on');
+        ti = (ti + 1) % tags.length;
+        tags[ti].classList.add('on');
+      }, 3200);
+    }
+  }
 
   /* ---- metric chips ---- */
   document.querySelectorAll('[data-count]').forEach(el => {
     const end = +el.dataset.count, suf = el.dataset.suffix || '';
-    const fmt = n => (end >= 1000 ? Math.round(n/1000)+'K' : Math.round(n)) + suf;
-    el.textContent = fmt(end);
+    const fmt = n => (end >= 1000 ? Math.round(n / 1000) + 'K' : Math.round(n)) + suf;
+    if (reduce) { el.textContent = fmt(end); return; }
+    const t0 = performance.now(), dur = 900;
+    const step = now => {
+      const p = Math.min(1, (now - t0) / dur);
+      const ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(end * ease);
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   });
 
   /* ---- epic-mode synth: 10 procedural songs, shuffled like a tiny OST ---- */
