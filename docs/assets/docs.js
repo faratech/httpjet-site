@@ -885,6 +885,58 @@
     }
   }
 
+  /* ---------- fullscreen viewport expand / minimize for diagrams, charts & explorer ---------- */
+  var EXP_ICO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/></svg><span>Expand</span>';
+  var MIN_ICO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4"/></svg><span>Minimize (Esc)</span>';
+  var activeExpanded = null;
+
+  function setExpanded(el, expand) {
+    if (!el) return;
+    var btn = el.querySelector(":scope > .expbtn");
+    if (expand) {
+      if (activeExpanded && activeExpanded !== el) setExpanded(activeExpanded, false);
+      el.classList.add("is-expanded");
+      doc.body.classList.add("has-expanded");
+      if (btn) { btn.innerHTML = MIN_ICO; btn.setAttribute("aria-expanded", "true"); btn.setAttribute("title", "Minimize back to page (Esc)"); }
+      activeExpanded = el;
+    } else {
+      el.classList.remove("is-expanded");
+      doc.body.classList.remove("has-expanded");
+      if (btn) { btn.innerHTML = EXP_ICO; btn.setAttribute("aria-expanded", "false"); btn.setAttribute("title", "Expand to full viewport"); }
+      if (activeExpanded === el) activeExpanded = null;
+    }
+  }
+
+  function attachExpandButtons(root) {
+    var targets = Array.prototype.slice.call((root || doc).querySelectorAll(".figure, .chart, .bexp"));
+    targets.forEach(function (el) {
+      if (el.querySelector(":scope > .expbtn")) return;
+      var btn = doc.createElement("button");
+      btn.type = "button";
+      btn.className = "expbtn";
+      btn.setAttribute("aria-expanded", "false");
+      btn.setAttribute("aria-label", "Toggle full-viewport view");
+      btn.setAttribute("title", "Expand to full viewport");
+      btn.innerHTML = EXP_ICO;
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        setExpanded(el, !el.classList.contains("is-expanded"));
+      });
+      el.insertBefore(btn, el.firstChild);
+    });
+  }
+  attachExpandButtons(doc);
+  if (bexp) {
+    bexp.addEventListener("click", function () { setTimeout(function () { attachExpandButtons(bexp); }, 0); });
+    bexp.addEventListener("change", function () { setTimeout(function () { attachExpandButtons(bexp); }, 0); });
+  }
+  doc.addEventListener("dblclick", function (e) {
+    var fig = e.target.closest(".figure svg, .chart svg");
+    if (!fig) return;
+    var box = fig.closest(".figure, .chart");
+    if (box) setExpanded(box, !box.classList.contains("is-expanded"));
+  });
+
   /* ---------- client-side search ---------- */
   var ov = doc.querySelector(".search-ov"),
       sbtn = doc.querySelector(".searchbtn"),
@@ -958,6 +1010,7 @@
   if (shouldOpenSearchFromUrl()) setTimeout(openSearch, 0);
 
   doc.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && activeExpanded) { e.preventDefault(); setExpanded(activeExpanded, false); return; }
     if ((e.key === "/" && !/^(INPUT|TEXTAREA)$/.test(doc.activeElement.tagName)) ||
         ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) { e.preventDefault(); openSearch(); return; }
     if (e.key === "Escape" && sidebar && sidebar.classList.contains("open")) { closeDrawer(true); return; }

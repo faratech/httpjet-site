@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261024b'
+VERSION = '20261024c'
 GA = 'G-ZR4WV214JT'
 
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; "
