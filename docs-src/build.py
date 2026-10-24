@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261024l'
+VERSION = '20261024m'
 GA = 'G-ZR4WV214JT'
 
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; "
@@ -178,33 +178,92 @@ def head(slug, title_suffix, desc, nav_title, docs_min_css):
     ]
     if slug != 'index':
         crumbs_ld.append({"@type": "ListItem", "position": 3, "name": nt, "item": url})
+    graph = [
+        {
+            "@type": "TechArticle",
+            "@id": url + "#article",
+            "headline": t,
+            "name": nt,
+            "articleSection": EYEBROW[slug],
+            "description": desc,
+            "url": url,
+            "datePublished": "2026-06-01",
+            "dateModified": today,
+            "inLanguage": "en-US",
+            "proficiencyLevel": "Expert",
+            "author": {"@type": "Organization", "name": "httpjet", "url": "https://httpjet.net/"},
+            "publisher": {"@type": "Organization", "name": "httpjet", "url": "https://httpjet.net/"},
+            "isPartOf": {"@id": "https://httpjet.net/#website"},
+            "about": {"@id": "https://httpjet.net/#software"},
+            "image": "https://httpjet.net/og.jpg"
+        },
+        {
+            "@type": "BreadcrumbList",
+            "@id": url + "#breadcrumb",
+            "itemListElement": crumbs_ld
+        }
+    ]
+    if slug == 'index':
+        graph.append({
+            "@type": "FAQPage",
+            "@id": url + "#faq",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": "Is httpjet a drop-in replacement for LiteSpeed Web Server?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes. httpjet reads the same LiteSpeed XML configuration tree (conf/httpd_config.xml and vhosts/*.xml), speaks the native LSAPI wire protocol to lsphp, evaluates Apache .htaccess files (mod_rewrite, Basic auth, access control, Header, ErrorDocument, LSCache directives), and provides an LSCache-compatible origin page cache."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "What transport and HTTP protocols does httpjet support?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "httpjet runs on Linux over a single pure-io_uring (monoio) transport and natively serves HTTP/1.1, HTTP/2 (146/146 h2spec conformance with zero-allocation HPACK), and HTTP/3 over QUIC, plus Unix domain sockets and PROXY protocol v1/v2."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "How fast is httpjet compared to LiteSpeed, OpenLiteSpeed, and nginx?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "In dedicated-host loopback benchmarks, httpjet reaches ~908k–965k req/s on HTTP/2 static workloads (vs OpenLiteSpeed ~793k–878k req/s), 298k–316k req/s on an 806-line .htaccess chain over HTTP/2 (vs OpenLiteSpeed 283.3k and nginx 125.4k), 44.8k–48.6k req/s on PHP over LSAPI (vs LiteSpeed 6.3.5 38.5k–41.2k), and 19,912 req/s on a 152 KB XenForo origin page-cache hit (101x faster than an uncached PHP render)."
+                    }
+                }
+            ]
+        })
+    elif slug == 'quickstart':
+        graph.append({
+            "@type": "HowTo",
+            "@id": url + "#howto",
+            "name": "How to build, validate, and run httpjet from source",
+            "description": "Compile the httpjet Rust binary, validate a LiteSpeed-compatible configuration tree with check --strict, and serve on loopback.",
+            "step": [
+                {"@type": "HowToStep", "position": 1, "name": "Build the binary", "text": "Clone https://github.com/faratech/httpjet.git and run cargo build --release -p httpjet."},
+                {"@type": "HowToStep", "position": 2, "name": "Validate configuration", "text": "Run target/release/httpjet --root \"$PWD/examples/litespeed\" check --strict to lint topology and directives."},
+                {"@type": "HowToStep", "position": 3, "name": "Serve on loopback", "text": "Run target/release/httpjet --root \"$PWD/examples/litespeed\" serve --http-addr 127.0.0.1:8080 --https-addr \"\" --workers 1 --no-php."},
+                {"@type": "HowToStep", "position": 4, "name": "Verify responses and metrics", "text": "Test HTTP/1.1 and h2c responses with curl against 127.0.0.1:8080 and inspect Prometheus metrics on 127.0.0.1:9090/metrics."}
+            ]
+        })
+    elif slug == 'migration':
+        graph.append({
+            "@type": "HowTo",
+            "@id": url + "#howto",
+            "name": "How to migrate from LiteSpeed or OpenLiteSpeed to httpjet",
+            "description": "A validation-first migration workflow from an existing LiteSpeed XML tree to httpjet with instant rollback.",
+            "step": [
+                {"@type": "HowToStep", "position": 1, "name": "Inventory the existing XML tree", "text": "Audit listeners, vhosts, .htaccess chains, external processors, and LSCache usage."},
+                {"@type": "HowToStep", "position": 2, "name": "Run check --strict", "text": "Run httpjet --root /usr/local/lsws check --strict and resolve any unsupported directives or topology warnings."},
+                {"@type": "HowToStep", "position": 3, "name": "Run an isolated candidate on alternate ports", "text": "Start httpjet on alternate loopback ports with a separate --php-socket and HTTPJET_LOG_DIR."},
+                {"@type": "HowToStep", "position": 4, "name": "Prove behavioral parity", "text": "Compare status codes, headers, rewrites, and PHP responses between LiteSpeed and the httpjet candidate."},
+                {"@type": "HowToStep", "position": 5, "name": "Cut over and monitor", "text": "Switch listener sockets to httpjet + httpjet-lsphp and monitor Prometheus metrics and error logs."}
+            ]
+        })
     ld = {
         "@context": "https://schema.org",
-        "@graph": [
-            {
-                "@type": "TechArticle",
-                "@id": url + "#article",
-                "headline": t,
-                "name": nt,
-                "articleSection": EYEBROW[slug],
-                "description": desc,
-                "url": url,
-                "datePublished": "2026-06-01",
-                "dateModified": today,
-                "inLanguage": "en-US",
-                "proficiencyLevel": "Expert",
-                "author": {"@type": "Organization", "name": "httpjet", "url": "https://httpjet.net/"},
-                "publisher": {"@type": "Organization", "name": "httpjet", "url": "https://httpjet.net/"},
-                "isPartOf": {"@id": "https://httpjet.net/#website"},
-                "about": {"@id": "https://httpjet.net/#software"},
-                "image": "https://httpjet.net/og.jpg"
-            },
-            {
-                "@type": "BreadcrumbList",
-                "@id": url + "#breadcrumb",
-                "itemListElement": crumbs_ld
-            }
-        ]
+        "@graph": graph
     }
     ld_json = json.dumps(ld, ensure_ascii=False, separators=(',', ':'))
     esc_t = html.escape(t, quote=True)
@@ -235,6 +294,8 @@ def head(slug, title_suffix, desc, nav_title, docs_min_css):
 <meta name="twitter:description" content="{esc_desc}">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="{url}">
+<link rel="alternate" type="text/markdown" href="{slug}.md" title="{esc_t} (Markdown)">
+<link rel="manifest" href="/site.webmanifest">
 <script type="application/ld+json">{ld_json}</script>
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
@@ -248,7 +309,7 @@ def head(slug, title_suffix, desc, nav_title, docs_min_css):
   (function(){{
     var _ap = HTMLHeadElement.prototype.appendChild;
     HTMLHeadElement.prototype.appendChild = function(el){{
-      if (el && el.tagName === 'SCRIPT' && /\/cdn-cgi\/challenge-platform\//.test(el.src || '')) return el;
+      if (el && el.tagName === 'SCRIPT' && /\\/cdn-cgi\\/challenge-platform\\//.test(el.src || '')) return el;
       return _ap.call(this, el);
     }};
     var loaded = false;
@@ -269,7 +330,8 @@ def head(slug, title_suffix, desc, nav_title, docs_min_css):
 <body>
 '''
 
-HEADER_HTML = '''<header class="hdr">
+HEADER_HTML = '''<a class="skip-link" href="#main-content">Skip to main content</a>
+<header class="hdr">
   <div class="wordmark"><a href="./"><b>httpjet</b></a> <span class="seg">·docs</span></div>
   <div class="grow"></div>
   <nav aria-label="Primary">
@@ -352,13 +414,33 @@ def build_page(i, entry, docs_min_css):
     raw_body = read(os.path.join(PAGES, slug + '.html'))
     body = re.sub(r'<!--diagram:(.*?)-->', diagram, raw_body, flags=re.S)
     body = re.sub(r'<!--chart:([a-z0-9-]+)-->', chart, body)
-    crumbs = '' if slug == 'index' else f'<p class="crumbs"><a href="./">Docs</a><span>/</span>{nav_title}</p>\n'
-    eyebrow = '' if slug == 'index' else f'<p class="eyebrow">{EYEBROW[slug]}</p>\n'
+    crumbs = f'<p class="crumbs"><a href="./">Docs</a><span>/</span>{nav_title}</p>'
+    eyebrow = '' if slug == 'index' else f'<p class="eyebrow">{EYEBROW[slug]}</p>'
+    page_bar = (
+        f'<div class="page-bar">'
+        f'<div class="page-bar__left">{crumbs}{eyebrow}</div>'
+        f'<div class="page-tools">'
+        f'<button type="button" class="mdcopy" data-md="{slug}.md" title="Copy clean Markdown of this page for LLMs">Copy Markdown</button>'
+        f'<a class="mdraw" href="{slug}.md" target="_blank" rel="noopener" title="View raw Markdown (.md)">Raw .md</a>'
+        f'</div></div>\n'
+    )
     out = head(slug, suffix, unesc(desc), nav_title, docs_min_css)
-    out += HEADER_HTML + '\n<div class="shell">\n' + sidebar_html(slug) + '\n<main class="content">\n' + crumbs + eyebrow + body.strip() + '\n\n' + pager(i) + '\n' + FOOT + '\n</main>\n' + TOC_HTML + '\n</div>\n' + SEARCH_OV_HTML + '\n'
-    out += f'<script defer src="assets/search-index.min.js?v={VERSION}"></script>\n<script defer src="assets/docs.min.js?v={VERSION}"></script>\n</body>\n</html>\n'
+    out += HEADER_HTML + '\n<div class="shell">\n' + sidebar_html(slug) + '\n<main class="content" id="main-content">\n' + page_bar + body.strip() + '\n\n' + pager(i) + '\n' + FOOT + '\n</main>\n' + TOC_HTML + '\n</div>\n' + SEARCH_OV_HTML + '\n'
+    out += f'<script defer src="assets/docs.min.js?v={VERSION}"></script>\n</body>\n</html>\n'
     with open(os.path.join(DOCS, slug + '.html'), 'w', encoding='utf-8') as f:
         f.write(out)
+    # Write individual per-page .md endpoint
+    loc = 'https://httpjet.net/docs/' if slug == 'index' else f'https://httpjet.net/docs/{slug}'
+    md_doc = (
+        f'# {unesc(nav_title)} — httpjet Documentation\n\n'
+        f'> {unesc(desc)}\n\n'
+        f'- **Canonical URL:** {loc}\n'
+        f'- **Source Repository:** https://github.com/faratech/httpjet\n\n'
+        f'---\n\n'
+        + html_to_md(raw_body) + '\n'
+    )
+    with open(os.path.join(DOCS, slug + '.md'), 'w', encoding='utf-8') as f:
+        f.write(md_doc)
     return body, raw_body
 
 def html_to_md(raw_html):

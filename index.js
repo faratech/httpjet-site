@@ -1,6 +1,6 @@
 (() => {
   const AUDIO_STORAGE_KEY = 'hj_epic_audio_v1';
-  const DOCS_ASSET_VER = '20261024l';
+  const DOCS_ASSET_VER = '20261024m';
 
   const makeRng = seed => () => {
     seed |= 0;
@@ -882,6 +882,8 @@
   if (!window.__hjRouter) {
     window.__hjRouter = (() => {
       let navBusy = false;
+      const prefetchCache = {};
+      let hoverTimer = 0;
 
       function loadScriptOnce(src) {
         return new Promise((resolve, reject) => {
@@ -892,6 +894,45 @@
           s.onerror = err => reject(err);
           document.body.appendChild(s);
         });
+      }
+
+      function resolveInternalUrl(rawHref) {
+        if (!rawHref || rawHref.charAt(0) === '#' || /^(?:mailto:|tel:|javascript:)/i.test(rawHref)) return null;
+        let url;
+        try {
+          url = new URL(rawHref, window.location.href);
+        } catch (_) { return null; }
+        if (url.hostname === 'httpjet.net' && window.location.hostname !== 'httpjet.net') {
+          url = new URL(url.pathname + url.search + url.hash, window.location.origin);
+        }
+        if (url.origin !== window.location.origin) return null;
+        if (/\.(?:txt|xml|json|md|pdf|zip|tar|gz|webmanifest)$/i.test(url.pathname)) return null;
+        if (url.pathname === '/docs') url.pathname = '/docs/';
+        const isDocs = url.pathname.startsWith('/docs/');
+        const isLanding = url.pathname === '/' || url.pathname === '/index.html';
+        if (!isDocs && !isLanding) return null;
+        return url;
+      }
+
+      function fetchPageHtml(key) {
+        if (prefetchCache[key]) return prefetchCache[key];
+        const p = fetch(key, { credentials: 'same-origin' }).then(res => {
+          if (!res.ok) throw new Error('status ' + res.status);
+          return res.text();
+        }).catch(err => {
+          delete prefetchCache[key];
+          throw err;
+        });
+        prefetchCache[key] = p;
+        return p;
+      }
+
+      function prefetch(rawHref) {
+        if (navigator.connection && (navigator.connection.saveData || /2g/.test(navigator.connection.effectiveType || ''))) return;
+        const url = resolveInternalUrl(rawHref);
+        if (!url) return;
+        const key = url.pathname + url.search;
+        if (!prefetchCache[key]) fetchPageHtml(key).catch(() => {});
       }
 
       function ensureStylesheet(href) {
@@ -942,12 +983,7 @@
             return;
           }
 
-          const res = await fetch(url.pathname + url.search, { credentials: 'same-origin' });
-          if (!res.ok) {
-            window.location.href = url.href;
-            return;
-          }
-          const htmlText = await res.text();
+          const htmlText = await fetchPageHtml(url.pathname + url.search);
           const parsed = new DOMParser().parseFromString(htmlText, 'text/html');
 
           if (isDocsTarget) {
@@ -1024,29 +1060,28 @@
         }
       }
 
+      document.addEventListener('pointerover', e => {
+        const a = e.target.closest && e.target.closest('a[href]');
+        if (!a || a.target || a.hasAttribute('download')) return;
+        clearTimeout(hoverTimer);
+        const href = a.getAttribute('href');
+        hoverTimer = setTimeout(() => { prefetch(href); }, 65);
+      }, { passive: true });
+
+      document.addEventListener('touchstart', e => {
+        const a = e.target.closest && e.target.closest('a[href]');
+        if (!a || a.target || a.hasAttribute('download')) return;
+        prefetch(a.getAttribute('href'));
+      }, { passive: true });
+
       document.addEventListener('click', e => {
         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         const a = e.target.closest && e.target.closest('a[href]');
         if (!a || a.target || a.hasAttribute('download')) return;
-        const rawHref = a.getAttribute('href') || '';
-        if (!rawHref || rawHref.charAt(0) === '#' || /^(?:mailto:|tel:|javascript:)/i.test(rawHref)) return;
-
-        let url;
-        try {
-          url = new URL(rawHref, window.location.href);
-        } catch (_) { return; }
-
-        if (url.hostname === 'httpjet.net' && window.location.hostname !== 'httpjet.net') {
-          url = new URL(url.pathname + url.search + url.hash, window.location.origin);
-        }
-        if (url.origin !== window.location.origin) return;
-        if (/\.(?:txt|xml|json|pdf|zip|tar|gz)$/i.test(url.pathname)) return;
-        if (url.pathname === '/docs') url.pathname = '/docs/';
+        const url = resolveInternalUrl(a.getAttribute('href') || '');
+        if (!url) return;
 
         const isDocs = url.pathname.startsWith('/docs/');
-        const isLanding = url.pathname === '/' || url.pathname === '/index.html';
-        if (!isDocs && !isLanding) return;
-
         const curIsDocs = window.location.pathname.startsWith('/docs');
         if (isDocs && curIsDocs && normDocSlug(url.pathname) === normDocSlug(window.location.pathname) && url.search === window.location.search) {
           if (url.hash) {
@@ -1066,7 +1101,7 @@
         navigate(window.location.href, false);
       });
 
-      return { navigate };
+      return { navigate, prefetch };
     })();
   }
 

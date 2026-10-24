@@ -5,7 +5,7 @@
   "use strict";
   var doc = document, root = doc.documentElement;
   var AUDIO_STORAGE_KEY = "hj_epic_audio_v1";
-  var DOCS_ASSET_VER = "20261024l";
+  var DOCS_ASSET_VER = "20261024m";
 
   var makeRng = function (seed) {
     return function () {
@@ -658,6 +658,8 @@
   if (!window.__hjRouter) {
     window.__hjRouter = (function () {
       var navBusy = false;
+      var prefetchCache = {};
+      var hoverTimer = 0;
 
       function loadScriptOnce(src) {
         return new Promise(function (resolve, reject) {
@@ -668,6 +670,45 @@
           s.onerror = function (err) { reject(err); };
           doc.body.appendChild(s);
         });
+      }
+
+      function resolveInternalUrl(rawHref) {
+        if (!rawHref || rawHref.charAt(0) === "#" || /^(?:mailto:|tel:|javascript:)/i.test(rawHref)) return null;
+        var url;
+        try {
+          url = new URL(rawHref, window.location.href);
+        } catch (_) { return null; }
+        if (url.hostname === "httpjet.net" && window.location.hostname !== "httpjet.net") {
+          url = new URL(url.pathname + url.search + url.hash, window.location.origin);
+        }
+        if (url.origin !== window.location.origin) return null;
+        if (/\.(?:txt|xml|json|md|pdf|zip|tar|gz|webmanifest)$/i.test(url.pathname)) return null;
+        if (url.pathname === "/docs") url.pathname = "/docs/";
+        var isDocs = url.pathname.indexOf("/docs/") === 0;
+        var isLanding = url.pathname === "/" || url.pathname === "/index.html";
+        if (!isDocs && !isLanding) return null;
+        return url;
+      }
+
+      function fetchPageHtml(key) {
+        if (prefetchCache[key]) return prefetchCache[key];
+        var p = fetch(key, { credentials: "same-origin" }).then(function (res) {
+          if (!res.ok) throw new Error("status " + res.status);
+          return res.text();
+        }).catch(function (err) {
+          delete prefetchCache[key];
+          throw err;
+        });
+        prefetchCache[key] = p;
+        return p;
+      }
+
+      function prefetch(rawHref) {
+        if (navigator.connection && (navigator.connection.saveData || /2g/.test(navigator.connection.effectiveType || ""))) return;
+        var url = resolveInternalUrl(rawHref);
+        if (!url) return;
+        var key = url.pathname + url.search;
+        if (!prefetchCache[key]) fetchPageHtml(key).catch(function () {});
       }
 
       function ensureStylesheet(href) {
@@ -725,10 +766,7 @@
           return Promise.resolve();
         }
 
-        return fetch(url.pathname + url.search, { credentials: "same-origin" }).then(function (res) {
-          if (!res.ok) throw new Error("status " + res.status);
-          return res.text();
-        }).then(function (htmlText) {
+        return fetchPageHtml(url.pathname + url.search).then(function (htmlText) {
           var parsed = new DOMParser().parseFromString(htmlText, "text/html");
           if (isDocsTarget) {
             var onDocsAlready = Boolean(doc.querySelector("header.hdr") && doc.querySelector("main.content"));
@@ -796,29 +834,28 @@
         });
       }
 
+      doc.addEventListener("pointerover", function (e) {
+        var a = e.target.closest && e.target.closest("a[href]");
+        if (!a || a.target || a.hasAttribute("download")) return;
+        clearTimeout(hoverTimer);
+        var href = a.getAttribute("href");
+        hoverTimer = setTimeout(function () { prefetch(href); }, 65);
+      }, { passive: true });
+
+      doc.addEventListener("touchstart", function (e) {
+        var a = e.target.closest && e.target.closest("a[href]");
+        if (!a || a.target || a.hasAttribute("download")) return;
+        prefetch(a.getAttribute("href"));
+      }, { passive: true });
+
       doc.addEventListener("click", function (e) {
         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         var a = e.target.closest && e.target.closest("a[href]");
         if (!a || a.target || a.hasAttribute("download")) return;
-        var rawHref = a.getAttribute("href") || "";
-        if (!rawHref || rawHref.charAt(0) === "#" || /^(?:mailto:|tel:|javascript:)/i.test(rawHref)) return;
-
-        var url;
-        try {
-          url = new URL(rawHref, window.location.href);
-        } catch (_) { return; }
-
-        if (url.hostname === "httpjet.net" && window.location.hostname !== "httpjet.net") {
-          url = new URL(url.pathname + url.search + url.hash, window.location.origin);
-        }
-        if (url.origin !== window.location.origin) return;
-        if (/\.(?:txt|xml|json|pdf|zip|tar|gz)$/i.test(url.pathname)) return;
-        if (url.pathname === "/docs") url.pathname = "/docs/";
+        var url = resolveInternalUrl(a.getAttribute("href") || "");
+        if (!url) return;
 
         var isDocs = url.pathname.indexOf("/docs/") === 0;
-        var isLanding = url.pathname === "/" || url.pathname === "/index.html";
-        if (!isDocs && !isLanding) return;
-
         var curIsDocs = window.location.pathname.indexOf("/docs") === 0;
         if (isDocs && curIsDocs && normDocSlug(url.pathname) === normDocSlug(window.location.pathname) && url.search === window.location.search) {
           if (url.hash) {
@@ -838,7 +875,7 @@
         navigate(window.location.href, false);
       });
 
-      return { navigate: navigate };
+      return { navigate: navigate, prefetch: prefetch };
     })();
   }
 
@@ -894,6 +931,30 @@
     if (focusMenu && menuBtn) menuBtn.focus();
   }
 
+  var searchIndexPromise = null;
+  function ensureSearchIndex() {
+    if (window.DOCS_INDEX && window.DOCS_INDEX.length) {
+      index = window.DOCS_INDEX;
+      return Promise.resolve(index);
+    }
+    if (searchIndexPromise) return searchIndexPromise;
+    searchIndexPromise = new Promise(function (resolve) {
+      var src = "/docs/assets/search-index.min.js?v=" + DOCS_ASSET_VER;
+      if (doc.querySelector('script[src*="search-index.min.js"]')) {
+        index = window.DOCS_INDEX || null;
+        resolve(index);
+        return;
+      }
+      var s = doc.createElement("script");
+      s.src = src;
+      s.async = true;
+      s.onload = function () { index = window.DOCS_INDEX || null; resolve(index); };
+      s.onerror = function () { searchIndexPromise = null; resolve(null); };
+      doc.body.appendChild(s);
+    });
+    return searchIndexPromise;
+  }
+
   function openSearch(initialQ) {
     if (!ov) return;
     if (activeExpanded) setExpanded(activeExpanded, false);
@@ -903,6 +964,11 @@
     var qVal = typeof initialQ === "string" ? initialQ : "";
     if (input) { input.value = qVal; input.focus(); }
     renderSearch(qVal);
+    if (!index) {
+      ensureSearchIndex().then(function () {
+        if (ov && ov.classList.contains("open")) renderSearch(input ? input.value : qVal);
+      });
+    }
   }
 
   function closeSearch(focusBack) {
@@ -1100,6 +1166,32 @@
       }, { rootMargin: "-12% 0px -72% 0px", threshold: 0 });
       heads.forEach(function (h) { activeScrollSpy.observe(h); });
     }
+
+    /* ---------- copy-markdown (.mdcopy) ---------- */
+    Array.prototype.slice.call(doc.querySelectorAll(".mdcopy")).forEach(function (btn) {
+      if (btn.dataset.hjBound) return;
+      btn.dataset.hjBound = "1";
+      btn.addEventListener("click", function () {
+        var mdUrl = btn.getAttribute("data-md");
+        if (!mdUrl) return;
+        fetch(mdUrl, { credentials: "same-origin" }).then(function (r) {
+          if (!r.ok) throw new Error(r.status);
+          return r.text();
+        }).then(function (txt) {
+          var done = function () {
+            btn.textContent = "Copied .md ✓";
+            btn.classList.add("ok");
+            setTimeout(function () { btn.textContent = "Copy Markdown"; btn.classList.remove("ok"); }, 1600);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, done);
+          else {
+            var t = doc.createElement("textarea"); t.value = txt; doc.body.appendChild(t); t.select();
+            try { doc.execCommand("copy"); } catch (e) {}
+            doc.body.removeChild(t); done();
+          }
+        }).catch(function () {});
+      });
+    });
 
     /* ---------- copy-code ---------- */
     Array.prototype.slice.call(doc.querySelectorAll(".codeframe")).forEach(function (frame) {
@@ -2248,6 +2340,11 @@
   }; /* end window.__hjInitDocs */
 
   window.__hjInitDocs();
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(function () { ensureSearchIndex(); }, { timeout: 2500 });
+  } else {
+    setTimeout(ensureSearchIndex, 1800);
+  }
 
   function getInitialSearchQuery() {
     try {
@@ -2287,9 +2384,18 @@
     doc.addEventListener("keydown", function (e) {
       if (!doc.querySelector("header.hdr")) return;
       if (e.key === "Escape" && activeExpanded) { e.preventDefault(); setExpanded(activeExpanded, false); return; }
-      if ((e.key === "/" && !/^(INPUT|TEXTAREA)$/.test(doc.activeElement.tagName)) ||
+      if ((e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(doc.activeElement.tagName)) ||
           ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) { e.preventDefault(); openSearch(""); return; }
       if (e.key === "Escape" && sidebar && sidebar.classList.contains("open")) { closeDrawer(true); return; }
+      if ((!ov || !ov.classList.contains("open")) && !e.metaKey && !e.ctrlKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(doc.activeElement.tagName)) {
+        if (e.key === "[") {
+          var prevLink = doc.querySelector(".pager a.prev");
+          if (prevLink && window.__hjRouter) { e.preventDefault(); window.__hjRouter.navigate(prevLink.href, true); return; }
+        } else if (e.key === "]") {
+          var nextLink = doc.querySelector(".pager a.next");
+          if (nextLink && window.__hjRouter) { e.preventDefault(); window.__hjRouter.navigate(nextLink.href, true); return; }
+        }
+      }
       if (!ov || !ov.classList.contains("open")) return;
       if (e.key === "Escape") { closeSearch(true); return; }
       if (e.key === "Tab") {
