@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/gateways.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
-<script defer src="assets/docs-head.min.js?v=20261013a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024a">
+<script defer src="assets/docs-head.min.js?v=20261024a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -58,7 +58,7 @@
           <tr><td><code>h2s://host[:443]</code> <span class="badge hj">httpjet</span></td><td>HTTP/2 over TLS, ALPN fail-closed</td></tr>
         </tbody></table></div>
       <p>Pool keys are scheme-scoped, so an h1 and an h2 target at the same address never share a connection. Forwarded requests to h2 upstreams are re-absolutized (the h2 client derives <code>:scheme</code>/<code>:authority</code> from the URI). Proxied <em>responses</em> may not assert <code>X-LiteSpeed-Purge</code>/<code>-Cache-Control</code>/<code>-Vary</code> — those are stripped so a remote backend cannot inject cache policy. Named upstreams receive a W3C <code>traceparent</code> when <a href="observability.html#otel">tracing</a> is on.</p>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">[P] targets are screened</span><p>Since 2026-09-16 a rewrite <code>[P]</code> URL that resolves (after DNS — <code>/etc/hosts</code> pins cannot bypass the screen) to loopback, link-local or a Unix socket is refused unless it matches an operator-configured extProcessor address. This closes the class where a <code>.htaccess</code> author reaches the local trust plane (metrics, admin, purge endpoints) through the server.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">[P] targets are screened</span><p>Since 2026-09-16 a rewrite <code>[P]</code> URL that resolves (after DNS — <code>/etc/hosts</code> pins cannot bypass the screen, and concurrent DNS lookups are bounded so slow resolvers fail fast) to loopback, link-local or a Unix socket is refused unless it matches an operator-configured extProcessor address. Forwarding to a foreign <code>[P]</code> origin also withholds client <code>Authorization</code> and <code>Cookie</code> headers. This closes the class where a <code>.htaccess</code> author reaches the local trust plane (metrics, admin, purge endpoints) or leaks origin credentials through the server.</p></div></div>
     </section>
 
     <section>
@@ -166,7 +166,7 @@
         <li><strong>Pool:</strong> caps all sockets including idle and in-progress dials under one acquisition deadline; poison/drop releases capacity immediately; clean idle sockets expire oldest-first.</li>
         <li><strong>CGI variables</strong> are server-derived; request headers become <code>HTTP_*</code> after validation; processor <code>env</code> cannot override protected identity/routing variables (<code>SCRIPT_FILENAME</code>, <code>DOCUMENT_ROOT</code>, <code>REMOTE_ADDR</code>, <code>SERVER_NAME</code>, <code>CONTENT_LENGTH</code>, <code>HTTP_AUTHORIZATION</code>, …). The same deny-list applies to <code>.htaccess</code> <code>[E=]</code> for LSAPI.</li>
         <li><strong>Bodies</strong> are buffered under the shared budget so the exact STDIN length is known; declared underflow/overflow, framing errors and cancellation poison the connection.</li>
-        <li><strong>Responses:</strong> strict CRLF head, repeated end-to-end headers preserved, one valid <code>Status</code>, CGI <code>Location</code> default, folding/hop-by-hop rejected; STDERR byte-capped and control-escaped into the error log, never the client.</li>
+        <li><strong>Responses:</strong> strict CRLF head, repeated end-to-end headers preserved, one valid <code>Status</code>, CGI <code>Location</code> default, folding rejected, app hop-by-hop headers and origin cache-control headers (<code>X-LiteSpeed-*</code>) stripped, and streams that end without an <code>END_REQUEST</code> frame abort the body; STDERR is byte-capped and control-escaped into the error log, never the client.</li>
       </ul>
       <p class="mini">Known follow-ups: explicit CGI context-directory routing (today: script-handler suffix mappings only), a codec fragmentation corpus, and a maintained real-application interoperability fixture.</p>
     </section>
@@ -186,9 +186,9 @@ cargo test -p httpjet --bin httpjet</code></pre></div>
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="lsapi.html"><div class="dir">← Prev</div><div class="ttl">LSAPI &amp; PHP</div></a><a class="next" href="rewrite.html"><div class="dir">Next →</div><div class="ttl">Rewrite &amp; .htaccess</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261013a"></script>
-<script defer src="assets/docs.min.js?v=20261013a"></script>
+<script defer src="assets/search-index.min.js?v=20261024a"></script>
+<script defer src="assets/docs.min.js?v=20261024a"></script>
 </body>
 </html>

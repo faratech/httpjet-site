@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/migration.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
-<script defer src="assets/docs-head.min.js?v=20261013a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024a">
+<script defer src="assets/docs-head.min.js?v=20261024a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -73,7 +73,7 @@
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>gate 1</b></span></div><pre><code>target/release/httpjet --root /abs/copied-root check --strict
 sudo -u &lt;service-user&gt; target/release/httpjet --root /abs/copied-root check --strict</code></pre></div>
       <p>Treat errors as blockers. Review every warning — ignored security elements (<code>lsrecaptcha</code>, <code>censorshipControl</code>), generic CGI contexts, wildcard maps, TLS over a Unix socket, unsupported auth forms, missing GeoIP data, unloaded vhosts, and settings that require a restart rather than a reload. <em>Parsed does not mean equivalent.</em> Compare the resulting listener/vhost map and effective limits with the source server, and run the check as the runtime identity too: readable-by-root is not proof the service user can read certificates or write logs, sockets and cache.</p>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Things LiteSpeed does that httpjet will not</span><p><code>*.example.com</code> vhost maps are not wildcards; <code>RequestHeader</code> and <code>Header edit</code> are ignored; APR1/crypt htpasswd hashes verify false; <code>Require</code> forms other than <code>all granted</code>/<code>valid-user</code>/<code>user</code> deny; anti-abuse elements are inert; <code>cacheStorePath</code> is unused; <code>respBuffer</code> always streams; <code>instances&gt;1</code> is a single upstream. Each is on the <a href="capabilities.html">capability matrix</a>.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Things LiteSpeed does that httpjet will not</span><p><code>RequestHeader</code> and <code>Header edit</code> are ignored; traditional DES and <code>$5$</code>/<code>$6$</code> <code>crypt()</code> htpasswd hashes verify false (bcrypt, APR1 <code>$apr1$</code>, MD5-crypt <code>$1$</code> and <code>{SHA}</code> are supported); <code>Require</code> forms other than <code>all granted</code>/<code>valid-user</code>/<code>user</code> deny; anti-abuse elements are inert; <code>cacheStorePath</code> is unused; <code>respBuffer</code> always streams; <code>instances&gt;1</code> is a single upstream. Each is on the <a href="capabilities.html">capability matrix</a>.</p></div></div>
     </section>
 
     <section>
@@ -130,9 +130,9 @@ sudo -u &lt;service-user&gt; target/release/httpjet --root /abs/copied-root chec
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="conformance.html"><div class="dir">← Prev</div><div class="ttl">Conformance &amp; testing</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261013a"></script>
-<script defer src="assets/docs.min.js?v=20261013a"></script>
+<script defer src="assets/search-index.min.js?v=20261024a"></script>
+<script defer src="assets/docs.min.js?v=20261024a"></script>
 </body>
 </html>

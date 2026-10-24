@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/performance.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
-<script defer src="assets/docs-head.min.js?v=20261013a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024a">
+<script defer src="assets/docs-head.min.js?v=20261024a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -90,7 +90,7 @@
     <section>
       <h2 id="instruction-floor">At the instruction floor</h2>
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>At saturation the h2 cache-hit path shows <strong>IPC 1.55</strong>, a <strong>0.31% branch-miss rate</strong> and <strong>1.6 L1d misses per 100 instructions</strong>: execution is efficient and the bottleneck is instructions retired per request, not locality. Futex traffic (~85% of syscall time) turned out to be idle parking and cross-thread waker churn — the box was ~50% idle at the apparent ceiling — not lock contention.</p><span class="regime">perf stat / strace · off-CPU analysis</span></div></div>
-      <p>Two structural moves followed: the global <strong>mimalloc</strong> allocator (fewer arena futexes across the per-core monoio workers plus the tokio side-runtime) and the <strong>on-core fast path</strong> with the finished-response memo, which removes pipeline work rather than speeding it up.</p>
+      <p>Two structural moves followed: the global <strong>mimalloc</strong> allocator (fewer arena futexes across the per-core monoio workers plus the tokio side-runtime) and the <strong>on-core fast path</strong> with the finished-response memo, which removes pipeline work rather than speeding it up. The October 2026 campaign (<code>0.0.9</code>–<code>0.1.5</code>) extended this to the remaining hot paths: keeping static-missing 404s and non-cacheable PHP GETs off the fast-path double lookup (−14.5% CPU on cookied guest pages), memoizing per-file <code>.htaccess</code> access rule matches (<code>access_decision_for_request</code> 13% → 2.7% of process CPU), extending the certified-peer idle window via <code>--trusted-proxy-idle-secs 1800</code> (cutting full TLS handshakes per request by 28% on x86 and 78% on ARM), tuning per-vhost dictionary zstd levels via <code>--page-cache-dict-level</code> (cutting ARM dictionary encode from ~50% to 11% of tokio CPU), and pooling transient response/TLS buffers and h2/bridge task slots (<code>hj_core::recycle::BODY_BUFS</code>) so sparse size classes do not page-fault under <code>MIMALLOC_PURGE_DELAY=0</code>.</p>
     </section>
 
     <section>
@@ -115,15 +115,15 @@
           <tr><td><code>--cf-send-zstd</code></td><td>Hands the CDN the cheapest encoding to produce; no browser-visible change.</td></tr>
           <tr><td>Fast-memo eligibility of the docroot chain</td><td>An ineligible chain (see <code>httpjet check</code>) pays the full pipeline on every static request; fix the directive rather than disabling the memo.</td></tr>
           <tr><td><code>--rewrite-ua-classify</code></td><td>Collapses UA diversity on UA-reading chains onto a handful of outcome-cache entries.</td></tr>
-          <tr><td>TLS resumption</td><td>Full handshakes dominate behind a CDN that does not re-offer tickets; ECDSA chains and the single AES-128-GCM suite keep them cheap.</td></tr>
+          <tr><td>TLS resumption &amp; certified idle window</td><td>Full handshakes dominate behind a CDN that does not re-offer tickets; ECDSA chains, the single AES-128-GCM suite, <code>--tls-session-tickets 0</code> and <code>--trusted-proxy-idle-secs</code> keep handshake CPU low.</td></tr>
           <tr><td>PHP: opcache, worker count, slow endpoints</td><td>Use <code>--php-slow-log</code> attribution; the pool is rarely the bottleneck (acquire p99.9 &lt; 1 ms).</td></tr>
         </tbody></table></div>
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="extensions.html"><div class="dir">← Prev</div><div class="ttl">Extending httpjet</div></a><a class="next" href="conformance.html"><div class="dir">Next →</div><div class="ttl">Conformance &amp; testing</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261013a"></script>
-<script defer src="assets/docs.min.js?v=20261013a"></script>
+<script defer src="assets/search-index.min.js?v=20261024a"></script>
+<script defer src="assets/docs.min.js?v=20261024a"></script>
 </body>
 </html>

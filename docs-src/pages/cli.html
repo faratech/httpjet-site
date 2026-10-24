@@ -1,5 +1,5 @@
     <h1>CLI reference</h1>
-    <p class="lede">One binary, four subcommands. <code>--root</code> is the only global option. Persistent policy lives in the XML; <strong>everything on the command line is an operational override</strong> — addresses, workers, PHP wiring, cache budgets, feature opt-ins. This page is generated from <code>httpjet serve --help</code> of v0.0.5 plus the feature-gated flags.</p>
+    <p class="lede">One binary, four subcommands. <code>--root</code> is the only global option. Persistent policy lives in the XML; <strong>everything on the command line is an operational override</strong> — addresses, workers, PHP wiring, cache budgets, feature opt-ins. This page is generated from <code>httpjet serve --help</code> of v0.1.5 plus the feature-gated flags.</p>
 
     <section>
       <h2 id="subcommands">Subcommands</h2>
@@ -7,7 +7,7 @@
 httpjet --root /abs/root serve [flags…]       <span class="t-c"># bind the configured listeners and serve</span>
 httpjet --root /abs/root lsphp [flags…]       <span class="t-c"># run a standalone persistent lsphp pool (the PHP half of a zero-downtime deploy)</span>
 httpjet lsphp-reload [flags…]                 <span class="t-c"># ask a running pool to replace its worker generation without closing the listener</span>
-httpjet --version                             <span class="t-c"># httpjet 0.0.5</span></code></pre></div>
+httpjet --version                             <span class="t-c"># httpjet 0.1.5</span></code></pre></div>
       <div class="tablewrap"><table>
         <thead><tr><th>Subcommand · flag</th><th>Default</th><th>Meaning</th></tr></thead>
         <tbody>
@@ -114,7 +114,8 @@ httpjet --version                             <span class="t-c"># httpjet 0.0.5<
 <tr data-group="admin"><th class="wrap">--admin-token-file <span class="mini">&lt;ADMIN_TOKEN_FILE&gt;</span></th><td class="def">—</td><td class="wrap">Private file containing a 64-character lowercase hexadecimal bearer token</td></tr>
 <tr data-group="admin"><th class="wrap">--admin-resource-root <span class="mini">&lt;ADMIN_RESOURCE_ROOT&gt;</span></th><td class="def">—</td><td class="wrap">Allowed existing filesystem root for submitted resources; repeatable</td></tr>
 <tr class="grouphead" data-group="waf"><td colspan="3">WAF sidecar</td></tr>
-<tr data-group="waf"><th class="wrap">--waf-sidecar-addr <span class="mini">&lt;WAF_SIDECAR_ADDR&gt;</span></th><td class="def">—</td><td class="wrap">Opt-in loopback HTTP request-inspection sidecar. The sidecar must return 204 to allow or 403 to block; absent keeps the WAF seam completely inert</td></tr>
+<tr data-group="waf"><th class="wrap">--waf-sidecar-addr <span class="mini">&lt;WAF_SIDECAR_ADDR&gt;</span></th><td class="def">—</td><td class="wrap">Opt-in HTTP request-inspection sidecar: <code>unix:/path</code> (its listener&#x27;s uid is verified) or a loopback <code>ip:port</code> (unauthenticated). The sidecar must return 204 to allow or 403 to block; absent keeps the WAF seam inert</td></tr>
+<tr data-group="waf"><th class="wrap">--waf-sidecar-uid <span class="mini">&lt;WAF_SIDECAR_UID&gt;</span></th><td class="def">—</td><td class="wrap">The uid a <code>unix:</code> sidecar must run as. Default: root or this process&#x27;s uid</td></tr>
 <tr data-group="waf"><th class="wrap">--waf-sidecar-path <span class="mini">&lt;WAF_SIDECAR_PATH&gt;</span></th><td class="def">/inspect</td><td class="wrap"></td></tr>
 <tr data-group="waf"><th class="wrap">--waf-timeout-ms <span class="mini">&lt;WAF_TIMEOUT_MS&gt;</span></th><td class="def">100</td><td class="wrap"></td></tr>
 <tr data-group="waf"><th class="wrap">--waf-body-max <span class="mini">&lt;WAF_BODY_MAX&gt;</span></th><td class="def">65536</td><td class="wrap"></td></tr>
@@ -149,6 +150,8 @@ httpjet --version                             <span class="t-c"># httpjet 0.0.5<
           <tr><td><code>HTTPJET_ACCESS_LOG_FORMAT</code></td><td>combined</td><td><code>json</code> selects JSON access lines (fixed field order: <code>ts, client_ip, remote_user, method, uri, protocol, status, bytes, referer, user_agent, reqid</code>).</td></tr>
           <tr><td><code>HTTPJET_ERROR_LOG_FORMAT</code></td><td>text</td><td><code>json</code> selects JSON error events (<code>schema_version 1</code>, credential redaction, bounded fields). Independent of the access format; does not change the stdout/journald tracing formatter. Restart to change; rotate first to avoid mixed files.</td></tr>
           <tr><td><code>HTTPJET_ACCESS_ROLLING_BYTES</code> / <code>HTTPJET_ACCESS_KEEP_DAYS</code></td><td>50 MB / 30</td><td>Unified access-log rolling size and retention.</td></tr>
+          <tr><td><code>HTTPJET_LOG_DIR</code></td><td>unset</td><td>Redirect every opened log file (unified and per-vhost) into this directory so isolated test or PGO runs never touch production log paths.</td></tr>
+          <tr><td><code>HTTPJET_URING_NO_IOWAIT</code></td><td>unset</td><td><code>1</code> sets <code>IORING_FEAT_NO_IOWAIT</code> on supported kernels so network-wait time on io_uring rings is not accounted as system iowait.</td></tr>
           <tr><td><code>HTTPJET_SYSLOG_TARGET</code></td><td>unset</td><td>Mirror every rendered access line to syslog: <code>udp://host:514</code>, bare <code>host:port</code>, or a unix-dgram path such as <code>/run/systemd/journal/syslog</code>. Sent from the writer task; failures counted, never fatal.</td></tr>
           <tr><td><code>HTTPJET_SYSLOG_FACILITY</code> · <code>_SEVERITY</code> · <code>_RFC</code> · <code>_HOSTNAME</code> · <code>_APP_NAME</code></td><td><code>daemon</code> · <code>info</code> · <code>5424</code> · server name · <code>httpjet</code></td><td>Syslog framing (<code>3164</code> for the BSD format).</td></tr>
           <tr><td><code>CF_SEND_ZSTD</code></td><td>unset</td><td><code>1</code> ≡ <code>--cf-send-zstd</code>.</td></tr>

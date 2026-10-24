@@ -21,13 +21,14 @@
 
     <section>
       <h2 id="waf">WAF sidecar</h2>
-      <p>httpjet embeds no rules engine and the ignored LiteSpeed <code>lsrecaptcha</code>/<code>censorshipControl</code> elements stay inactive. Instead, <code>--waf-sidecar-addr</code> turns on a bounded inspection call to a loopback HTTP service — the integration point for an existing maintained engine such as a Coraza/OWASP CRS adapter. httpjet does not claim CRS compatibility; the adapter owns the translation from the stable inspection document to its engine's model.</p>
-      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · sidecar flags</span></div><pre><code>--waf-sidecar-addr 127.0.0.1:19090   <span class="t-c"># required loopback address; absent = seam completely inert</span>
+      <p>httpjet embeds no rules engine and the ignored LiteSpeed <code>lsrecaptcha</code>/<code>censorshipControl</code> elements stay inactive. Instead, <code>--waf-sidecar-addr</code> turns on a bounded inspection call to a local HTTP service over a Unix socket (<code>unix:/path</code>, peer UID verified via <code>SO_PEERCRED</code> against <code>--waf-sidecar-uid</code>) or loopback TCP (<code>ip:port</code>) — the integration point for an existing maintained engine such as a Coraza/OWASP CRS adapter. httpjet does not claim CRS compatibility; the adapter owns the translation from the stable inspection document to its engine's model.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · sidecar flags</span></div><pre><code>--waf-sidecar-addr unix:/run/waf/inspect.sock   <span class="t-c"># or loopback 127.0.0.1:19090; absent = seam inert</span>
+--waf-sidecar-uid 0                   <span class="t-c"># uid a unix: sidecar must run as (default: root or serving uid)</span>
 --waf-sidecar-path /inspect           <span class="t-c"># absolute, no control characters</span>
 --waf-timeout-ms 100                  <span class="t-c"># total deadline: admission + allowance + connect + write + parse (≤ 30 s)</span>
 --waf-body-max 65536                  <span class="t-c"># bodies at or below this are sent as body_hex (≤ 1 MiB)</span>
 --waf-concurrency 128                 <span class="t-c"># ≤ 4096</span>
---waf-fail-open                       <span class="t-c"># weaker policy: continue on sidecar failure (every bypass is logged)</span></code></pre></div>
+--waf-fail-open                       <span class="t-c"># weaker policy: continue on sidecar failure (every bypass is logged; 403 still blocks)</span></code></pre></div>
       <!--diagram:waf-sidecar|<strong>One inspection per request.</strong> Inspection runs after URI decoding/normalization and body-limit enforcement but before rewrite, cache lookup and any backend — background cache refreshes go through the same dispatch and are inspected too. Only two replies are valid; everything else is a sidecar failure.-->
       <ul>
         <li><strong>Document.</strong> <code>version: 1</code>, method, normalized path, query, resolved vhost, resolved client IP, protocol, effective TLS state, all request headers. Header values and the body are lowercase hexadecimal so raw bytes are lossless and cannot inject log or protocol controls; adapters must reject unsupported versions.</li>

@@ -31,7 +31,7 @@
           <tr><td><code>&lt;quic&gt;&lt;quicEnable&gt;</code></td><td><code>0</code></td><td>HTTP/3 master switch; also drives <code>Alt-Svc</code>. Needs the UDP port published.</td></tr>
           <tr><td><code>&lt;tuning&gt;maxConnections</code></td><td><code>65000</code></td><td>Connection cap.</td></tr>
           <tr><td><code>connTimeout</code> / <code>keepAliveTimeout</code></td><td><code>60</code> / <code>5</code> s</td><td>Idle / keep-alive timeouts.</td></tr>
-          <tr><td><code>maxKeepAliveReq</code></td><td><code>1000</code></td><td>Requests per keep-alive connection (0 = unlimited).</td></tr>
+          <tr><td><code>maxKeepAliveReq</code></td><td><code>1000</code></td><td>Requests per keep-alive connection (0 or 1 disables keep-alive, matching OpenLiteSpeed).</td></tr>
           <tr><td><code>maxReqURLLen</code> / <code>maxReqHeaderSize</code></td><td><code>8192</code> / <code>16380</code></td><td>URL and header-block caps.</td></tr>
           <tr><td><code>maxReqBodySize</code></td><td><code>100M</code></td><td>Server-wide request-body cap (413); per-context override below.</td></tr>
           <tr><td><code>perIpRate</code> · <code>perIpRateWindowSecs</code> <span class="badge hj">httpjet</span></td><td><code>0</code> · <code>1</code></td><td>Per-client-IP request throttle (0 = off) and its fixed window. 429 on exceed; fail-open under state pressure.</td></tr>
@@ -40,7 +40,7 @@
           <tr><td><code>maxMMapFileSize</code> / <code>totalMMapCacheSize</code></td><td><code>256K</code> / <code>2G</code></td><td>Parsed for compatibility; the mmap file cache was removed.</td></tr>
           <tr><td><code>fileETag</code></td><td><code>28</code></td><td>ETag bitmask (INODE|MTIME|SIZE → <code>"size-mtime-inode;;;"</code>); 0 = no ETag.</td></tr>
           <tr><td><code>enable{Gzip,Br,Zstd}Compress</code> (+<code>Dyn</code>)</td><td>on</td><td>Static/dynamic compression per codec; <code>zstdCompressLevel</code> 3, <code>brCompressLevel</code> 5.</td></tr>
-          <tr><td><code>&lt;expires&gt;enableExpires</code>, <code>expiresByType</code></td><td>off</td><td><code>image/*=A604800, text/css=M86400</code> (A = access, M = modify). XML only; not honored in <code>.htaccess</code>. Authenticated responses get <code>private, no-store</code> when no explicit policy exists.</td></tr>
+          <tr><td><code>&lt;expires&gt;enableExpires</code>, <code>expiresByType</code></td><td>off</td><td><code>image/*=A604800, text/css=M86400</code> (A = access, M = modify). Also honored in <code>.htaccess</code> via <code>ExpiresActive</code> / <code>ExpiresDefault</code> / <code>ExpiresByType</code> (sharing the same grammar). Authenticated responses get <code>private, no-store</code> when no explicit policy exists.</td></tr>
           <tr><td><code>&lt;cache&gt;expireInSeconds</code> · <code>privateExpireInSeconds</code> · <code>cacheStatusCode</code> · <code>enablePostCache</code></td><td><code>900</code> · <code>0</code> · <code>200,301</code> · off</td><td>Default public/private TTLs and cacheable statuses. <code>cacheStorePath</code> is parsed but deliberately unused (see <code>--page-cache-store-path</code>).</td></tr>
         </tbody></table></div>
     </section>
@@ -56,7 +56,7 @@
           <tr><td><code>geoipDBFile</code> · <code>geoAllow</code>/<code>geoDeny</code> · <code>asnAllow</code>/<code>asnDeny</code> <span class="badge hj">httpjet</span></td><td>none</td><td>Offline CidrList source and label lists; deny-first, allow-only = whitelist, unknown label = build error. <a href="security.html#geo">→</a></td></tr>
           <tr><td><code>&lt;suexec&gt;enable</code> · <code>uidMin</code> · <code>gidMin</code></td><td><code>0</code> · <code>100</code> · <code>100</code></td><td>suEXEC master gate and floors; uid/gid 0 always rejected.</td></tr>
           <tr><td><code>&lt;suexec&gt;&lt;namespace&gt;</code> <code>enable</code>, <code>mount</code>, <code>pid</code>, <code>net</code>, <code>uts</code>, <code>ipc</code></td><td>off</td><td>Namespace isolation for PHP workers; <code>pid</code> is accepted but not honored.</td></tr>
-          <tr><td><code>&lt;CGIRLimit&gt;</code> <code>CPUSoftLimit</code>/<code>CPUHardLimit</code></td><td>—</td><td>Inherited by <code>phpConfig</code>; other rlimit fields are warned as no-ops.</td></tr>
+          <tr><td><code>&lt;CGIRLimit&gt;</code> <code>CPUSoftLimit</code>/<code>CPUHardLimit</code></td><td>—</td><td>Parsed for compatibility; ignored on persistent <code>lsphp</code> workers (<code>check</code> warns).</td></tr>
           <tr><td><code>lsrecaptcha</code>, <code>censorshipControl</code>, permission masks</td><td>—</td><td><span class="badge no">not enforced</span> — <code>check</code> warns.</td></tr>
         </tbody></table></div>
     </section>
@@ -72,7 +72,7 @@
           <tr><td><code>crlFile</code> <span class="badge hj">httpjet</span></td><td>none</td><td>PEM CRL/bundle enforced by the client verifier.</td></tr>
           <tr><td><code>enableStapling</code></td><td><code>0</code></td><td>Compatibility only; OCSP needs <code>--features ocsp</code> + <code>--ocsp-responder</code>.</td></tr>
           <tr><td><code>proxyProtocol</code> <span class="badge hj">httpjet</span></td><td><code>0</code></td><td>PROXY v2/v1 required on <em>this</em> listener; fail-closed; never on a public bind.</td></tr>
-          <tr><td><code>vhostMapList/vhostMap</code> <code>vhost</code>, <code>domain</code></td><td>—</td><td>Host→vhost; domains lowercased; only bare <code>*</code> is a catch-all (<code>*.example.com</code> warns).</td></tr>
+          <tr><td><code>vhostMapList/vhostMap</code> <code>vhost</code>, <code>domain</code></td><td>—</td><td>Host→vhost; domains lowercased; exact matches take precedence over longest-match leading (<code>*.example.com</code>) or suffix (<code>example.*</code>) wildcards, then the bare <code>*</code> catch-all.</td></tr>
         </tbody></table></div>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>httpd_config.xml</b> · a TLS listener with h3</span></div><pre><code>&lt;quic&gt;&lt;quicEnable&gt;1&lt;/quicEnable&gt;&lt;/quic&gt;
 &lt;listenerList&gt;

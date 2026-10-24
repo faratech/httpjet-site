@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/compression.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
-<script defer src="assets/docs-head.min.js?v=20261013a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024a">
+<script defer src="assets/docs-head.min.js?v=20261024a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -70,7 +70,7 @@
   S -- &quot;Body::Full&quot; --&gt; E1[&quot;encode in one shot&quot;]
   S -- &quot;Body::Stream (proxy, SSE, LSAPI)&quot; --&gt; E2[&quot;CompressStream: per-chunk, never buffered&quot;]
   S -- &quot;static file with .br/.gz sibling&quot; --&gt; E3[&quot;serve the precompressed sibling (br preferred)&quot;]</code></pre></details></figure>
-      <p>zstd encoding uses a per-thread <code>ZSTD_CCTX</code> pool so no context is allocated per response. Streamed bodies (<code>Body::Stream</code> — LSAPI, proxy, SSE) wrap in a lazy per-chunk <code>CompressStream</code>: each inbound chunk is encoded as it arrives, so SSE stays real-time and a slow backend never holds the first byte hostage.</p>
+      <p>zstd encoding uses a per-thread <code>ZSTD_CCTX</code> pool and pooled transient output buffers (<code>hj_core::recycle::BODY_BUFS</code>) so neither contexts nor output buffers page-fault per response. Streamed bodies (<code>Body::Stream</code> — LSAPI, proxy, SSE) wrap in a lazy per-chunk <code>CompressStream</code>: each inbound chunk is encoded as it arrives, so SSE stays real-time and a slow backend never holds the first byte hostage.</p>
     </section>
 
     <section>
@@ -121,9 +121,9 @@
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="page-cache.html"><div class="dir">← Prev</div><div class="ttl">Page cache</div></a><a class="next" href="configuration.html"><div class="dir">Next →</div><div class="ttl">Configuration</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261013a"></script>
-<script defer src="assets/docs.min.js?v=20261013a"></script>
+<script defer src="assets/search-index.min.js?v=20261024a"></script>
+<script defer src="assets/docs.min.js?v=20261024a"></script>
 </body>
 </html>

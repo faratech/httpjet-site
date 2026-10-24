@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
-<script defer src="assets/docs-head.min.js?v=20261013a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024a">
+<script defer src="assets/docs-head.min.js?v=20261024a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -40,7 +40,7 @@
 <main class="content">
 <div class="callout gotcha construction-notice" role="note" aria-label="Documentation status"><div class="ico" aria-hidden="true">!</div><div class="body"><span class="tag">Under construction</span><p>This documentation is still in progress. Some information may be incomplete or out of date. Please check back later.</p></div></div>
 <section id="top">
-      <p class="eyebrow reveal d1">httpjet · documentation · v0.0.5</p>
+      <p class="eyebrow reveal d1">httpjet · documentation · v0.1.5</p>
       <h1 class="reveal d1" style="font-size:clamp(40px,8vw,76px);line-height:1"><span style="background:var(--brand);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent">httpjet</span></h1>
       <p class="lede reveal d2">A from-scratch <strong>Rust web server</strong> that is a <strong>drop-in LiteSpeed replacement</strong>: it reads the same <code>conf/httpd_config.xml</code> tree, speaks native LSAPI to <code>lsphp</code>, evaluates the same <code>.htaccess</code> files, and adds native HTTP/2 and HTTP/3, reverse-proxy and FastCGI gateways, an opt-in LSCache-protocol page cache, optional ACME and OCSP, and a loopback admin API — all on one io_uring transport.</p>
 
@@ -87,7 +87,7 @@
           <li><a href="admin-api.html">Loopback status + transactional config API</a>, <a href="extensions.html#waf">WAF sidecar</a>, compile-time extensions</li>
         </ul></div>
       </div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Where it runs</span><p>httpjet serves <a href="https://windowsforum.com">WindowsForum.com</a> in production on a single x86_64 node behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version <strong>0.0.5</strong>, Rust 1.99+, edition 2024, GPL-3.0-only) built around one production configuration — test on alternate ports before trusting it elsewhere. See <a href="capabilities.html">Capabilities &amp; limits</a> for the honest matrix.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Where it runs</span><p>httpjet serves <a href="https://windowsforum.com">WindowsForum.com</a> on an x86_64 origin and <a href="https://moontimenow.com">MoonTimeNow.com</a> + <a href="https://thisdayinhistory.ai">ThisDayInHistory.ai</a> on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version <strong>0.1.5</strong>, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See <a href="capabilities.html">Capabilities &amp; limits</a> for the honest matrix.</p></div></div>
     </section>
 
     <section>
@@ -137,7 +137,7 @@
         <div class="stat accent"><div class="v">101<span class="u">×</span></div><div class="l">cache hit vs full PHP render of the same page (19,912 vs 196 rps)</div></div>
         <div class="stat"><div class="v">146<span class="u">/146</span></div><div class="l">h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs</div></div>
         <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's share of production request latency — ~138 µs/req; PHP owns the rest</div></div>
-        <div class="stat accent"><div class="v">2,000<span class="u">+</span></div><div class="l">test functions across 20 crates; full workspace suite green at v0.0.5</div></div>
+        <div class="stat accent"><div class="v">3,000<span class="u">+</span></div><div class="l">test functions across 20 crates; full workspace suite green at v0.1.5</div></div>
       </div>
     </section>
 
@@ -145,15 +145,15 @@
       <h2 id="status">Project status</h2>
       <div class="tablewrap">
         <table>
-          <thead><tr><th>Aspect</th><th>State (2026-10-13)</th></tr></thead>
+          <thead><tr><th>Aspect</th><th>State (2026-10-24)</th></tr></thead>
           <tbody>
-            <tr><td>Version</td><td><strong>0.0.5</strong> — semantic versioning adopted 2026-09-17; MSRV Rust 1.99, edition 2024; dependencies current (0.0.5 sweep: aws-lc-rs 1.18, zstd 0.14, opentelemetry 0.33; the vendored monoio forks are off socket2 0.5/mio 0.8).</td></tr>
+            <tr><td>Version</td><td><strong>0.1.5</strong> — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3).</td></tr>
             <tr><td>Configuration</td><td>LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. <code>check --strict</code> is the deploy gate.</td></tr>
             <tr><td>Transport</td><td>Pure io_uring (monoio) for H1/H2/H3 — the <em>only</em> transport; there is no epoll fallback and no Windows/macOS port.</td></tr>
             <tr><td>PHP</td><td>Native LSAPI; the operator supplies <code>lsphp</code>. Production runs the persistent external pool with zero-downtime generation reloads.</td></tr>
-            <tr><td>Page cache</td><td>Off by default; LSCache-protocol opt-in, private tier, tmpfs file tier, per-vhost dictionaries, generation-scoped namespaces. Live in production.</td></tr>
+            <tr><td>Page cache</td><td>Off by default; LSCache-protocol opt-in, private tier, per-URL cookie vary, tmpfs file tier, per-vhost dictionaries, generation-scoped namespaces. Live in production.</td></tr>
             <tr><td>Optional features</td><td><code>acme</code>, <code>ocsp</code>, <code>otel</code>, <code>ktls</code>, <code>profiling</code> — build features that still need explicit runtime opt-in.</td></tr>
-            <tr><td>Security posture</td><td>Whole-codebase review rounds 2026-08-30, 09-06, 09-16 and 10-06 landed, plus a 0.0.5 remediation sweep of 15 findings (see <a href="security.html#audit">audit posture</a>); fail-closed defaults throughout.</td></tr>
+            <tr><td>Security posture</td><td>Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1; see <a href="security.html#audit">audit posture</a>); fail-closed defaults throughout.</td></tr>
             <tr><td>Release</td><td>Source builds, generic systemd units, and a hardened OCI example. Signed public packages and a supported-platform matrix are still release work.</td></tr>
           </tbody>
         </table>
@@ -174,9 +174,9 @@
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="next" href="quickstart.html" style="margin-left:auto"><div class="dir">Next →</div><div class="ttl">Quickstart</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261013a"></script>
-<script defer src="assets/docs.min.js?v=20261013a"></script>
+<script defer src="assets/search-index.min.js?v=20261024a"></script>
+<script defer src="assets/docs.min.js?v=20261024a"></script>
 </body>
 </html>

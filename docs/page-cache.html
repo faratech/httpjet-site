@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/page-cache.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
-<script defer src="assets/docs-head.min.js?v=20261013a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024a">
+<script defer src="assets/docs-head.min.js?v=20261024a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -124,7 +124,7 @@ X-LiteSpeed-Purge: tag=T1234                              <span class="t-c"># dr
       </div>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Invariant 1 · key by the original URI</span><p>The key uses <code>orig_path</code>/<code>orig_query</code>, never the rewrite-resolved path. XenForo's front controller rewrites <em>every</em> page to <code>/index.php</code>; keying by the resolved path once collapsed the whole site onto one entry and served the wrong page to everyone. The incident is documented in the crate itself.</p></div></div>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Invariant 2 · the identity guard</span><p>Every entry records the host + raw request path it was built for; a lookup serves only if both match. A key collision degrades to a miss (<code>httpjet_pagecache_key_id_collisions_total</code>), never to wrong content.</p></div></div>
-      <p>Two more dimensions were added later and are part of the key today: <strong>Origin</strong> when the vhost's <code>.htaccess</code> chain reads it (2026-09-16 — a reflected <code>Access-Control-Allow-Origin</code> no longer replays the first storer's CORS verdict; an absent Origin keeps the historic base key so persisted entries survive), and the <strong>epoch + generation</strong> namespace introduced by the first <a href="admin-api.html#write">API publication</a> so an old in-flight render can never overwrite a new generation's entry.</p>
+      <p>Three more dimensions were added later and are part of the key today: <strong>per-URL cookie vary</strong> (<code>X-LiteSpeed-Vary: cookie=NAME</code> per URL in addition to the vhost-wide <code>--page-cache-vary-cookies</code> list, with request-header vary dimensions hashed with SHA-256), <strong>Origin</strong> when the vhost's <code>.htaccess</code> chain reads it (2026-09-16 — a reflected <code>Access-Control-Allow-Origin</code> no longer replays the first storer's CORS verdict; an absent Origin keeps the historic base key so persisted entries survive), and the <strong>epoch + generation</strong> namespace introduced by the first <a href="admin-api.html#write">API publication</a> so an old in-flight render can never overwrite a new generation's entry. Only the canonical Host spelling may read or populate a vhost's entry.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>Tier</th><th>Routed when</th><th>Keyed by</th><th>Notes</th></tr></thead>
         <tbody>
@@ -214,7 +214,7 @@ X-LiteSpeed-Purge: tag=T1234                              <span class="t-c"># dr
 
     <section>
       <h2 id="variants">Variants, compression and egress</h2>
-      <p>The store keeps identity bytes plus <strong>one best precompressed variant</strong> chosen by the request's <code>Accept-Encoding</code> under the server priority zstd &gt; br &gt; gzip; a client whose accepted set differs gets a per-serve compress of the identity form. Egress is therefore always standard zstd/brotli/gzip/identity, and a hit re-negotiates encoding — stored responses are never tied to the first client. Hits from the hot tier are zero-copy <code>Bytes</code> on h2. See <a href="compression.html#cache-interaction">Compression</a>.</p>
+      <p>The store keeps identity bytes plus <strong>one best precompressed variant</strong> chosen by the request's <code>Accept-Encoding</code> under the server priority zstd &gt; br &gt; gzip (when <code>--cf-send-zstd</code> is active, background refreshes fill only the zstd variant); a client whose accepted set differs gets a per-serve compress of the identity form. Egress is therefore always standard zstd/brotli/gzip/identity, and a hit re-negotiates encoding — stored responses are never tied to the first client. Hits from the hot tier are zero-copy <code>Bytes</code> on h2. See <a href="compression.html#cache-interaction">Compression</a>.</p>
     </section>
 
     <section>
@@ -258,7 +258,7 @@ x-litespeed-cache: miss            <span class="t-c"># ran the backend; stored i
 $ curl -sI -H 'Host: example.test' http://127.0.0.1:8080/ | grep -i x-litespeed-cache
 x-litespeed-cache: hit             <span class="t-c"># served from cache (also: hit,stale-if-error)</span>
 
-$ curl -s http://127.0.0.1:9090/cache-entries      <span class="t-c"># totals, per-URL-class counts, top-N by size, ram/disk line, health line</span>
+$ curl -s -H "Authorization: Bearer $(cat /etc/httpjet/profile.token)" http://127.0.0.1:9090/cache-entries   <span class="t-c"># totals, per-URL-class counts, top-N by size, ram/disk line, health line</span>
 $ curl -s http://127.0.0.1:9090/metrics | grep -E '^httpjet_(pagecache|cache)_'
 $ curl -sk https://127.0.0.1/__hj_cache_ready -o /dev/null -w '%{http_code}\n'   <span class="t-c"># 200 once the boot scan finished</span></code></pre></div>
       <p>Judge health by <code>httpjet_cache_hit_ratio_real</code> (non-loopback lookups), <code>httpjet_pagecache_{hits,misses,stores,purges,evictions}_total</code>, the per-vhost <code>httpjet_cache_{hits,misses}_by_vhost{vhost}</code> split (2026-10-04), <code>disk_{read,write,full}_errors_total</code>, <code>missing_file_invalidations_total</code>, <code>poisoned_locks_total</code> (nonzero = indexes may be inconsistent), and direct content checks — never by a transient raw file count. The full metric list is on <a href="observability.html#metrics">Observability</a>.</p>
@@ -279,9 +279,9 @@ $ curl -sk https://127.0.0.1/__hj_cache_ready -o /dev/null -w '%{http_code}\n'  
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="security.html"><div class="dir">← Prev</div><div class="ttl">Security &amp; access control</div></a><a class="next" href="compression.html"><div class="dir">Next →</div><div class="ttl">Compression</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261013a"></script>
-<script defer src="assets/docs.min.js?v=20261013a"></script>
+<script defer src="assets/search-index.min.js?v=20261024a"></script>
+<script defer src="assets/docs.min.js?v=20261024a"></script>
 </body>
 </html>

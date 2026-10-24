@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/lsapi.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
-<script defer src="assets/docs-head.min.js?v=20261013a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024a">
+<script defer src="assets/docs-head.min.js?v=20261024a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -81,7 +81,7 @@
       <p><code>proto/{frame,builder}</code> implement the protocol straight from the vendored php-src <code>lsapidef.h</code> constants (BSD-3-Clause), so frames match byte-for-byte what <code>lsphp</code> reads. One sharp edge deserves stating precisely: every env key/value and known header value is length-prefixed with a big-endian <code>u16</code> that <strong>includes the trailing NUL</strong>, so the largest safe field is <code>u16::MAX − 1</code> bytes. A longer field would wrap the prefix and desync <code>lsphp</code>'s parser for every subsequent frame; the builder rejects it.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>proto</b> · the NUL-inclusive length prefix</span></div><pre><code><span class="t-c">// each env/header field:  [u16 BE = byte_len + 1] [bytes…] [0x00]</span>
 <span class="t-k">const</span> MAX_FIELD: usize = (u16::MAX <span class="t-k">as</span> usize) - 1;   <span class="t-c">// 65534</span></code></pre></div>
-      <p>The response-header parser is one of the eight fuzz targets (<code>lsapi_resp_header</code>). Inbound tracing context reaches PHP as <code>HTTP_TRACEPARENT</code> in the unknown-header table when <a href="observability.html#otel">OpenTelemetry</a> is on.</p>
+      <p>The response-header parser is one of the eight fuzz targets (<code>lsapi_resp_header</code>). Request bodies are scanned before transmission and refused if they embed an <code>lsphp</code> <code>BEGIN_REQUEST</code> frame signature, negative env counts are rejected at the builder, and the repository ships a verified <code>packaging/lsphp/lsapilib-hardening.patch</code> for upstream <code>lsapilib.c</code>. If a worker dies before emitting an <code>LSAPI_RESP_END</code> packet, the response body is aborted rather than silently truncated. Inbound tracing context reaches PHP as <code>HTTP_TRACEPARENT</code> in the unknown-header table when <a href="observability.html#otel">OpenTelemetry</a> is on.</p>
     </section>
 
     <section>
@@ -101,7 +101,7 @@
 
     <section>
       <h2 id="supervisor">The lsphp supervisor</h2>
-      <p>In spawn mode (<code>serve</code> without <code>--lsphp-external</code>) <code>hj-lsapi</code> spawns and supervises <code>lsphp</code> itself: the listen socket is passed on <strong>fd 0</strong>, <code>PR_SET_PDEATHSIG</code> ties a worker's life to its parent, and the <code>pre_exec</code> closure between fork and exec calls only async-signal-safe syscalls. The process is a subreaper and tracks each generation family by an injected <code>LSAPI_Z_HTTPJET_GENERATION_MARKER</code> plus pidfds. The config's <code>LSAPI_CHILDREN</code> env is stripped so <code>--php-children</code> / <code>maxConns</code> is the only cap (values below 2 normalize to 2).</p>
+      <p>In spawn mode (<code>serve</code> without <code>--lsphp-external</code>) <code>hj-lsapi</code> spawns and supervises <code>lsphp</code> itself: the listen socket is passed on <strong>fd 0</strong>, inherited socket-activation listeners are kept out of PHP children via <code>FD_CLOEXEC</code> and <code>close_range(..., CLOSE_RANGE_CLOEXEC)</code>, <code>setsid()</code> detaches the pool from any controlling terminal, <code>PR_SET_PDEATHSIG</code> ties a worker's life to its parent, and the <code>pre_exec</code> closure between fork and exec calls only async-signal-safe syscalls. The process is a subreaper (reaping all adopted PHP orphan zombies) and tracks each generation family by an injected <code>LSAPI_Z_HTTPJET_GENERATION_MARKER</code> plus pidfds. The config's <code>LSAPI_CHILDREN</code> env is stripped so <code>--php-children</code> / <code>maxConns</code> is the only cap (values below 2 normalize to 2).</p>
       <p>Two refusals are unconditional (2026-09-16): the supervisor <strong>never runs workers as root</strong> (resolve_credentials rejects uid/gid 0 even if suEXEC would compute it) and <strong>refuses to spawn a setuid <code>lsphp</code> binary</strong>.</p>
       <p><code>--php-max-process-time-ms</code> sets a total per-request deadline: exceeded → 504. In spawn mode the monitor also kills and restarts the worker; under <code>--lsphp-external</code> there is no monitor in the web process, so only the 504 applies and a wedged worker is not auto-reclaimed here — keep the value conservative.</p>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Packaging boundary</span><p>httpjet ships no PHP runtime. The executable, its extensions, <code>php.ini</code>, opcache settings and writable application paths are operator-managed. For the pool unit's sandboxing the repository ships a <strong>validated hardening runbook</strong> (<code>systemd/httpjet-lsphp.service.d/hardening.conf</code>: a bounded capability set, the standard Protect*/Restrict* family, and <code>MemoryDenyWriteExecute=no</code> because opcache JIT needs RWX, with the opcache helper steps run via <code>+</code>-prefixed ExecStartPre/Reload) — validated against a live pool, but not applied by any unit by default; adopting it is the operator's call.</p></div></div>
@@ -154,7 +154,7 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
         <tbody>
           <tr><td><code>REQUEST_URI</code></td><td>The original request URI, preserved through rewrites.</td></tr>
           <tr><td><code>SCRIPT_FILENAME</code> / <code>SCRIPT_NAME</code></td><td>The resolved on-disk script and its URI-space name.</td></tr>
-          <tr><td><code>REMOTE_ADDR</code>, <code>SERVER_NAME</code>, <code>HTTPS</code>, <code>CONTENT_LENGTH</code>, <code>HTTP_AUTHORIZATION</code>, …</td><td>Server-computed. Since 2026-09-16 a <code>.htaccess</code> <code>[E=…]</code> or processor <code>env</code> entry that names one of these is <strong>denied</strong> (shared deny-list with FastCGI) — a directory cannot override the server's view of the client.</td></tr>
+          <tr><td><code>REMOTE_ADDR</code>, <code>SERVER_NAME</code>, <code>HTTPS</code>, <code>CONTENT_LENGTH</code>, <code>HTTP_AUTHORIZATION</code>, <code>PHP_VALUE</code>, <code>PHP_ADMIN_VALUE</code>, …</td><td>Server-computed or special-env only. Since 2026-09-16 a <code>.htaccess</code> <code>[E=…]</code>/<code>SetEnv</code> or processor <code>env</code> entry that names one of these is <strong>denied</strong> (shared deny-list with FastCGI) — a directory cannot override the server's view of the client or inject PHP ini overrides through the regular environment.</td></tr>
           <tr><td><code>HTTP_*</code></td><td>Request headers after name/value validation, under one forwarding rule (2026-10-06, applied identically to the CGI env table, the LSAPI wire header block and FastCGI params): the <code>Proxy</code> header and underscore-named headers never pass, and forwarding-authority names (<code>CF-Connecting-IP</code>, <code>X-Forwarded-*</code>, <code>X-Real-IP</code>, <code>True-Client-IP</code>, <code>Forwarded</code>) pass only from a peer that is <em>both</em> a trusted proxy and — on a client-cert listener — presented one. <code>HTTP_TRACEPARENT</code> when OTel is enabled.</td></tr>
           <tr><td><code>REMOTE_USER</code></td><td>Set by a successful <a href="rewrite.html#basic-auth">Basic auth</a> realm.</td></tr>
           <tr><td>special-env section</td><td><code>php_value</code> / <code>php_admin_value</code> / <code>php_flag</code> / <code>php_admin_flag</code> from <code>.htaccess</code>, carried on the LSAPI special-env wire path with the right permission level — plain <code>lsphp</code> ignores a regular CGI <code>PHP_VALUE</code>.</td></tr>
@@ -178,9 +178,9 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="certificates.html"><div class="dir">← Prev</div><div class="ttl">TLS, ACME &amp; OCSP</div></a><a class="next" href="gateways.html"><div class="dir">Next →</div><div class="ttl">Proxy &amp; gateways</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261013a"></script>
-<script defer src="assets/docs.min.js?v=20261013a"></script>
+<script defer src="assets/search-index.min.js?v=20261024a"></script>
+<script defer src="assets/docs.min.js?v=20261024a"></script>
 </body>
 </html>

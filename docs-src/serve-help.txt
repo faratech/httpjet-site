@@ -124,7 +124,9 @@ Options:
       --admin-resource-root <ADMIN_RESOURCE_ROOT>
           Allowed existing filesystem root for submitted resources; repeatable
       --waf-sidecar-addr <WAF_SIDECAR_ADDR>
-          Opt-in loopback HTTP request-inspection sidecar. The sidecar must return 204 to allow or 403 to block; absent keeps the WAF seam completely inert
+          Opt-in HTTP request-inspection sidecar: `unix:/path` (its listener's uid is verified) or a loopback `ip:port` (unauthenticated). The sidecar must return 204 to allow or 403 to block; absent keeps the WAF seam inert
+      --waf-sidecar-uid <WAF_SIDECAR_UID>
+          The uid a `unix:` sidecar must run as. Default: root or this process's uid
       --waf-sidecar-path <WAF_SIDECAR_PATH>
           [default: /inspect]
       --waf-timeout-ms <WAF_TIMEOUT_MS>

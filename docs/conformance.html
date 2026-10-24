@@ -23,8 +23,8 @@
 <link rel="canonical" href="https://httpjet.net/docs/conformance.html">
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261013a">
-<script defer src="assets/docs-head.min.js?v=20261013a"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024a">
+<script defer src="assets/docs-head.min.js?v=20261024a"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -42,7 +42,7 @@
 <p class="crumbs"><a href="./">Docs</a><span>/</span>Conformance &amp; testing</p>
 <p class="eyebrow">Running it</p>
 <h1>Conformance &amp; testing</h1>
-    <p class="lede">Two axes define httpjet's posture: <strong>LiteSpeed compatibility</strong> on the same configuration tree (LSWS 6.3.5 target — XML model, LSAPI, ETags, LSCache protocol, <code>.htaccess</code>), and <strong>standards conformance</strong> on the wire. Where they agree there is one right answer; where LiteSpeed made a deliberate choice a strict reading would call optional, httpjet matches LiteSpeed. Everything is held in place by ~1,900 tests, h2spec, fuzzing, CI interoperability jobs and the production deploy gates.</p>
+    <p class="lede">Two axes define httpjet's posture: <strong>LiteSpeed compatibility</strong> on the same configuration tree (LSWS 6.3.5 target — XML model, LSAPI, ETags, LSCache protocol, <code>.htaccess</code>), and <strong>standards conformance</strong> on the wire. Where they agree there is one right answer; where LiteSpeed made a deliberate choice a strict reading would call optional, httpjet matches LiteSpeed. Everything is held in place by ~3,000 tests, h2spec, fuzzing, CI interoperability jobs and the production deploy gates.</p>
 
     <section>
       <h2 id="matrix">Conformance matrix</h2>
@@ -60,7 +60,7 @@
           <tr><td>LSAPI</td><td>Native wire codec (vendored php-src <code>lsapidef.h</code>)</td><td>Parity with <code>lsphp</code>; fuzzed response-header parser</td></tr>
           <tr><td>FastCGI</td><td>FastCGI 1.0 (65,535-byte records, application record types)</td><td>Synthetic responder interoperability</td></tr>
           <tr><td>ETag</td><td>LiteSpeed <code>fileETag=28</code></td><td><code>"&lt;size&gt;-&lt;mtime&gt;-&lt;inode&gt;;;;"</code>, byte-for-byte</td></tr>
-          <tr><td><code>.htaccess</code></td><td>Apache mod_rewrite / mod_access / mod_auth_basic / mod_headers subset</td><td>Directive and flag parity for the common core; <code>Header</code> boundary characterized by fixtures</td></tr>
+          <tr><td><code>.htaccess</code></td><td>Apache mod_rewrite / mod_access / mod_auth_basic / mod_headers / mod_expires subset</td><td>Directive and flag parity for the common core (including <code>Expires*</code>, <code>Header merge</code> and APR1/MD5-crypt htpasswd); <code>Header</code> boundary characterized by fixtures</td></tr>
           <tr><td>OpenTelemetry</td><td>OTLP HTTP/protobuf, W3C traceparent (version 00)</td><td>Behind <code>--features otel</code>; decoded-protobuf tests</td></tr>
           <tr><td>LiteSpeed parity</td><td>Retired differential matrix vs LSWS 6.3.5</td><td>11 / 11 on the retained behaviors; now exercised continuously by production</td></tr>
         </tbody></table></div>
@@ -83,7 +83,7 @@
           <tr><td><span class="crate">live (<code>#[ignore]</code>)</span></td><td>Spawn <code>lsphp</code>, read real certificates, bind ports, QUIC round-trips, Pebble issuance. Run individually with their prerequisites; never as one batch.</td><td><code>cargo test -- --ignored &lt;name&gt;</code></td></tr>
           <tr><td><span class="crate">scripts</span></td><td>Real-server fixtures on isolated loopback listeners: h2spec, ACME/OCSP/admin runtime tests, the cache gates, memo parity, OCI smoke.</td><td>see each page</td></tr>
         </tbody></table></div>
-      <p>The last full runs: the whole workspace suite green at the 0.0.5 release (2,028 passed / 0 failed); 2,016 at the 0.0.4 security review. A failure is a regression, not "pre-existing." Timing-flaky meta-assertions were deleted in June 2026 so the concurrency tests are deterministic.</p>
+      <p>The last full runs: the whole workspace suite green at the 0.1.5 release (3,019 passed / 0 failed); 2,028 at 0.0.5. A failure is a regression, not "pre-existing." Timing-flaky meta-assertions were deleted in June 2026 so the concurrency tests are deterministic.</p>
     </section>
 
     <section>
@@ -116,9 +116,9 @@ python3 scripts/fuzz-seeds.py     <span class="t-c"># regenerate the shared seed
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="performance.html"><div class="dir">← Prev</div><div class="ttl">Performance</div></a><a class="next" href="migration.html"><div class="dir">Next →</div><div class="ttl">Migrating from LiteSpeed</div></a></nav>
-<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-13 (v0.0.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261013a"></script>
-<script defer src="assets/docs.min.js?v=20261013a"></script>
+<script defer src="assets/search-index.min.js?v=20261024a"></script>
+<script defer src="assets/docs.min.js?v=20261024a"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@
           <tr><td><span class="crate">gzip</span></td><td><code>flate2</code></td><td>6</td><td><code>enableGzipCompress</code>, <code>enableDynGzipCompress</code></td></tr>
         </tbody></table></div>
       <!--diagram:compression-negotiation|<strong>Choosing an encoder.</strong> Bodies of 200 bytes or fewer are never compressed (OpenLiteSpeed parity), the compressible-type set matches LiteSpeed's <code>compressibleTypes</code>, already-encoded and 206 responses are skipped, and every encoded response carries <code>Vary: Accept-Encoding</code>.-->
-      <p>zstd encoding uses a per-thread <code>ZSTD_CCTX</code> pool so no context is allocated per response. Streamed bodies (<code>Body::Stream</code> — LSAPI, proxy, SSE) wrap in a lazy per-chunk <code>CompressStream</code>: each inbound chunk is encoded as it arrives, so SSE stays real-time and a slow backend never holds the first byte hostage.</p>
+      <p>zstd encoding uses a per-thread <code>ZSTD_CCTX</code> pool and pooled transient output buffers (<code>hj_core::recycle::BODY_BUFS</code>) so neither contexts nor output buffers page-fault per response. Streamed bodies (<code>Body::Stream</code> — LSAPI, proxy, SSE) wrap in a lazy per-chunk <code>CompressStream</code>: each inbound chunk is encoded as it arrives, so SSE stays real-time and a slow backend never holds the first byte hostage.</p>
     </section>
 
     <section>

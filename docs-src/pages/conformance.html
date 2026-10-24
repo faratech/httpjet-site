@@ -1,5 +1,5 @@
     <h1>Conformance &amp; testing</h1>
-    <p class="lede">Two axes define httpjet's posture: <strong>LiteSpeed compatibility</strong> on the same configuration tree (LSWS 6.3.5 target — XML model, LSAPI, ETags, LSCache protocol, <code>.htaccess</code>), and <strong>standards conformance</strong> on the wire. Where they agree there is one right answer; where LiteSpeed made a deliberate choice a strict reading would call optional, httpjet matches LiteSpeed. Everything is held in place by ~1,900 tests, h2spec, fuzzing, CI interoperability jobs and the production deploy gates.</p>
+    <p class="lede">Two axes define httpjet's posture: <strong>LiteSpeed compatibility</strong> on the same configuration tree (LSWS 6.3.5 target — XML model, LSAPI, ETags, LSCache protocol, <code>.htaccess</code>), and <strong>standards conformance</strong> on the wire. Where they agree there is one right answer; where LiteSpeed made a deliberate choice a strict reading would call optional, httpjet matches LiteSpeed. Everything is held in place by ~3,000 tests, h2spec, fuzzing, CI interoperability jobs and the production deploy gates.</p>
 
     <section>
       <h2 id="matrix">Conformance matrix</h2>
@@ -17,7 +17,7 @@
           <tr><td>LSAPI</td><td>Native wire codec (vendored php-src <code>lsapidef.h</code>)</td><td>Parity with <code>lsphp</code>; fuzzed response-header parser</td></tr>
           <tr><td>FastCGI</td><td>FastCGI 1.0 (65,535-byte records, application record types)</td><td>Synthetic responder interoperability</td></tr>
           <tr><td>ETag</td><td>LiteSpeed <code>fileETag=28</code></td><td><code>"&lt;size&gt;-&lt;mtime&gt;-&lt;inode&gt;;;;"</code>, byte-for-byte</td></tr>
-          <tr><td><code>.htaccess</code></td><td>Apache mod_rewrite / mod_access / mod_auth_basic / mod_headers subset</td><td>Directive and flag parity for the common core; <code>Header</code> boundary characterized by fixtures</td></tr>
+          <tr><td><code>.htaccess</code></td><td>Apache mod_rewrite / mod_access / mod_auth_basic / mod_headers / mod_expires subset</td><td>Directive and flag parity for the common core (including <code>Expires*</code>, <code>Header merge</code> and APR1/MD5-crypt htpasswd); <code>Header</code> boundary characterized by fixtures</td></tr>
           <tr><td>OpenTelemetry</td><td>OTLP HTTP/protobuf, W3C traceparent (version 00)</td><td>Behind <code>--features otel</code>; decoded-protobuf tests</td></tr>
           <tr><td>LiteSpeed parity</td><td>Retired differential matrix vs LSWS 6.3.5</td><td>11 / 11 on the retained behaviors; now exercised continuously by production</td></tr>
         </tbody></table></div>
@@ -40,7 +40,7 @@
           <tr><td><span class="crate">live (<code>#[ignore]</code>)</span></td><td>Spawn <code>lsphp</code>, read real certificates, bind ports, QUIC round-trips, Pebble issuance. Run individually with their prerequisites; never as one batch.</td><td><code>cargo test -- --ignored &lt;name&gt;</code></td></tr>
           <tr><td><span class="crate">scripts</span></td><td>Real-server fixtures on isolated loopback listeners: h2spec, ACME/OCSP/admin runtime tests, the cache gates, memo parity, OCI smoke.</td><td>see each page</td></tr>
         </tbody></table></div>
-      <p>The last full runs: the whole workspace suite green at the 0.0.5 release (2,028 passed / 0 failed); 2,016 at the 0.0.4 security review. A failure is a regression, not "pre-existing." Timing-flaky meta-assertions were deleted in June 2026 so the concurrency tests are deterministic.</p>
+      <p>The last full runs: the whole workspace suite green at the 0.1.5 release (3,019 passed / 0 failed); 2,028 at 0.0.5. A failure is a regression, not "pre-existing." Timing-flaky meta-assertions were deleted in June 2026 so the concurrency tests are deterministic.</p>
     </section>
 
     <section>
