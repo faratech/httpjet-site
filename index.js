@@ -1,6 +1,6 @@
 (() => {
   const AUDIO_STORAGE_KEY = 'hj_epic_audio_v1';
-  const DOCS_ASSET_VER = '20261024j';
+  const DOCS_ASSET_VER = '20261024l';
 
   const makeRng = seed => () => {
     seed |= 0;
@@ -994,7 +994,7 @@
           } else if (isLandingTarget) {
             let landingStyle = document.getElementById('hj-landing-style');
             if (!landingStyle) {
-              const parsedStyle = parsed.querySelector('head style');
+              const parsedStyle = parsed.getElementById('hj-landing-style') || parsed.querySelector('head style:not(#hj-docs-css)');
               if (parsedStyle) {
                 landingStyle = document.createElement('style');
                 landingStyle.id = 'hj-landing-style';

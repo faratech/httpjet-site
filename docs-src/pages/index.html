@@ -18,6 +18,7 @@
       <span class="rail__cap reveal d3">one pipeline per request, whatever the wire protocol — every page tells you where it sits on this rail</span>
 
       <div class="chips reveal d4">
+        <a class="chip ok" href="https://github.com/faratech/httpjet"><span class="dot"></span>GitHub · faratech/httpjet ↗</a>
         <span class="chip ok"><span class="dot"></span>Drop-in LiteSpeed XML config</span>
         <span class="chip"><span class="dot"></span>HTTP/1.1 · native HTTP/2 · HTTP/3</span>
         <span class="chip"><span class="dot"></span>Native LSAPI → lsphp · FastCGI</span>
@@ -31,14 +32,14 @@
       <h2 id="what">What httpjet is</h2>
       <p>httpjet is a complete origin server on a memory-safe Rust core, built so that an existing LiteSpeed Web Server (LSWS 6.3.5 compatibility target) or OpenLiteSpeed deployment becomes an httpjet deployment by pointing <code>--root</code> at the tree it already has. Compatibility is the feature; everything httpjet adds on top is an explicit opt-in that LiteSpeed simply ignores.</p>
       <div class="two">
-        <div><h4>Compatible surface</h4><ul>
+        <div><h3>Compatible surface</h3><ul>
           <li>LiteSpeed XML: server, tuning, listeners, vhosts, contexts, <code>mime.properties</code></li>
           <li>Native <a href="lsapi.html">LSAPI</a> wire protocol to any LSAPI-capable <code>lsphp</code></li>
           <li><a href="rewrite.html">mod_rewrite</a>, access control, Basic auth, <code>Header</code>, <code>ErrorDocument</code>, LSCache directives</li>
           <li>LSCache protocol (<code>X-LiteSpeed-Cache-Control</code> / <code>-Tag</code> / <code>-Vary</code> / <code>-Purge</code>)</li>
           <li>LiteSpeed <code>fileETag=28</code> ETags, <code>.html</code>→PHP dispatch order</li>
         </ul></div>
-        <div><h4>httpjet-native (opt-in)</h4><ul>
+        <div><h3>httpjet-native (opt-in)</h3><ul>
           <li>Per-client throttle, <a href="security.html#geo">GeoIP/ASN</a> rules, <a href="protocols.html#frontdoors">PROXY protocol</a>, Unix-socket listeners</li>
           <li><a href="gateways.html#groups">Weighted upstream groups</a> with active health checks; <code>h2://</code> / <code>h2s://</code> upstreams; <a href="gateways.html#fastcgi">FastCGI</a></li>
           <li>Per-context body/timeout/bandwidth overrides, <code>sub_filter</code>, request decompression</li>
@@ -81,7 +82,7 @@
             <tr><td>Page cache</td><td>Off by default; LSCache-protocol opt-in, private tier, per-URL cookie vary, tmpfs file tier, per-vhost dictionaries, generation-scoped namespaces. Live in production.</td></tr>
             <tr><td>Optional features</td><td><code>acme</code>, <code>ocsp</code>, <code>otel</code>, <code>ktls</code>, <code>profiling</code> — build features that still need explicit runtime opt-in.</td></tr>
             <tr><td>Security posture</td><td>Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1; see <a href="security.html#audit">audit posture</a>); fail-closed defaults throughout.</td></tr>
-            <tr><td>Release</td><td>Source builds, generic systemd units, and a hardened OCI example. Signed public packages and a supported-platform matrix are still release work.</td></tr>
+            <tr><td>Release</td><td>Source builds on <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>, generic systemd units, and a hardened OCI example. Signed public packages and a supported-platform matrix are still release work.</td></tr>
           </tbody>
         </table>
       </div>
@@ -97,5 +98,6 @@
         <a class="stat" href="page-cache.html" style="text-decoration:none"><div class="v" style="font-size:18px">Page cache →</div><div class="l">Keys, tiers, admission, purge, the file tier, capsules.</div></a>
         <a class="stat" href="cli.html" style="text-decoration:none"><div class="v" style="font-size:18px">CLI reference →</div><div class="l">Every subcommand and flag, filterable.</div></a>
         <a class="stat" href="migration.html" style="text-decoration:none"><div class="v" style="font-size:18px">Migrating →</div><div class="l">The validation-first path off LiteSpeed.</div></a>
+        <a class="stat accent" href="https://github.com/faratech/httpjet" style="text-decoration:none"><div class="v" style="font-size:18px">GitHub ↗</div><div class="l">Browse the source tree, benchmark harnesses, and issues at <code>faratech/httpjet</code>.</div></a>
       </div>
     </section>

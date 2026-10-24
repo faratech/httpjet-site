@@ -39,6 +39,8 @@ body{
 }
 a{color:var(--c1);text-decoration:none}
 a:hover{text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(34,211,238,.5)}
+.content p:not(.crumbs):not(.eyebrow) a:not(.anchor):not(.chip):not(.badge),.content li a:not(.chip):not(.badge),.content dd a:not(.chip):not(.badge),.content td a:not(.chip):not(.badge){text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(34,211,238,.62)}
+.content p:not(.crumbs):not(.eyebrow) a:not(.anchor):not(.chip):not(.badge):hover,.content li a:not(.chip):not(.badge):hover,.content dd a:not(.chip):not(.badge):hover,.content td a:not(.chip):not(.badge):hover{text-decoration-color:var(--c1)}
 :focus-visible{outline:2px solid var(--c1);outline-offset:2px;border-radius:3px}
 img,svg{max-width:100%}
 hr{border:0;border-top:1px solid var(--line);margin:34px 0}
@@ -80,12 +82,13 @@ hr{border:0;border-top:1px solid var(--line);margin:34px 0}
 .hdr nav a:hover{background:var(--panel);text-decoration:none;color:#fff}
 .hdr .ext{color:var(--muted)}
 .hdr .ext::after{content:" \2197";font-size:.8em;color:var(--c2)}
-.searchbtn,.menubtn{
+.searchbtn,.menubtn,.ghbtn{
   display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:8px;cursor:pointer;
   background:var(--panel);border:1px solid var(--line);color:var(--muted);
-  font-family:var(--mono);font-size:12px;
+  font-family:var(--mono);font-size:12px;text-decoration:none;flex:none;
 }
-.searchbtn:hover,.menubtn:hover{border-color:var(--line-2);color:var(--ink)}
+.searchbtn:hover,.menubtn:hover,.ghbtn:hover{border-color:var(--line-2);color:var(--ink);text-decoration:none}
+.ghbtn svg{width:15px!important;height:15px!important;fill:currentColor;flex:none;display:block}
 .searchbtn kbd{font-family:var(--mono);font-size:10.5px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--muted)}
 .menubtn{display:none;padding:0 10px}
 
@@ -363,13 +366,9 @@ td .crate{font-family:var(--mono);color:var(--c1);font-size:13px}
 .search-empty{padding:18px 20px;color:var(--muted);font-size:14px}
 
 /* ---------- reveal animation (landing) ----------
-   Hidden state is scoped under html.js so a no-JS load shows everything immediately. */
-html.js .reveal{opacity:0;transform:translateY(10px)}
-html.js.revealed .reveal{animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
-html.js.revealed .reveal.d1{animation-delay:.05s}
-html.js.revealed .reveal.d2{animation-delay:.14s}
-html.js.revealed .reveal.d3{animation-delay:.24s}
-html.js.revealed .reveal.d4{animation-delay:.34s}
+   Keep opacity:1 at first paint so hero h1/lede never delay LCP. */
+html.js .reveal{opacity:1;transform:none}
+html.js.revealed .reveal{animation:none}
 @keyframes rise{to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){html.js .reveal{opacity:1!important;transform:none!important;animation:none!important}}
 
@@ -405,7 +404,8 @@ html.js.revealed .reveal.d4{animation-delay:.34s}
 @media (max-width:560px){
   .hdr{gap:10px;padding:0 12px}
   .hdr nav{display:none}
-  .searchbtn kbd{display:none}
+  .searchbtn kbd,.ghbtn span{display:none}
+  .ghbtn{padding:0 9px}
   .pager{flex-direction:column}
 }
 
@@ -520,7 +520,7 @@ html:not(.js) .widget{display:none}
 .content h2 .badge,.content h3 .badge{margin-left:8px;vertical-align:middle}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:18px 0}
 .two > div{padding:14px 16px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
-.two h4{margin:0 0 8px;font-size:14px;color:#fff}
+.two h3,.two h4{margin:0 0 8px;font-size:14px;color:#fff;font-family:var(--mono);font-weight:600}
 .two ul{margin:0;padding-left:18px;font-size:14px}
 .content .mini{font-size:13.5px;color:var(--muted)}
 .content kbd.key{font-family:var(--mono);font-size:11px;border:1px solid var(--line-2);border-radius:5px;padding:1px 6px;background:var(--bg-2);color:var(--ink-dim)}

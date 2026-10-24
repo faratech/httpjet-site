@@ -28,7 +28,7 @@ window.DOCS_INDEX = [
    {
     "id": "next",
     "t": "Read next",
-    "kw": "check --strict hj-core"
+    "kw": "check --strict hj-core faratech httpjet"
    }
   ]
  },
@@ -46,7 +46,7 @@ window.DOCS_INDEX = [
    {
     "id": "build",
     "t": "1 · Build the binary",
-    "kw": "cargo build httpjet --locked"
+    "kw": "httpjet cargo build --locked"
    },
    {
     "id": "check",

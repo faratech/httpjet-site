@@ -5,6 +5,7 @@
       <h2 id="workspace">Workspace shape</h2>
       <p>Responsibilities are split so the contract a handler depends on stays tiny while transports, protocols, gateways and the cache evolve behind it. Three libraries are completely isolated — <code>hj-log</code>, <code>hj-geo</code> and <code>hj-cache</code> take no <code>hj-*</code> dependency — while <code>hj-rewrite</code> depends only on <code>hj-compress</code> so <code>.htaccess</code> and XML expiry directives share one <code>A/M</code> time grammar. <code>hj-pagecache</code> is transport-agnostic and builds on <code>hj-cache</code>'s sharded LRU; its request-aware glue lives in the binary.</p>
       <div class="chips">
+        <a class="chip ok" href="https://github.com/faratech/httpjet"><span class="dot"></span>Browse workspace on GitHub ↗</a>
         <span class="chip"><span class="dot"></span>1 binary + 19 libraries</span>
         <span class="chip"><span class="dot"></span>Rust 1.99.1 · edition 2024 · v0.1.5</span>
         <span class="chip"><span class="dot"></span>Acyclic; hj-config at the root</span>

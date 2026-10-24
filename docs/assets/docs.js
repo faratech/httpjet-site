@@ -5,7 +5,7 @@
   "use strict";
   var doc = document, root = doc.documentElement;
   var AUDIO_STORAGE_KEY = "hj_epic_audio_v1";
-  var DOCS_ASSET_VER = "20261024j";
+  var DOCS_ASSET_VER = "20261024l";
 
   var makeRng = function (seed) {
     return function () {
@@ -759,7 +759,7 @@
           } else if (isLandingTarget) {
             var landingStyle = doc.getElementById("hj-landing-style");
             if (!landingStyle) {
-              var parsedStyle = parsed.querySelector("head style");
+              var parsedStyle = parsed.getElementById("hj-landing-style") || parsed.querySelector("head style:not(#hj-docs-css)");
               if (parsedStyle) {
                 landingStyle = doc.createElement("style");
                 landingStyle.id = "hj-landing-style";
@@ -857,12 +857,12 @@
       if (activeExpanded && activeExpanded !== el) setExpanded(activeExpanded, false);
       el.classList.add("is-expanded");
       doc.body.classList.add("has-expanded");
-      if (btn) { btn.innerHTML = MIN_ICO; btn.setAttribute("aria-expanded", "true"); btn.setAttribute("title", "Minimize back to page (Esc)"); }
+      if (btn) { btn.innerHTML = MIN_ICO; btn.setAttribute("aria-expanded", "true"); btn.setAttribute("aria-label", "Minimize (Esc)"); btn.setAttribute("title", "Minimize back to page (Esc)"); }
       activeExpanded = el;
     } else {
       el.classList.remove("is-expanded");
       doc.body.classList.remove("has-expanded");
-      if (btn) { btn.innerHTML = EXP_ICO; btn.setAttribute("aria-expanded", "false"); btn.setAttribute("title", "Expand to full viewport"); }
+      if (btn) { btn.innerHTML = EXP_ICO; btn.setAttribute("aria-expanded", "false"); btn.setAttribute("aria-label", "Expand to full viewport"); btn.setAttribute("title", "Expand to full viewport"); }
       if (activeExpanded === el) activeExpanded = null;
     }
   }
@@ -876,7 +876,7 @@
       btn.type = "button";
       btn.className = "expbtn";
       btn.setAttribute("aria-expanded", "false");
-      btn.setAttribute("aria-label", "Toggle full-viewport view");
+      btn.setAttribute("aria-label", "Expand to full viewport");
       btn.setAttribute("title", "Expand to full viewport");
       btn.innerHTML = EXP_ICO;
       btn.addEventListener("click", function (e) {
@@ -1961,8 +1961,8 @@
           h.push('</div>');
           var ba = BUILDS[cmpA], bb = BUILDS[cmpB];
           h.push('<div class="two" style="margin:10px 0 14px">');
-          h.push('<div><h4>A · ' + esc(ba.title) + '</h4><p class="mini" style="margin:0 0 8px">' + esc(ba.date + " · " + ba.commit + " · " + ba.regime) + '</p><p style="font-size:13.5px;margin:0">' + esc(ba.summary) + '</p></div>');
-          h.push('<div><h4>B · ' + esc(bb.title) + '</h4><p class="mini" style="margin:0 0 8px">' + esc(bb.date + " · " + bb.commit + " · " + bb.regime) + '</p><p style="font-size:13.5px;margin:0">' + esc(bb.summary) + '</p></div>');
+          h.push('<div><h3>A · ' + esc(ba.title) + '</h3><p class="mini" style="margin:0 0 8px">' + esc(ba.date + " · " + ba.commit + " · " + ba.regime) + '</p><p style="font-size:13.5px;margin:0">' + esc(ba.summary) + '</p></div>');
+          h.push('<div><h3>B · ' + esc(bb.title) + '</h3><p class="mini" style="margin:0 0 8px">' + esc(bb.date + " · " + bb.commit + " · " + bb.regime) + '</p><p style="font-size:13.5px;margin:0">' + esc(bb.summary) + '</p></div>');
           h.push('</div>');
           h.push(renderSvgChart(ba.chart));
           h.push(renderSvgChart(bb.chart));
@@ -2013,7 +2013,7 @@
         else if (e.key === "ArrowLeft") { e.preventDefault(); if (curIdx > 0) { curIdx--; renderExplorer(); } }
       });
 
-      renderExplorer();
+      setTimeout(renderExplorer, 0);
     }
 
     /* ---------- unified all-builds performance curve vs LiteSpeed, OLS & nginx ---------- */
@@ -2240,7 +2240,7 @@
       /* keep the highlighted point on the curve synced when the user steps through the slide deck */
       bexp.addEventListener("click", function () { setTimeout(renderCurve, 0); });
       bexp.addEventListener("keydown", function () { setTimeout(renderCurve, 0); });
-      renderCurve();
+      setTimeout(renderCurve, 0);
     }
   }
 

@@ -43,8 +43,8 @@ sudo -u &lt;service-user&gt; target/release/httpjet --root /abs/copied-root chec
     <section>
       <h2 id="prove">5 · Prove behavior, not only startup</h2>
       <div class="two">
-        <div><h4>Routing &amp; transport</h4><ul><li>exact / default / foreign Host routing, HTTP→HTTPS behavior</li><li>SNI, chain validation, ALPN, client certificates, CRL rejection</li><li>h1 keep-alive and chunking, h2 multiplexing, h3 over UDP, large files, ranges, conditional requests, compression, HEAD</li></ul></div>
-        <div><h4>Application</h4><ul><li>rewrite/redirect loops, front controllers, PATH_INFO, per-directory access, Basic auth, custom headers, error documents</li><li>PHP/FastCGI environment, uploads, streaming, timeouts, worker recycling, source-disclosure failure cases</li><li>proxy/WebSocket/SSE, upstream TLS identity, load distribution, all-backends-down, active-health recovery</li><li>logs, request ids, metrics, readiness, graceful shutdown, restart, reload</li></ul></div>
+        <div><h3>Routing &amp; transport</h3><ul><li>exact / default / foreign Host routing, HTTP→HTTPS behavior</li><li>SNI, chain validation, ALPN, client certificates, CRL rejection</li><li>h1 keep-alive and chunking, h2 multiplexing, h3 over UDP, large files, ranges, conditional requests, compression, HEAD</li></ul></div>
+        <div><h3>Application</h3><ul><li>rewrite/redirect loops, front controllers, PATH_INFO, per-directory access, Basic auth, custom headers, error documents</li><li>PHP/FastCGI environment, uploads, streaming, timeouts, worker recycling, source-disclosure failure cases</li><li>proxy/WebSocket/SSE, upstream TLS identity, load distribution, all-backends-down, active-health recovery</li><li>logs, request ids, metrics, readiness, graceful shutdown, restart, reload</li></ul></div>
       </div>
       <p>Compare status, headers and body bytes with the incumbent where compatibility is required. Normalize inherently variable fields (Date, generated request ids) explicitly — do not discard all headers to make a comparison pass.</p>
     </section>

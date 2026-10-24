@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261024j'
+VERSION = '20261024l'
 GA = 'G-ZR4WV214JT'
 
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; "
@@ -161,7 +161,7 @@ def chart(m):
     out.append('</tbody></table></div></details></div>')
     return ''.join(out)
 
-def head(slug, title_suffix, desc, nav_title):
+def head(slug, title_suffix, desc, nav_title, docs_min_css):
     url = 'https://httpjet.net/docs/' + ('' if slug == 'index' else slug)
     nt = unesc(nav_title)
     if slug == 'index':
@@ -210,7 +210,7 @@ def head(slug, title_suffix, desc, nav_title):
     esc_t = html.escape(t, quote=True)
     esc_desc = html.escape(desc, quote=True)
     return f'''<!doctype html>
-<html lang="en" class="no-js">
+<html lang="en" class="js revealed">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="{CSP}">
@@ -238,16 +238,32 @@ def head(slug, title_suffix, desc, nav_title):
 <script type="application/ld+json">{ld_json}</script>
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v={VERSION}">
-<script defer src="assets/docs-head.min.js?v={VERSION}"></script>
+<style id="hj-docs-css">{docs_min_css}</style>
 <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id={GA}"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){{dataLayer.push(arguments);}}
   gtag('js', new Date());
-
   gtag('config', '{GA}');
+  (function(){{
+    var _ap = HTMLHeadElement.prototype.appendChild;
+    HTMLHeadElement.prototype.appendChild = function(el){{
+      if (el && el.tagName === 'SCRIPT' && /\/cdn-cgi\/challenge-platform\//.test(el.src || '')) return el;
+      return _ap.call(this, el);
+    }};
+    var loaded = false;
+    function loadGtag(){{
+      if (loaded) return;
+      loaded = true;
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id={GA}';
+      _ap.call(document.head, s);
+    }}
+    ['pointerdown','keydown','touchstart','mousemove','wheel'].forEach(function(ev){{
+      window.addEventListener(ev, loadGtag, {{once:true, passive:true}});
+    }});
+  }})();
 </script>
 </head>
 <body>
@@ -284,6 +300,7 @@ HEADER_HTML = '''<header class="hdr">
       <input id="audioVolume" type="range" min="0" max="6" step="0.1" value="6" aria-label="Volume">
     </label>
   </div>
+  <a class="ghbtn" href="https://github.com/faratech/httpjet" aria-label="GitHub repository" title="faratech/httpjet on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span></a>
   <button class="searchbtn" aria-label="Search docs">search <kbd>/</kbd></button>
   <button class="menubtn" aria-label="Menu" aria-expanded="false">☰</button>
 </header>
@@ -311,6 +328,7 @@ def sidebar_html(active_slug):
             act = ' active' if p_slug == active_slug else ''
             parts.append(f'<a class="nav-link{act}" href="{href}">{label}</a><div class="nav-sub"></div>')
         parts.append('</div>')
+    parts.append('<div class="nav-group"><span class="nav-eyebrow">Source</span><a class="nav-link" href="https://github.com/faratech/httpjet">GitHub · faratech/httpjet ↗</a></div>')
     parts.append('</nav>')
     return ''.join(parts)
 
@@ -329,14 +347,14 @@ def pager(i):
 FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>'
         'Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>')
 
-def build_page(i, entry):
+def build_page(i, entry, docs_min_css):
     slug, nav_title, suffix, desc = entry
     raw_body = read(os.path.join(PAGES, slug + '.html'))
     body = re.sub(r'<!--diagram:(.*?)-->', diagram, raw_body, flags=re.S)
     body = re.sub(r'<!--chart:([a-z0-9-]+)-->', chart, body)
     crumbs = '' if slug == 'index' else f'<p class="crumbs"><a href="./">Docs</a><span>/</span>{nav_title}</p>\n'
     eyebrow = '' if slug == 'index' else f'<p class="eyebrow">{EYEBROW[slug]}</p>\n'
-    out = head(slug, suffix, unesc(desc), nav_title)
+    out = head(slug, suffix, unesc(desc), nav_title, docs_min_css)
     out += HEADER_HTML + '\n<div class="shell">\n' + sidebar_html(slug) + '\n<main class="content">\n' + crumbs + eyebrow + body.strip() + '\n\n' + pager(i) + '\n' + FOOT + '\n</main>\n' + TOC_HTML + '\n</div>\n' + SEARCH_OV_HTML + '\n'
     out += f'<script defer src="assets/search-index.min.js?v={VERSION}"></script>\n<script defer src="assets/docs.min.js?v={VERSION}"></script>\n</body>\n</html>\n'
     with open(os.path.join(DOCS, slug + '.html'), 'w', encoding='utf-8') as f:
@@ -401,10 +419,13 @@ def headings(body):
     return hs
 
 def main():
+    # minify docs.css first so we can inline docs.min.css into every page <head>
+    subprocess.run([ESBUILD, os.path.join(ASSETS, 'docs.css'), '--minify', '--log-level=warning', '--outfile=' + os.path.join(ASSETS, 'docs.min.css')], check=True)
+    docs_min_css = read(os.path.join(ASSETS, 'docs.min.css')).strip()
     index = []
     raw_pages = []
     for i, entry in enumerate(ORDER):
-        body, raw_body = build_page(i, entry)
+        body, raw_body = build_page(i, entry, docs_min_css)
         slug, nav_title, suffix, desc = entry
         raw_pages.append((slug, unesc(nav_title), unesc(desc), raw_body))
         index.append({'url': './' if slug == 'index' else slug + '.html', 'section': EYEBROW[slug], 'title': unesc(nav_title), 'blurb': unesc(desc), 'headings': headings(body)})
@@ -484,8 +505,8 @@ def main():
     with open('/web/httpjet/llms-full.txt', 'w', encoding='utf-8') as f:
         f.write('\n'.join(llms_full))
 
-    # minify
-    for src, dst, loader in [('docs.js', 'docs.min.js', 'js'), ('docs-head.js', 'docs-head.min.js', 'js'), ('search-index.js', 'search-index.min.js', 'js'), ('docs.css', 'docs.min.css', 'css')]:
+    # minify JS assets
+    for src, dst, loader in [('docs.js', 'docs.min.js', 'js'), ('docs-head.js', 'docs-head.min.js', 'js'), ('search-index.js', 'search-index.min.js', 'js')]:
         subprocess.run([ESBUILD, os.path.join(ASSETS, src), '--minify', '--log-level=warning', '--outfile=' + os.path.join(ASSETS, dst)], check=True)
     print('built', len(ORDER), 'pages; version', VERSION)
 
