@@ -1,6 +1,6 @@
 (() => {
   const AUDIO_STORAGE_KEY = 'hj_epic_audio_v1';
-  const DOCS_ASSET_VER = '20261024m';
+  const DOCS_ASSET_VER = '20261024n';
 
   const makeRng = seed => () => {
     seed |= 0;

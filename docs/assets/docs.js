@@ -5,7 +5,7 @@
   "use strict";
   var doc = document, root = doc.documentElement;
   var AUDIO_STORAGE_KEY = "hj_epic_audio_v1";
-  var DOCS_ASSET_VER = "20261024m";
+  var DOCS_ASSET_VER = "20261024n";
 
   var makeRng = function (seed) {
     return function () {
@@ -1037,7 +1037,7 @@
     var lastCurSeg = cleanCurPath.split("/").pop() || "";
     curPageUrl = (!lastCurSeg || lastCurSeg === "docs" || lastCurSeg === "index" || lastCurSeg === "index.html")
       ? "./"
-      : (lastCurSeg.endsWith(".html") ? lastCurSeg : lastCurSeg + ".html");
+      : lastCurSeg.replace(/\.html$/, "");
 
     sidebar = doc.querySelector(".sidebar");
     menuBtn = doc.querySelector(".menubtn");

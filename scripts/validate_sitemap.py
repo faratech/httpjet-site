@@ -53,5 +53,23 @@ if live:
     key = re.search(r"INDEXNOW_KEY = '(\w+)'", open('/web/httpjet/docs-src/build.py').read()).group(1)
     code, body = fetch(f'{SITE}/{key}.txt')
     if code != 200 or body.strip() != key: fail('IndexNow key file not live / mismatched')
+if live:
+    # crawl every internal link/asset reference: any redirect or non-200 is a defect (each costs a round trip)
+    from urllib.parse import urljoin, urldefrag, urlparse
+    pages = locs + [SITE + '/404.html']
+    seen = {}
+    for pg in pages:
+        html = fetch(pg)[1]
+        for h in re.findall(r'(?:href|src)="([^"]+)"', html):
+            if h.startswith(('mailto:', 'tel:', 'data:', 'javascript:', '#')): continue
+            u = urldefrag(urljoin(pg, h))[0]
+            if urlparse(u).netloc != 'httpjet.net' or u in seen: continue
+            if u.endswith('/404.html'): continue
+            seen[u] = pg
+    bad = 0
+    for u, pg in sorted(seen.items()):
+        code = fetch(u)[0]
+        if code != 200: fail(f'link {u} -> HTTP {code} (first seen on {pg})'); bad += 1
+    print(f'{len(seen)} internal link/asset targets checked, {bad} redirecting/broken')
 print('OK' if not errs else f'{len(errs)} problem(s)')
 sys.exit(1 if errs else 0)

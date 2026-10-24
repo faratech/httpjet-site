@@ -33,7 +33,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "quickstart.html",
+  "url": "quickstart",
   "section": "Guide",
   "title": "Quickstart",
   "blurb": "Build httpjet from source, validate a LiteSpeed-compatible configuration tree with check --strict, and serve it on loopback in ten minutes.",
@@ -76,7 +76,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "architecture.html",
+  "url": "architecture",
   "section": "Guide",
   "title": "Architecture",
   "blurb": "The httpjet workspace: 19 hj-* library crates under one binary, the frozen hj-core contract, the io_uring transport bridge, the request pipeline, and configuration generations.",
@@ -129,7 +129,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "capabilities.html",
+  "url": "capabilities",
   "section": "Guide",
   "title": "Capabilities & limits",
   "blurb": "What httpjet supports today, what is optional behind build features, what is deliberately unsupported, and the fixed operational bounds.",
@@ -165,7 +165,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "protocols.html",
+  "url": "protocols",
   "section": "Internals",
   "title": "Protocol stacks",
   "blurb": "HTTP/1.1, native HTTP/2 with zero-allocation HPACK, HTTP/3 over QUIC, sendfile and kTLS egress, PROXY protocol, and Unix-socket listeners on one io_uring transport.",
@@ -222,7 +222,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "certificates.html",
+  "url": "certificates",
   "section": "Internals",
   "title": "TLS, ACME & OCSP",
   "blurb": "Certificate selection, mutual TLS with CRLs, resumption policy, opt-in ACME HTTP-01 and DNS-01 issuance, and opt-in OCSP stapling.",
@@ -260,7 +260,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "lsapi.html",
+  "url": "lsapi",
   "section": "Internals",
   "title": "LSAPI & PHP",
   "blurb": "The native LSAPI wire codec, the lsphp supervisor, the zero-downtime external pool with generation tracking, the CGI environment, and the fail-closed jail.",
@@ -308,7 +308,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "gateways.html",
+  "url": "gateways",
   "section": "Internals",
   "title": "Proxy & gateways",
   "blurb": "Reverse proxy over h1/h2/h2s, weighted upstream groups with active health checks, WebSocket and SSE relay, and the opt-in FastCGI gateway.",
@@ -351,7 +351,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "rewrite.html",
+  "url": "rewrite",
   "section": "Internals",
   "title": "Rewrite & .htaccess",
   "blurb": "The Apache mod_rewrite engine: per-directory loading, the dense-DFA prefilter, directives and flags, access control, Basic auth, header operations, and the fast-path memo.",
@@ -423,7 +423,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "security.html",
+  "url": "security",
   "section": "Internals",
   "title": "Security & access control",
   "blurb": "Client identity, network ACLs, throttling, GeoIP/ASN rules, PROXY protocol trust, request decompression limits, the body budget, the WAF sidecar, and the PHP jail.",
@@ -486,7 +486,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "page-cache.html",
+  "url": "page-cache",
   "section": "Internals",
   "title": "Page cache",
   "blurb": "The opt-in LSCache-protocol origin page cache: keys, tiers, admission, purge, the file tier, dictionaries, stale policies, capsules, and generation-scoped namespaces.",
@@ -566,7 +566,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "compression.html",
+  "url": "compression",
   "section": "Internals",
   "title": "Compression",
   "blurb": "Response compression with gzip, brotli and zstd, server-priority negotiation, streaming encoders, precompressed siblings, and bounded request decompression.",
@@ -603,7 +603,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "configuration.html",
+  "url": "configuration",
   "section": "Running it",
   "title": "Configuration",
   "blurb": "The LiteSpeed-compatible XML reference: server, tuning, security, listeners, external processors, upstream groups, virtual hosts, contexts, and httpjet-native extensions.",
@@ -656,7 +656,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "cli.html",
+  "url": "cli",
   "section": "Running it",
   "title": "CLI reference",
   "blurb": "Every httpjet subcommand and serve flag, grouped and filterable, plus the environment variables the binary reads.",
@@ -684,7 +684,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "operations.html",
+  "url": "operations",
   "section": "Running it",
   "title": "Operations",
   "blurb": "Systemd socket activation, the persistent PHP pool, safe changes, deploy gates, rollback, kill switches, and the hardened OCI example.",
@@ -737,7 +737,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "observability.html",
+  "url": "observability",
   "section": "Running it",
   "title": "Observability",
   "blurb": "Prometheus metrics, the cache-entries report, access and error logs in text or JSON, syslog, request ids, telemetry, the PHP slow log, OpenTelemetry, and profiling.",
@@ -785,7 +785,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "admin-api.html",
+  "url": "admin-api",
   "section": "Running it",
   "title": "Admin API & reload",
   "blurb": "SIGHUP reload semantics, the read-only status API, the transactional configuration API, revisions, and the restart-required boundary.",
@@ -827,7 +827,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "extensions.html",
+  "url": "extensions",
   "section": "Running it",
   "title": "Extending httpjet",
   "blurb": "Compile-time extension hooks, the bounded WAF sidecar contract, and why there is no dynamic plugin ABI.",
@@ -860,7 +860,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "performance.html",
+  "url": "performance",
   "section": "Running it",
   "title": "Performance",
   "blurb": "Measured throughput by regime: loopback three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.",
@@ -916,7 +916,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "conformance.html",
+  "url": "conformance",
   "section": "Running it",
   "title": "Conformance & testing",
   "blurb": "h2spec 146/146, RFC coverage, LiteSpeed parity, the test layers, CI interoperability jobs, fuzzing, and the deploy gates.",
@@ -952,7 +952,7 @@ window.DOCS_INDEX = [
   ]
  },
  {
-  "url": "migration.html",
+  "url": "migration",
   "section": "Running it",
   "title": "Migrating from LiteSpeed",
   "blurb": "A validation-first migration path from LiteSpeed or OpenLiteSpeed: inventory, check --strict, isolated candidate, behavioral proof, caching, cutover and rollback.",
