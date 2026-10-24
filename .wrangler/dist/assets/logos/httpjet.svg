@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 72" role="img" aria-labelledby="title">
+  <title id="title">httpjet</title>
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset=".48" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#e879f9"/>
+    </linearGradient>
+    <filter id="s" x="-20%" y="-40%" width="140%" height="180%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#818cf8" flood-opacity=".35"/>
+    </filter>
+  </defs>
+  <rect x="6" y="8" width="208" height="56" rx="18" fill="#07090f" fill-opacity=".78"/>
+  <path d="M42 14 20 40h22l-7 18 31-33H43l9-11Z" fill="url(#g)" filter="url(#s)"/>
+  <text x="74" y="45" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="30" font-weight="850" letter-spacing="-1.4" fill="url(#g)">httpjet</text>
+</svg>

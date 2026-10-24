@@ -590,7 +590,27 @@ def main():
     # minify JS assets
     for src, dst, loader in [('docs.js', 'docs.min.js', 'js'), ('docs-head.js', 'docs-head.min.js', 'js'), ('search-index.js', 'search-index.min.js', 'js')]:
         subprocess.run([ESBUILD, os.path.join(ASSETS, src), '--minify', '--log-level=warning', '--outfile=' + os.path.join(ASSETS, dst)], check=True)
-    print('built', len(ORDER), 'pages; version', VERSION)
+
+    # stage clean Cloudflare Pages bundle in /web/httpjet/.wrangler/dist (excludes docs-src, CLAUDE.md, .htaccess, unminified sources)
+    import shutil
+    dist = '/web/httpjet/.wrangler/dist'
+    if os.path.exists(dist):
+        shutil.rmtree(dist)
+    os.makedirs(os.path.join(dist, 'assets', 'logos'), exist_ok=True)
+    os.makedirs(os.path.join(dist, 'docs', 'assets'), exist_ok=True)
+    for rf in ('index.html', '404.html', 'index.min.css', 'index.min.js', 'og.jpg', 'robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'site.webmanifest', '_headers', '_redirects'):
+        src_p = os.path.join('/web/httpjet', rf)
+        if os.path.exists(src_p):
+            shutil.copy2(src_p, os.path.join(dist, rf))
+    for lf in os.listdir('/web/httpjet/assets/logos'):
+        shutil.copy2(os.path.join('/web/httpjet/assets/logos', lf), os.path.join(dist, 'assets', 'logos', lf))
+    for df in os.listdir(DOCS):
+        if df.endswith(('.html', '.md')):
+            shutil.copy2(os.path.join(DOCS, df), os.path.join(dist, 'docs', df))
+    for af in ('docs.min.css', 'docs.min.js', 'search-index.min.js', 'favicon.svg'):
+        shutil.copy2(os.path.join(ASSETS, af), os.path.join(dist, 'docs', 'assets', af))
+
+    print('built', len(ORDER), 'pages + clean Pages dist; version', VERSION)
 
 if __name__ == '__main__':
     main()

@@ -1,0 +1,18 @@
+{
+  "name": "httpjet — Rust Web Server & LiteSpeed Replacement",
+  "short_name": "httpjet",
+  "description": "High-performance Linux web server written in Rust on io_uring: drop-in LiteSpeed XML compatibility, native LSAPI PHP, .htaccess mod_rewrite, HTTP/1.1 · HTTP/2 · HTTP/3, and LSCache origin page cache.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07090f",
+  "theme_color": "#07090f",
+  "icons": [
+    {
+      "src": "/docs/assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -21,11 +21,11 @@ Deploying changes to Cloudflare Pages can be done either via Git push to `farate
 
 ```bash
 cd /web/httpjet
-# After rebuilding docs:
+# After rebuilding docs (which stages the clean bundle in .wrangler/dist):
 source /web/.env
 CLOUDFLARE_API_KEY="$CLOUDFLARE_GLOBAL_TOKEN" \
 CLOUDFLARE_EMAIL="$CLOUDFLARE_EMAIL" \
-npx wrangler pages deploy . --project-name httpjet-site --branch main
+npx wrangler pages deploy .wrangler/dist --project-name httpjet-site --branch main
 ```
 
 
