@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261024h'
+VERSION = '20261024i'
 GA = 'G-ZR4WV214JT'
 
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; "
@@ -162,31 +162,80 @@ def chart(m):
     return ''.join(out)
 
 def head(slug, title_suffix, desc, nav_title):
-    url = 'https://httpjet.net/docs/' + ('' if slug == 'index' else slug + '.html')
-    t = f'httpjet — {title_suffix}'
+    url = 'https://httpjet.net/docs/' + ('' if slug == 'index' else slug)
+    nt = unesc(nav_title)
+    if slug == 'index':
+        t = 'httpjet Documentation — Rust Web Server, LiteSpeed XML, LSAPI PHP & HTTP/3'
+    elif nt.lower() == title_suffix.lower():
+        t = f'{nt} — httpjet Documentation (Rust Web Server)'
+    else:
+        ts = title_suffix[:1].upper() + title_suffix[1:]
+        t = f'{nt} — httpjet {ts}'
+    today = f'{VERSION[:4]}-{VERSION[4:6]}-{VERSION[6:8]}'
+    crumbs_ld = [
+        {"@type": "ListItem", "position": 1, "name": "httpjet", "item": "https://httpjet.net/"},
+        {"@type": "ListItem", "position": 2, "name": "Docs", "item": "https://httpjet.net/docs/"}
+    ]
+    if slug != 'index':
+        crumbs_ld.append({"@type": "ListItem", "position": 3, "name": nt, "item": url})
+    ld = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "TechArticle",
+                "@id": url + "#article",
+                "headline": t,
+                "name": nt,
+                "articleSection": EYEBROW[slug],
+                "description": desc,
+                "url": url,
+                "datePublished": "2026-06-01",
+                "dateModified": today,
+                "inLanguage": "en-US",
+                "proficiencyLevel": "Expert",
+                "author": {"@type": "Organization", "name": "httpjet", "url": "https://httpjet.net/"},
+                "publisher": {"@type": "Organization", "name": "httpjet", "url": "https://httpjet.net/"},
+                "isPartOf": {"@id": "https://httpjet.net/#website"},
+                "about": {"@id": "https://httpjet.net/#software"},
+                "image": "https://httpjet.net/og.jpg"
+            },
+            {
+                "@type": "BreadcrumbList",
+                "@id": url + "#breadcrumb",
+                "itemListElement": crumbs_ld
+            }
+        ]
+    }
+    ld_json = json.dumps(ld, ensure_ascii=False, separators=(',', ':'))
+    esc_t = html.escape(t, quote=True)
+    esc_desc = html.escape(desc, quote=True)
     return f'''<!doctype html>
 <html lang="en" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="{CSP}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{t}</title>
-<meta name="description" content="{html.escape(desc, quote=True)}">
-<meta property="og:title" content="{t}">
-<meta property="og:description" content="{html.escape(desc, quote=True)}">
+<title>{esc_t}</title>
+<meta name="description" content="{esc_desc}">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+<meta property="og:title" content="{esc_t}">
+<meta property="og:description" content="{esc_desc}">
+<meta property="og:site_name" content="httpjet">
+<meta property="og:locale" content="en_US">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:image:alt" content="{esc_t}">
 <meta property="og:url" content="{url}">
-<meta property="og:type" content="website">
+<meta property="og:type" content="article">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{t}">
-<meta name="twitter:description" content="{html.escape(desc, quote=True)}">
+<meta name="twitter:title" content="{esc_t}">
+<meta name="twitter:description" content="{esc_desc}">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="{url}">
+<script type="application/ld+json">{ld_json}</script>
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/docs.min.css?v={VERSION}">
@@ -204,8 +253,46 @@ def head(slug, title_suffix, desc, nav_title):
 <body>
 '''
 
-NOTICE = ('<div class="callout gotcha construction-notice" role="note" aria-label="Documentation status"><div class="ico" aria-hidden="true">!</div>'
-          '<div class="body"><span class="tag">Under construction</span><p>This documentation is still in progress. Some information may be incomplete or out of date. Please check back later.</p></div></div>')
+HEADER_HTML = '''<header class="hdr">
+  <div class="wordmark"><a href="./"><b>httpjet</b></a> <span class="seg">·docs</span></div>
+  <div class="grow"></div>
+  <nav aria-label="Primary">
+    <a href="./">Overview</a>
+    <a href="quickstart.html" class="hide-sm">Quickstart</a>
+    <a href="architecture.html" class="hide-sm">Architecture</a>
+    <a href="page-cache.html" class="hide-sm">Page cache</a>
+    <a href="cli.html" class="hide-sm">CLI</a>
+    <a href="performance.html" class="hide-sm">Performance</a>
+    <a href="https://httpjet.net/" class="ext repo">httpjet.net</a>
+  </nav>
+  <button class="searchbtn" aria-label="Search docs">search <kbd>/</kbd></button>
+  <button class="menubtn" aria-label="Menu" aria-expanded="false">☰</button>
+</header>
+<div class="scrim" aria-hidden="true"></div>'''
+
+TOC_HTML = '''<aside class="tocwrap">
+  <div class="toc-title">On this page</div>
+  <nav class="toc" aria-label="On this page"></nav>
+</aside>'''
+
+SEARCH_OV_HTML = '''<div class="search-ov" role="dialog" aria-modal="true" aria-label="Search docs">
+  <div class="search-box">
+    <input type="text" placeholder="Search the docs…" aria-label="Search the docs" autocomplete="off" spellcheck="false">
+    <div class="search-res"></div>
+  </div>
+</div>'''
+
+def sidebar_html(active_slug):
+    parts = ['<nav class="sidebar" aria-label="Documentation sections">']
+    for eyebrow, links in NAV:
+        parts.append(f'<div class="nav-group"><span class="nav-eyebrow">{eyebrow}</span>')
+        for p_slug, label, _, _ in links:
+            href = './' if p_slug == 'index' else p_slug + '.html'
+            act = ' active' if p_slug == active_slug else ''
+            parts.append(f'<a class="nav-link{act}" href="{href}">{label}</a><div class="nav-sub"></div>')
+        parts.append('</div>')
+    parts.append('</nav>')
+    return ''.join(parts)
 
 def pager(i):
     prev = ORDER[i-1] if i > 0 else None
@@ -224,17 +311,48 @@ FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tre
 
 def build_page(i, entry):
     slug, nav_title, suffix, desc = entry
-    body = read(os.path.join(PAGES, slug + '.html'))
-    body = re.sub(r'<!--diagram:(.*?)-->', diagram, body, flags=re.S)
+    raw_body = read(os.path.join(PAGES, slug + '.html'))
+    body = re.sub(r'<!--diagram:(.*?)-->', diagram, raw_body, flags=re.S)
     body = re.sub(r'<!--chart:([a-z0-9-]+)-->', chart, body)
     crumbs = '' if slug == 'index' else f'<p class="crumbs"><a href="./">Docs</a><span>/</span>{nav_title}</p>\n'
     eyebrow = '' if slug == 'index' else f'<p class="eyebrow">{EYEBROW[slug]}</p>\n'
     out = head(slug, suffix, unesc(desc), nav_title)
-    out += '\n<main class="content">\n' + crumbs + eyebrow + body.strip() + '\n\n' + pager(i) + '\n' + FOOT + '\n</main>\n'
+    out += HEADER_HTML + '\n<div class="shell">\n' + sidebar_html(slug) + '\n<main class="content">\n' + crumbs + eyebrow + body.strip() + '\n\n' + pager(i) + '\n' + FOOT + '\n</main>\n' + TOC_HTML + '\n</div>\n' + SEARCH_OV_HTML + '\n'
     out += f'<script defer src="assets/search-index.min.js?v={VERSION}"></script>\n<script defer src="assets/docs.min.js?v={VERSION}"></script>\n</body>\n</html>\n'
     with open(os.path.join(DOCS, slug + '.html'), 'w', encoding='utf-8') as f:
         f.write(out)
-    return body
+    return body, raw_body
+
+def html_to_md(raw_html):
+    s = re.sub(r'<!--diagram:([a-z0-9-]+)\|(.*?)-->', lambda m: f'\n> [Diagram: {m.group(1)}] {unesc(re.sub(r"<[^>]+>", "", m.group(2)))}\n', raw_html, flags=re.S)
+    s = re.sub(r'<!--chart:([a-z0-9-]+)-->', lambda m: f'\n> [Benchmark Chart: {m.group(1)} — {CHARTS[m.group(1)][0]} ({CHARTS[m.group(1)][1]})]\n', s)
+    s = re.sub(r'<div class="(?:rail|filterbar|bexp__fallback)"[^>]*>.*?</div>', '', s, flags=re.S)
+    s = re.sub(r'<h1[^>]*>(.*?)</h1>', lambda m: '\n# ' + unesc(re.sub(r'<[^>]+>', '', m.group(1))).strip() + '\n', s, flags=re.S)
+    s = re.sub(r'<h2[^>]*>(.*?)</h2>', lambda m: '\n## ' + unesc(re.sub(r'<[^>]+>', '', m.group(1))).strip() + '\n', s, flags=re.S)
+    s = re.sub(r'<h3[^>]*>(.*?)</h3>', lambda m: '\n### ' + unesc(re.sub(r'<[^>]+>', '', m.group(1))).strip() + '\n', s, flags=re.S)
+    s = re.sub(r'<h4[^>]*>(.*?)</h4>', lambda m: '\n#### ' + unesc(re.sub(r'<[^>]+>', '', m.group(1))).strip() + '\n', s, flags=re.S)
+    s = re.sub(r'<pre><code>(.*?)</code></pre>', lambda m: '\n```\n' + unesc(re.sub(r'<[^>]+>', '', m.group(1))).strip() + '\n```\n', s, flags=re.S)
+    s = re.sub(r'<code>(.*?)</code>', lambda m: '`' + unesc(re.sub(r'<[^>]+>', '', m.group(1))) + '`', s, flags=re.S)
+    s = re.sub(r'<strong>(.*?)</strong>|<b>(.*?)</b>', lambda m: '**' + unesc(re.sub(r'<[^>]+>', '', m.group(1) or m.group(2) or '')) + '**', s, flags=re.S)
+    s = re.sub(r'<em>(.*?)</em>|<i>(.*?)</i>', lambda m: '*' + unesc(re.sub(r'<[^>]+>', '', m.group(1) or m.group(2) or '')) + '*', s, flags=re.S)
+    s = re.sub(r'<li[^>]*>(.*?)</li>', lambda m: '\n- ' + ' '.join(unesc(re.sub(r'<[^>]+>', ' ', m.group(1))).split()), s, flags=re.S)
+    s = re.sub(r'<tr[^>]*>(.*?)</tr>', lambda m: '\n| ' + ' | '.join(' '.join(unesc(re.sub(r'<[^>]+>', ' ', c)).split()) for c in re.findall(r'<t[hd][^>]*>(.*?)</t[hd]>', m.group(1), flags=re.S)) + ' |', s, flags=re.S)
+    s = re.sub(r'<dt[^>]*>(.*?)</dt>\s*<dd[^>]*>(.*?)</dd>', lambda m: '\n- **' + unesc(re.sub(r'<[^>]+>', '', m.group(1))).strip() + '**: ' + ' '.join(unesc(re.sub(r'<[^>]+>', ' ', m.group(2))).split()), s, flags=re.S)
+    s = re.sub(r'<p[^>]*>(.*?)</p>', lambda m: '\n' + ' '.join(unesc(re.sub(r'<[^>]+>', ' ', m.group(1))).split()) + '\n', s, flags=re.S)
+    s = re.sub(r'<[^>]+>', ' ', s)
+    s = unesc(s)
+    lines = [ln.rstrip() for ln in s.splitlines()]
+    cleaned = []
+    blank = 0
+    for ln in lines:
+        if not ln.strip():
+            blank += 1
+            if blank <= 1:
+                cleaned.append('')
+        else:
+            blank = 0
+            cleaned.append(ln)
+    return '\n'.join(cleaned).strip()
 
 def headings(body):
     hs = []
@@ -264,9 +382,11 @@ def headings(body):
 
 def main():
     index = []
+    raw_pages = []
     for i, entry in enumerate(ORDER):
-        body = build_page(i, entry)
+        body, raw_body = build_page(i, entry)
         slug, nav_title, suffix, desc = entry
+        raw_pages.append((slug, unesc(nav_title), unesc(desc), raw_body))
         index.append({'url': './' if slug == 'index' else slug + '.html', 'section': EYEBROW[slug], 'title': unesc(nav_title), 'blurb': unesc(desc), 'headings': headings(body)})
     js = '/* httpjet docs — client-side search index. GENERATED by the docs build; one entry per page. Delivered as a script (not fetched) because the zone CSP has no connect-src for XHR. */\nwindow.DOCS_INDEX = ' + json.dumps(index, ensure_ascii=False, indent=1) + ';\n'
     with open(os.path.join(ASSETS, 'search-index.js'), 'w', encoding='utf-8') as f:
@@ -280,18 +400,70 @@ def main():
     dh = re.sub(r'\?v=\d{8}[a-z]', '?v=' + VERSION, dh)
     with open(os.path.join(ASSETS, 'docs-head.js'), 'w', encoding='utf-8') as f:
         f.write(dh)
-    # sync 404.html asset version and sitemap.xml lastmod
+    # sync 404.html asset version
     p404 = '/web/httpjet/404.html'
     if os.path.exists(p404):
         s404 = re.sub(r'docs\.min\.css\?v=[^"]+', 'docs.min.css?v=' + VERSION, read(p404))
         with open(p404, 'w', encoding='utf-8') as f:
             f.write(s404)
-    psite = '/web/httpjet/sitemap.xml'
-    if os.path.exists(psite):
-        today = f'{VERSION[:4]}-{VERSION[4:6]}-{VERSION[6:8]}'
-        ssite = re.sub(r'<lastmod>[^<]+</lastmod>', f'<lastmod>{today}</lastmod>', read(psite))
-        with open(psite, 'w', encoding='utf-8') as f:
-            f.write(ssite)
+    # generate clean canonical sitemap.xml (zero .html 308 redirects)
+    today = f'{VERSION[:4]}-{VERSION[4:6]}-{VERSION[6:8]}'
+    high_pri = {'quickstart', 'architecture', 'capabilities', 'page-cache', 'configuration', 'cli', 'performance', 'migration'}
+    smap = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    smap.append(f'  <url>\n    <loc>https://httpjet.net/</loc>\n    <lastmod>{today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>')
+    for slug, _, _, _ in ORDER:
+        loc = 'https://httpjet.net/docs/' if slug == 'index' else f'https://httpjet.net/docs/{slug}'
+        pri = '0.9' if slug == 'index' else ('0.8' if slug in high_pri else '0.7')
+        smap.append(f'  <url>\n    <loc>{loc}</loc>\n    <lastmod>{today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>{pri}</priority>\n  </url>')
+    smap.append('</urlset>\n')
+    with open('/web/httpjet/sitemap.xml', 'w', encoding='utf-8') as f:
+        f.write('\n'.join(smap))
+    # generate /llms.txt and /llms-full.txt for AI search engines
+    llms = [
+        '# httpjet',
+        '',
+        '> httpjet is a from-scratch Linux web server written in Rust (v0.1.5, Rust 1.99.1+, edition 2024, GPL-3.0-only) built as a drop-in replacement for LiteSpeed Web Server (LSWS 6.3.5) and OpenLiteSpeed. It reads the same LiteSpeed XML configuration (`httpd_config.xml` + per-vhost XML), speaks native LSAPI to `lsphp`, evaluates Apache `.htaccess` (`mod_rewrite`, Basic auth, access control, headers, expires, LSCache directives) with a dense-DFA prefilter and on-core `fast_memo`, and serves HTTP/1.1, HTTP/2 (146/146 `h2spec`), and HTTP/3 (QUIC) over a single pure-`io_uring` (`monoio`) transport with an LSCache-equivalent origin page cache.',
+        '',
+        '## Key Facts & Benchmarks',
+        '',
+        '- **HTTP/2 Static Throughput (loopback, c=50 / c=200):** ~908k–937k req/s vs OpenLiteSpeed ~793k req/s',
+        '- **Heavy 806-line `.htaccess` Static (c=100, PGO):** 298k req/s HTTP/2, 168.7k req/s HTTP/1.1 (vs nginx 125.4k / 145.6k)',
+        '- **Origin Page Cache Hit vs Full PHP Render:** 19,912 req/s (p50 2 ms) vs 196 req/s (p50 93 ms) — 101× speedup',
+        '- **PHP over LSAPI (HTTP/1.1, c=40, PGO):** 44.8k req/s vs LiteSpeed 6.3.5 38.5k req/s (41.2k at c=60)',
+        '- **Production Latency Attribution:** httpjet CPU is ~0.2% of request wall time (~138 µs/req, ~38 µs/cache hit); PHP renders account for 86.5–98.8%',
+        '- **Full Documentation Corpus (single file):** [https://httpjet.net/llms-full.txt](https://httpjet.net/llms-full.txt)',
+        '- **Source Repository:** [https://github.com/faratech/httpjet](https://github.com/faratech/httpjet)',
+        ''
+    ]
+    for group_name, entries in NAV:
+        llms.append(f'## {group_name}')
+        llms.append('')
+        for slug, nav_title, _, desc in entries:
+            loc = 'https://httpjet.net/docs/' if slug == 'index' else f'https://httpjet.net/docs/{slug}'
+            llms.append(f'- [{unesc(nav_title)}]({loc}): {unesc(desc)}')
+        llms.append('')
+    with open('/web/httpjet/llms.txt', 'w', encoding='utf-8') as f:
+        f.write('\n'.join(llms))
+
+    llms_full = [
+        '# httpjet — Complete Technical Documentation (v0.1.5)',
+        '',
+        'Canonical URL: https://httpjet.net/docs/',
+        'Source Repository: https://github.com/faratech/httpjet',
+        ''
+    ]
+    for slug, nav_title, desc, raw_body in raw_pages:
+        loc = 'https://httpjet.net/docs/' if slug == 'index' else f'https://httpjet.net/docs/{slug}'
+        llms_full.append('=' * 78)
+        llms_full.append(f'PAGE: {nav_title} ({loc})')
+        llms_full.append(f'SUMMARY: {desc}')
+        llms_full.append('=' * 78)
+        llms_full.append('')
+        llms_full.append(html_to_md(raw_body))
+        llms_full.append('')
+    with open('/web/httpjet/llms-full.txt', 'w', encoding='utf-8') as f:
+        f.write('\n'.join(llms_full))
+
     # minify
     for src, dst, loader in [('docs.js', 'docs.min.js', 'js'), ('docs-head.js', 'docs-head.min.js', 'js'), ('search-index.js', 'search-index.min.js', 'js'), ('docs.css', 'docs.min.css', 'css')]:
         subprocess.run([ESBUILD, os.path.join(ASSETS, src), '--minify', '--log-level=warning', '--outfile=' + os.path.join(ASSETS, dst)], check=True)

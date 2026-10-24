@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>httpjet — a web server, in Rust</title>
-<meta name="description" content="httpjet — a blazing-fast web server engineered in Rust. Drop-in. HTTP/1·2·3. Built for speed.">
+<title>httpjet — High-Performance Rust Web Server &amp; Drop-In LiteSpeed Replacement</title>
+<meta name="description" content="httpjet is a blazing-fast Linux web server engineered in Rust on io_uring: a drop-in LiteSpeed (LSWS) replacement with native HTTP/1.1, HTTP/2, HTTP/3, LSAPI PHP, Apache .htaccess mod_rewrite, and an LSCache origin page cache.">
 <meta name="theme-color" content="#05060a">
-<meta property="og:title" content="httpjet">
-<meta property="og:description" content="A blazing-fast web server engineered in Rust. Built for speed.">
+<meta property="og:title" content="httpjet — High-Performance Rust Web Server &amp; Drop-In LiteSpeed Replacement">
+<meta property="og:description" content="Drop-in LiteSpeed replacement in Rust on io_uring: HTTP/1.1 · HTTP/2 · HTTP/3, native LSAPI PHP, .htaccess rewrite engine, and LSCache origin page cache (~908K h2 req/s).">
 <meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
 <meta property="og:url" content="https://httpjet.net/">
 <meta property="og:site_name" content="httpjet">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
@@ -17,16 +18,16 @@
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="httpjet — a web server, in Rust">
+<meta property="og:image:alt" content="httpjet — High-Performance Rust Web Server &amp; Drop-In LiteSpeed Replacement">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="httpjet — a web server, in Rust">
-<meta name="twitter:description" content="A blazing-fast web server engineered in Rust. Built for speed.">
+<meta name="twitter:title" content="httpjet — High-Performance Rust Web Server &amp; Drop-In LiteSpeed Replacement">
+<meta name="twitter:description" content="Drop-in LiteSpeed replacement in Rust on io_uring: HTTP/1.1 · HTTP/2 · HTTP/3, native LSAPI PHP, .htaccess rewrite engine, and LSCache origin page cache.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
 <link rel="canonical" href="https://httpjet.net/">
 <!-- flip to "noindex, nofollow" if you don't want this teaser in search results -->
-<meta name="robots" content="index, follow">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"httpjet","softwareVersion":"0.1.5","applicationCategory":"DeveloperApplication","operatingSystem":"Linux","license":"https://spdx.org/licenses/GPL-3.0-only.html","description":"A blazing-fast web server engineered in Rust — drop-in LiteSpeed replacement, HTTP/1·2·3, LSAPI PHP, .htaccess rewrite engine, and origin page cache.","url":"https://httpjet.net/","image":"https://httpjet.net/og.jpg"}
+{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://httpjet.net/#website","name":"httpjet","alternateName":"httpjet Rust Web Server","url":"https://httpjet.net/","inLanguage":"en-US","potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://httpjet.net/docs/?q={search_term_string}"},"query-input":"required name=search_term_string"}},{"@type":["SoftwareApplication","SoftwareSourceCode"],"@id":"https://httpjet.net/#software","name":"httpjet","softwareVersion":"0.1.5","applicationCategory":"DeveloperApplication","operatingSystem":"Linux","runtimePlatform":"Linux io_uring","programmingLanguage":"Rust","codeRepository":"https://github.com/faratech/httpjet","license":"https://spdx.org/licenses/GPL-3.0-only.html","description":"A from-scratch Rust web server and drop-in LiteSpeed Web Server (LSWS 6.3.5) replacement: reads LiteSpeed XML config, speaks native LSAPI to lsphp, processes Apache .htaccess mod_rewrite rules, and serves HTTP/1.1, HTTP/2, and HTTP/3 over io_uring with an LSCache-equivalent origin page cache.","url":"https://httpjet.net/","image":"https://httpjet.net/og.jpg","featureList":["Drop-in LiteSpeed XML configuration compatibility","Pure io_uring transport for HTTP/1.1, HTTP/2, and HTTP/3 (QUIC)","Native LSAPI wire protocol and persistent lsphp pool","Apache mod_rewrite .htaccess engine with dense-DFA prefilter and fast_memo","LSCache-compatible origin page cache with tmpfs file tier and zstd dictionaries","Reverse proxy (h1/h2/h2s), WebSocket/SSE relay, and FastCGI gateway","Optional ACME (HTTP-01/DNS-01), OCSP stapling, kTLS, and OpenTelemetry"]}]}
 </script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
 <!-- index.min.css is inlined below to eliminate the render-blocking stylesheet

@@ -4,27 +4,31 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; script-src-elem 'self' 'unsafe-inline' ajax.cloudflare.com static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://static.cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>httpjet — performance</title>
+<title>Performance — httpjet Documentation (Rust Web Server)</title>
 <meta name="description" content="Measured throughput by regime: loopback three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.">
-<meta property="og:title" content="httpjet — performance">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+<meta property="og:title" content="Performance — httpjet Documentation (Rust Web Server)">
 <meta property="og:description" content="Measured throughput by regime: loopback three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.">
+<meta property="og:site_name" content="httpjet">
+<meta property="og:locale" content="en_US">
 <meta property="og:image" content="https://httpjet.net/og.jpg">
 <meta property="og:image:secure_url" content="https://httpjet.net/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="httpjet — a web server, in Rust">
-<meta property="og:url" content="https://httpjet.net/docs/performance.html">
-<meta property="og:type" content="website">
+<meta property="og:image:alt" content="Performance — httpjet Documentation (Rust Web Server)">
+<meta property="og:url" content="https://httpjet.net/docs/performance">
+<meta property="og:type" content="article">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="httpjet — performance">
+<meta name="twitter:title" content="Performance — httpjet Documentation (Rust Web Server)">
 <meta name="twitter:description" content="Measured throughput by regime: loopback three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.">
 <meta name="twitter:image" content="https://httpjet.net/og.jpg">
-<link rel="canonical" href="https://httpjet.net/docs/performance.html">
+<link rel="canonical" href="https://httpjet.net/docs/performance">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","@id":"https://httpjet.net/docs/performance#article","headline":"Performance — httpjet Documentation (Rust Web Server)","name":"Performance","articleSection":"Running it","description":"Measured throughput by regime: loopback three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.","url":"https://httpjet.net/docs/performance","datePublished":"2026-06-01","dateModified":"2026-10-24","inLanguage":"en-US","proficiencyLevel":"Expert","author":{"@type":"Organization","name":"httpjet","url":"https://httpjet.net/"},"publisher":{"@type":"Organization","name":"httpjet","url":"https://httpjet.net/"},"isPartOf":{"@id":"https://httpjet.net/#website"},"about":{"@id":"https://httpjet.net/#software"},"image":"https://httpjet.net/og.jpg"},{"@type":"BreadcrumbList","@id":"https://httpjet.net/docs/performance#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"httpjet","item":"https://httpjet.net/"},{"@type":"ListItem","position":2,"name":"Docs","item":"https://httpjet.net/docs/"},{"@type":"ListItem","position":3,"name":"Performance","item":"https://httpjet.net/docs/performance"}]}]}</script>
 <meta name="theme-color" content="#07090f">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/docs.min.css?v=20261024h">
-<script defer src="assets/docs-head.min.js?v=20261024h"></script>
+<link rel="stylesheet" href="assets/docs.min.css?v=20261024i">
+<script defer src="assets/docs-head.min.js?v=20261024i"></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZR4WV214JT"></script>
 <script>
@@ -36,7 +40,24 @@
 </script>
 </head>
 <body>
-
+<header class="hdr">
+  <div class="wordmark"><a href="./"><b>httpjet</b></a> <span class="seg">·docs</span></div>
+  <div class="grow"></div>
+  <nav aria-label="Primary">
+    <a href="./">Overview</a>
+    <a href="quickstart.html" class="hide-sm">Quickstart</a>
+    <a href="architecture.html" class="hide-sm">Architecture</a>
+    <a href="page-cache.html" class="hide-sm">Page cache</a>
+    <a href="cli.html" class="hide-sm">CLI</a>
+    <a href="performance.html" class="hide-sm">Performance</a>
+    <a href="https://httpjet.net/" class="ext repo">httpjet.net</a>
+  </nav>
+  <button class="searchbtn" aria-label="Search docs">search <kbd>/</kbd></button>
+  <button class="menubtn" aria-label="Menu" aria-expanded="false">☰</button>
+</header>
+<div class="scrim" aria-hidden="true"></div>
+<div class="shell">
+<nav class="sidebar" aria-label="Documentation sections"><div class="nav-group"><span class="nav-eyebrow">Guide</span><a class="nav-link" href="./">Overview</a><div class="nav-sub"></div><a class="nav-link" href="quickstart.html">Quickstart</a><div class="nav-sub"></div><a class="nav-link" href="architecture.html">Architecture</a><div class="nav-sub"></div><a class="nav-link" href="capabilities.html">Capabilities &amp; limits</a><div class="nav-sub"></div></div><div class="nav-group"><span class="nav-eyebrow">Internals</span><a class="nav-link" href="protocols.html">Protocol stacks</a><div class="nav-sub"></div><a class="nav-link" href="certificates.html">TLS, ACME &amp; OCSP</a><div class="nav-sub"></div><a class="nav-link" href="lsapi.html">LSAPI &amp; PHP</a><div class="nav-sub"></div><a class="nav-link" href="gateways.html">Proxy &amp; gateways</a><div class="nav-sub"></div><a class="nav-link" href="rewrite.html">Rewrite &amp; .htaccess</a><div class="nav-sub"></div><a class="nav-link" href="security.html">Security &amp; access control</a><div class="nav-sub"></div><a class="nav-link" href="page-cache.html">Page cache</a><div class="nav-sub"></div><a class="nav-link" href="compression.html">Compression</a><div class="nav-sub"></div></div><div class="nav-group"><span class="nav-eyebrow">Running it</span><a class="nav-link" href="configuration.html">Configuration</a><div class="nav-sub"></div><a class="nav-link" href="cli.html">CLI reference</a><div class="nav-sub"></div><a class="nav-link" href="operations.html">Operations</a><div class="nav-sub"></div><a class="nav-link" href="observability.html">Observability</a><div class="nav-sub"></div><a class="nav-link" href="admin-api.html">Admin API &amp; reload</a><div class="nav-sub"></div><a class="nav-link" href="extensions.html">Extending httpjet</a><div class="nav-sub"></div><a class="nav-link active" href="performance.html">Performance</a><div class="nav-sub"></div><a class="nav-link" href="conformance.html">Conformance &amp; testing</a><div class="nav-sub"></div><a class="nav-link" href="migration.html">Migrating from LiteSpeed</a><div class="nav-sub"></div></div></nav>
 <main class="content">
 <p class="crumbs"><a href="./">Docs</a><span>/</span>Performance</p>
 <p class="eyebrow">Running it</p>
@@ -224,7 +245,18 @@
 <nav class="pager" aria-label="Pagination"><a class="prev" href="extensions.html"><div class="dir">← Prev</div><div class="ttl">Extending httpjet</div></a><a class="next" href="conformance.html"><div class="dir">Next →</div><div class="ttl">Conformance &amp; testing</div></a></nav>
 <p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
-<script defer src="assets/search-index.min.js?v=20261024h"></script>
-<script defer src="assets/docs.min.js?v=20261024h"></script>
+<aside class="tocwrap">
+  <div class="toc-title">On this page</div>
+  <nav class="toc" aria-label="On this page"></nav>
+</aside>
+</div>
+<div class="search-ov" role="dialog" aria-modal="true" aria-label="Search docs">
+  <div class="search-box">
+    <input type="text" placeholder="Search the docs…" aria-label="Search the docs" autocomplete="off" spellcheck="false">
+    <div class="search-res"></div>
+  </div>
+</div>
+<script defer src="assets/search-index.min.js?v=20261024i"></script>
+<script defer src="assets/docs.min.js?v=20261024i"></script>
 </body>
 </html>

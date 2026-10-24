@@ -1298,14 +1298,15 @@
     ? "./"
     : (lastCurSeg.endsWith(".html") ? lastCurSeg : lastCurSeg + ".html");
 
-  function openSearch() {
+  function openSearch(initialQ) {
     if (!ov) return;
     if (activeExpanded) setExpanded(activeExpanded, false);
     if (!index && window.DOCS_INDEX) index = window.DOCS_INDEX;
     lastFocus = doc.activeElement;
     ov.classList.add("open");
-    if (input) { input.value = ""; input.focus(); }
-    render("");
+    var qVal = typeof initialQ === "string" ? initialQ : "";
+    if (input) { input.value = qVal; input.focus(); }
+    render(qVal);
   }
   function closeSearch(focusBack) {
     if (ov) ov.classList.remove("open");
@@ -1358,7 +1359,7 @@
     });
   }
 
-  if (sbtn) sbtn.addEventListener("click", openSearch);
+  if (sbtn) sbtn.addEventListener("click", function () { openSearch(""); });
   if (input) input.addEventListener("input", function () { render(input.value); });
   if (ov) ov.addEventListener("click", function (e) { if (e.target === ov) closeSearch(true); });
   if (results) {
@@ -1368,15 +1369,19 @@
     });
   }
 
-  function shouldOpenSearchFromUrl() {
-    if (window.location.hash === "#search") return true;
+  function getInitialSearchQuery() {
     try {
-      return new URLSearchParams(window.location.search).get("search") === "1";
+      var sp = new URLSearchParams(window.location.search);
+      if (sp.get("q")) return sp.get("q");
+      if (sp.get("search") === "1") return "";
     } catch (e) {
-      return /(?:^|[?&])search=1(?:&|$)/.test(window.location.search);
+      if (/(?:^|[?&])search=1(?:&|$)/.test(window.location.search)) return "";
     }
+    if (window.location.hash === "#search") return "";
+    return null;
   }
-  if (shouldOpenSearchFromUrl()) setTimeout(openSearch, 0);
+  var initQ = getInitialSearchQuery();
+  if (initQ !== null) setTimeout(function () { openSearch(initQ); }, 0);
 
   doc.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && activeExpanded) { e.preventDefault(); setExpanded(activeExpanded, false); return; }
