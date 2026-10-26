@@ -879,6 +879,11 @@ window.DOCS_INDEX = [
     "t": "Loopback throughput"
    },
    {
+    "id": "release-0-1-10",
+    "t": "Release 0.1.10: controlled A/B against 0.1.5",
+    "kw": "v0.1.5 htaccess SetEnvIf RestrictSUIDSGID yes openat2 ENOSYS"
+   },
+   {
     "id": "cache-result",
     "t": "The origin cache result",
     "kw": "help"

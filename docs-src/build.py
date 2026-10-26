@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261024n'
+VERSION = '20261026a'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 ROOT = '/web/httpjet'
@@ -430,7 +430,7 @@ def pager(i):
         out += f'<a class="next" href="{href}"{" style=\"margin-left:auto\"" if not prev else ""}><div class="dir">Next →</div><div class="ttl">{nxt[1]}</div></a>'
     return out + '</nav>'
 
-FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5).<br>'
+FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5); performance results updated 2026-10-26 (v0.1.10).<br>'
         'Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>')
 
 SLUGS = None
@@ -590,7 +590,7 @@ def main():
     llms = [
         '# httpjet',
         '',
-        '> httpjet is a from-scratch Linux web server written in Rust (v0.1.5, Rust 1.99.1+, edition 2024, GPL-3.0-only) built as a drop-in replacement for LiteSpeed Web Server (LSWS 6.3.5) and OpenLiteSpeed. It reads the same LiteSpeed XML configuration (`httpd_config.xml` + per-vhost XML), speaks native LSAPI to `lsphp`, evaluates Apache `.htaccess` (`mod_rewrite`, Basic auth, access control, headers, expires, LSCache directives) with a dense-DFA prefilter and on-core `fast_memo`, and serves HTTP/1.1, HTTP/2 (146/146 `h2spec`), and HTTP/3 (QUIC) over a single pure-`io_uring` (`monoio`) transport with an LSCache-equivalent origin page cache.',
+        '> httpjet is a from-scratch Linux web server written in Rust (v0.1.10, Rust 1.99.1+, edition 2024, GPL-3.0-only) built as a drop-in replacement for LiteSpeed Web Server (LSWS 6.3.5) and OpenLiteSpeed. It reads the same LiteSpeed XML configuration (`httpd_config.xml` + per-vhost XML), speaks native LSAPI to `lsphp`, evaluates Apache `.htaccess` (`mod_rewrite`, Basic auth, access control, headers, expires, LSCache directives) with a dense-DFA prefilter and on-core `fast_memo`, and serves HTTP/1.1, HTTP/2 (146/146 `h2spec`), and HTTP/3 (QUIC) over a single pure-`io_uring` (`monoio`) transport with an LSCache-equivalent origin page cache.',
         '',
         '## Key Facts & Benchmarks',
         '',
@@ -599,6 +599,7 @@ def main():
         '- **Origin Page Cache Hit vs Full PHP Render:** 19,912 req/s (p50 2 ms) vs 196 req/s (p50 93 ms) — 101× speedup',
         '- **PHP over LSAPI (HTTP/1.1, c=40, PGO):** 44.8k req/s vs LiteSpeed 6.3.5 38.5k req/s (41.2k at c=60)',
         '- **Production Latency Attribution:** httpjet CPU is ~0.2% of request wall time (~138 µs/req, ~38 µs/cache hit); PHP renders account for 86.5–98.8%',
+        '- **Release 0.1.10 vs 0.1.5 (controlled loopback A/B, relative change, not production throughput):** 0 of 80 metric rows worse; page-cache miss-to-store CPU per request −61% (throughput +16%), warmer burst CPU −38%, open-loop mix p99 −29%, uncached PHP +6% throughput / −6% CPU, RSS −8% to −10%; static-file CPU +1–2% (within noise)',
         '- **Full Documentation Corpus (single file):** [https://httpjet.net/llms-full.txt](https://httpjet.net/llms-full.txt)',
         '- **Source Repository:** [https://github.com/faratech/httpjet](https://github.com/faratech/httpjet)',
         ''
@@ -614,7 +615,7 @@ def main():
         f.write('\n'.join(llms))
 
     llms_full = [
-        '# httpjet — Complete Technical Documentation (v0.1.5)',
+        '# httpjet — Complete Technical Documentation (v0.1.10)',
         '',
         'Canonical URL: https://httpjet.net/docs/',
         'Source Repository: https://github.com/faratech/httpjet',

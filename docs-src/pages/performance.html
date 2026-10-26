@@ -8,6 +8,7 @@
       <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's share of production request latency</div></div>
       <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation (hardware counters)</div></div>
       <div class="stat accent"><div class="v">0.0002<span class="u">flt</span></div><div class="l">v0.1.5 h2 static minor page faults/req</div></div>
+      <div class="stat accent"><div class="v">0<span class="u">/ 80</span></div><div class="l">metric rows worse, 0.1.10 vs 0.1.5 (controlled A/B)</div></div>
     </div>
 
     <section>
@@ -22,7 +23,7 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) is recorded below with its exact regime, commit, and CSV receipt in <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>. Use the <strong>All-Builds Curve vs LiteSpeed &amp; nginx</strong> below to see the full trajectory on one canvas, or step through the <strong>13 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
+      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) and the <code>0.1.10</code> bug/perf release is recorded below with its exact regime, commit, and CSV receipt in <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>. Use the <strong>All-Builds Curve vs LiteSpeed &amp; nginx</strong> below to see the full trajectory on one canvas, or step through the <strong>13 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
 
       <div class="bexp" id="all-builds-curve" aria-label="All builds performance curve vs LiteSpeed, OpenLiteSpeed, and nginx">
         <div class="bexp__curve"></div>
@@ -31,7 +32,7 @@
       <div class="bexp" id="build-explorer" tabindex="0" aria-label="Interactive performance across builds presentation">
         <div class="bexp__interactive"></div>
         <div class="bexp__fallback">
-          <p class="mini">Enable JavaScript for the interactive slide deck, cross-build trajectory charts, and build-vs-build comparator. All 13 builds are listed in the <a href="#build-ledger">complete receipts ledger</a> below.</p>
+          <p class="mini">Enable JavaScript for the interactive slide deck, cross-build trajectory charts, and build-vs-build comparator. All 14 builds are listed in the <a href="#build-ledger">complete receipts ledger</a> below.</p>
         </div>
       </div>
     </section>
@@ -44,6 +45,30 @@
       <!--chart:heavy-rewrite-->
       <!--chart:memo-ab-->
       <!--chart:php-h1-->
+    </section>
+
+    <section>
+      <h2 id="release-0-1-10">Release 0.1.10: controlled A/B against 0.1.5</h2>
+      <p>The <code>0.1.10</code> release (October 26, 2026) closed a five-round bug and performance review: <strong>23 issues found, 22 fixed and 1 closed by decision</strong>, with the full workspace suite (3,068 tests) green. To see what that did to the serving paths, the public <code>v0.1.5</code> build and the <code>0.1.10</code> build were run back to back, each with the flags it runs with in production, over <strong>16 workloads, 5 blocks, in both run orders</strong>. Result: <strong>0 of 80 metric rows were worse</strong>. Every figure below is a <em>relative</em> change from that A/B, not a production throughput number.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Workload</th><th>Throughput</th><th>p50</th><th>p99</th><th>CPU / request</th><th>RSS</th></tr></thead>
+          <tbody>
+            <tr><td>Page-cache miss &rarr; store</td><td><strong>+16%</strong></td><td>&minus;8%</td><td>&minus;9%</td><td><strong>&minus;61%</strong></td><td>&minus;10%</td></tr>
+            <tr><td>Warmer burst (fresh TLS connections)</td><td>+1%</td><td>&minus;2%</td><td>&minus;4%</td><td><strong>&minus;38%</strong></td><td>&minus;8%</td></tr>
+            <tr><td>Open-loop realistic mix (fixed offered rate)</td><td>fixed rate</td><td>+2%</td><td><strong>&minus;29%</strong></td><td>&minus;17%</td><td>&ndash;</td></tr>
+            <tr><td>Uncached PHP</td><td>+6%</td><td>&minus;5%</td><td>&minus;6%</td><td>&minus;6%</td><td>&minus;8%</td></tr>
+            <tr><td>Cookied page-cache serve</td><td>+1%</td><td>&minus;1%</td><td>&minus;3%</td><td>&minus;6%</td><td>&minus;8%</td></tr>
+            <tr><td>Beacon POST to PHP</td><td>+3%</td><td>&minus;5%</td><td>+4%</td><td>&minus;5%</td><td>&minus;8%</td></tr>
+            <tr><td>h2 cache hits</td><td>+2%</td><td>+1%</td><td>+20% <span class="mini">(noisy metric)</span></td><td>&minus;3%</td><td>&minus;8%</td></tr>
+            <tr><td>Static 1 KiB / 64 KiB, heavy <code>.htaccess</code>, h1 and h2</td><td>&minus;4% to +1%</td><td>&minus;2% to +1%</td><td>&minus;2% to +11%</td><td>+0.8% to +1.8% <span class="mini">(within noise)</span></td><td>&minus;8% to &minus;9%</td></tr>
+            <tr><td>New TLS 1.2 / 1.3 connections</td><td>same</td><td>same</td><td>same</td><td>same</td><td>&minus;9%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Honest caveats</span><p>Static-file CPU per request is up 1&ndash;2%, which is within the measurement noise. The h2 cache-hit p99 row (+20%) is a high-variance metric on a loop that finishes in a couple of milliseconds. All of this is loopback measurement on a shared 8-core host, so read it as direction and size of change between two builds, not as capacity. The largest page-cache miss and warmer gains come mostly from the egress-at-rest work that shipped in <code>0.1.7</code>, which <code>0.1.5</code> predates.</p></div></div>
+      <p>Measured against <code>0.1.9</code> alone, the <code>0.1.10</code> review changes CPU per request by <strong>&minus;4.7%</strong> on uncached PHP, <strong>&minus;4.3%</strong> on beacon POSTs, <strong>&minus;4.2%</strong> on cookied page-cache serves and <strong>&minus;1.8%</strong> on h2 cache hits. Microbenchmarks behind that: HPACK header-block encode went from <strong>4.73 &micro;s to 1.34 &micro;s</strong> (word-at-a-time Huffman plus a long-literal memo), and cookie <code>SetEnvIf</code> evaluation on the production <code>.htaccess</code> from <strong>29 &micro;s to 1 &micro;s</strong> (lookahead conjunctions now run in linear time).</p>
+      <p>The release also fixes a live bug: under systemd <code>RestrictSUIDSGID=yes</code>, <code>openat2</code> returns <code>ENOSYS</code> and static files of a sandboxed vhost answered 404. A component-by-component no-follow walk now resolves beneath the docroot, and a transient unit with that option confirmed it (<code>0.1.9</code>: 404, <code>0.1.10</code>: 200).</p>
     </section>
 
     <section>
@@ -95,7 +120,7 @@
 
     <section>
       <h2 id="build-ledger">All builds &amp; benchmark receipts ledger</h2>
-      <p>Filter by build tag, commit, workload, regime, or CSV receipt file across all 13 benchmarked eras:</p>
+      <p>Filter by build tag, commit, workload, regime, or CSV receipt file across all 14 benchmarked eras:</p>
       <div class="filterbar" data-filter="ledger-tbl">
         <input type="text" placeholder="Filter builds, workloads, commits, or CSV receipts (e.g. v0.1.5, h2, faults, ols, pgo)…" aria-label="Filter build ledger">
         <button type="button" class="fchip" data-group="foundation">Phase 1–7</button>
@@ -173,6 +198,11 @@
               <th><code>v0.1.5</code> · BODY_BUFS<span class="mini">2026-10-24 · <code>16ed92f9</code></span></th>
               <td class="def">perf stat PGO<br><span class="mini">x86 + ARM64</span></td>
               <td class="wrap"><code>BODY_BUFS</code> <code>TieredPool&lt;Vec&lt;u8&gt;&gt;</code> frozen via <code>Bytes::from_owner</code>, zero-copy LSAPI <code>PacketReader</code> slices, <code>spawn_blocking</code> variant/dict fills, per-thread <code>PageDict</code> <code>DCtx</code>, <code>MAP_POPULATE</code> tmpfs mmaps, and per-core TLS record size-class retention: streamed 117 KB <code>/login/</code> H2 faults/req dropped <strong><code>1.80 → 0.106 (−94%)</code></strong>, W1 cache hit <strong><code>0.0325 → 0.0005</code></strong>, W3s1 1 KiB <strong><code>0.185 → 0.0002</code></strong>, and 500-URL miss→store RSS dropped <strong><code>165–195 MB → 125–132 MB</code></strong>. <span class="mini">Receipt: PR <code>#1163</code> (<code>16ed92f9</code>)</span></td>
+            </tr>
+            <tr data-group="zerofault">
+              <th><code>v0.1.10</code> &middot; Bug/Perf Bash<span class="mini">2026-10-26 &middot; <code>c07d345</code></span></th>
+              <td class="def">loopback A/B, both orders<br><span class="mini">x86, vs public v0.1.5</span></td>
+              <td class="wrap">16 workloads &times; 5 blocks: <strong><code>0 of 80</code></strong> metric rows worse. Page-cache miss&rarr;store CPU/req <strong><code>&minus;61%</code></strong> (throughput <code>+16%</code>), warmer burst CPU/req <strong><code>&minus;38%</code></strong>, open-loop mix p99 <strong><code>&minus;29%</code></strong>, uncached PHP <code>+6%</code> throughput / <code>&minus;6%</code> CPU, RSS <code>&minus;8..&minus;10%</code> across the board. Static-file CPU <code>+0.8..+1.8%</code> (within noise); h2-hit p99 <code>+20%</code> is a noisy metric. HPACK encode <code>4.73 &rarr; 1.34 &micro;s</code>, cookie <code>SetEnvIf</code> <code>29 &rarr; 1 &micro;s</code>. <span class="mini">Relative A/B, not production throughput.</span></td>
             </tr>
           </tbody>
         </table>

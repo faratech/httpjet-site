@@ -17,6 +17,7 @@ httpjet is fast — and these docs are strict about *where* the time goes. Every
         0.2 %   httpjet's share of production request latency
         1.55 IPC   h2 hit path at saturation (hardware counters)
         0.0002 flt   v0.1.5 h2 static minor page faults/req
+        0 / 80   metric rows worse, 0.1.10 vs 0.1.5 (controlled A/B)
 
 ## Read the regime, not just the number
 
@@ -28,7 +29,7 @@ A loopback benchmark removes the network, real TLS handshakes and the CDN — it
 
 ## Performance across builds — interactive presentation
 
-Every benchmark campaign from the initial Phase 1–7 baseline (`0.0.1`, June 2026) through the October 2026 zero-fault pooling release (`v0.1.5`) is recorded below with its exact regime, commit, and CSV receipt in github.com/faratech/httpjet . Use the **All-Builds Curve vs LiteSpeed & nginx** below to see the full trajectory on one canvas, or step through the **13 build slides**, **Workload Trajectories**, and **Build-vs-Build Diff**.
+Every benchmark campaign from the initial Phase 1–7 baseline (`0.0.1`, June 2026) through the October 2026 zero-fault pooling release (`v0.1.5`) and the `0.1.10` bug/perf release is recorded below with its exact regime, commit, and CSV receipt in github.com/faratech/httpjet . Use the **All-Builds Curve vs LiteSpeed & nginx** below to see the full trajectory on one canvas, or step through the **13 build slides**, **Workload Trajectories**, and **Build-vs-Build Diff**.
 
 ## Loopback throughput
 
@@ -43,6 +44,37 @@ One h2 connection is not a ceiling (~58k req/s at c=1), and throughput keeps ris
 > [Benchmark Chart: memo-ab — Fast-path memo, same binary A/B (forum chain · /robots.txt · c=100 · req/s)]
 
 > [Benchmark Chart: php-h1 — PHP over LSAPI, HTTP/1.1 (loopback · PGO build · 2026-06 · req/s)]
+
+## Release 0.1.10: controlled A/B against 0.1.5
+
+The `0.1.10` release (October 26, 2026) closed a five-round bug and performance review: **23 issues found, 22 fixed and 1 closed by decision**, with the full workspace suite (3,068 tests) green. To see what that did to the serving paths, the public `v0.1.5` build and the `0.1.10` build were run back to back, each with the flags it runs with in production, over **16 workloads, 5 blocks, in both run orders**. Result: **0 of 80 metric rows were worse**. Every figure below is a *relative* change from that A/B, not a production throughput number.
+
+| Workload | Throughput | p50 | p99 | CPU / request | RSS |
+
+| Page-cache miss → store | **+16%** | −8% | −9% | **−61%** | −10% |
+
+| Warmer burst (fresh TLS connections) | +1% | −2% | −4% | **−38%** | −8% |
+
+| Open-loop realistic mix (fixed offered rate) | fixed rate | +2% | **−29%** | −17% | – |
+
+| Uncached PHP | +6% | −5% | −6% | −6% | −8% |
+
+| Cookied page-cache serve | +1% | −1% | −3% | −6% | −8% |
+
+| Beacon POST to PHP | +3% | −5% | +4% | −5% | −8% |
+
+| h2 cache hits | +2% | +1% | +20% (noisy metric) | −3% | −8% |
+
+| Static 1 KiB / 64 KiB, heavy `.htaccess`, h1 and h2 | −4% to +1% | −2% to +1% | −2% to +11% | +0.8% to +1.8% (within noise) | −8% to −9% |
+
+| New TLS 1.2 / 1.3 connections | same | same | same | same | −9% |
+
+        ⎁   Honest caveats
+Static-file CPU per request is up 1–2%, which is within the measurement noise. The h2 cache-hit p99 row (+20%) is a high-variance metric on a loop that finishes in a couple of milliseconds. All of this is loopback measurement on a shared 8-core host, so read it as direction and size of change between two builds, not as capacity. The largest page-cache miss and warmer gains come mostly from the egress-at-rest work that shipped in `0.1.7`, which `0.1.5` predates.
+
+Measured against `0.1.9` alone, the `0.1.10` review changes CPU per request by **−4.7%** on uncached PHP, **−4.3%** on beacon POSTs, **−4.2%** on cookied page-cache serves and **−1.8%** on h2 cache hits. Microbenchmarks behind that: HPACK header-block encode went from **4.73 µs to 1.34 µs** (word-at-a-time Huffman plus a long-literal memo), and cookie `SetEnvIf` evaluation on the production `.htaccess` from **29 µs to 1 µs** (lookahead conjunctions now run in linear time).
+
+The release also fixes a live bug: under systemd `RestrictSUIDSGID=yes`, `openat2` returns `ENOSYS` and static files of a sandboxed vhost answered 404. A component-by-component no-follow walk now resolves beneath the docroot, and a transient unit with that option confirmed it (`0.1.9`: 404, `0.1.10`: 200).
 
 ## The origin cache result
 
@@ -102,7 +134,7 @@ Debug builds are ~5× slower and meaningless. Even a plain release build differs
 
 ## All builds & benchmark receipts ledger
 
-Filter by build tag, commit, workload, regime, or CSV receipt file across all 13 benchmarked eras:
+Filter by build tag, commit, workload, regime, or CSV receipt file across all 14 benchmarked eras:
 
 | Build / Commit | Regime | Measured Results & Source Receipt |
 
@@ -131,3 +163,5 @@ Filter by build tag, commit, workload, regime, or CSV receipt file across all 13
 | `v0.1.2–0.1.3` · Task Pools 2026-10-24 · `2f259201` | perf stat PGO PURGE_DELAY=0 | `hj_core::recycle::Recycled ` for H2 stream & bridge futures, LSAPI read/BEGIN pools, and per-thread zstd/gzip scratch: minor page faults/req dropped **`0.80 → 0.0005`** on H2 1 KiB (`−22..32%` CPU), **`1.61 → 0.05`** on heavy `.htaccess` (`−19..25%` CPU), **`1.60 → 0.026`** on 64 KiB, and **`0.41 → 0.001`** on cache hits. `v0.1.3` (`0c10fdc4`) skipped quality-9 brotli on internal refresh under `--cf-send-zstd` (**`−8k` faults & `−10 ms`/page**). Receipt: PR `#1157`, commit `0c10fdc4` |
 
 | `v0.1.5` · BODY_BUFS 2026-10-24 · `16ed92f9` | perf stat PGO x86 + ARM64 | `BODY_BUFS` `TieredPool >` frozen via `Bytes::from_owner`, zero-copy LSAPI `PacketReader` slices, `spawn_blocking` variant/dict fills, per-thread `PageDict` `DCtx`, `MAP_POPULATE` tmpfs mmaps, and per-core TLS record size-class retention: streamed 117 KB `/login/` H2 faults/req dropped **`1.80 → 0.106 (−94%)`**, W1 cache hit **`0.0325 → 0.0005`**, W3s1 1 KiB **`0.185 → 0.0002`**, and 500-URL miss→store RSS dropped **`165–195 MB → 125–132 MB`**. Receipt: PR `#1163` (`16ed92f9`) |
+
+| `v0.1.10` · Bug/Perf Bash 2026-10-26 · `c07d345` | loopback A/B, both orders x86, vs public v0.1.5 | 16 workloads × 5 blocks: **`0 of 80`** metric rows worse. Page-cache miss→store CPU/req **`−61%`** (throughput `+16%`), warmer burst CPU/req **`−38%`**, open-loop mix p99 **`−29%`**, uncached PHP `+6%` throughput / `−6%` CPU, RSS `−8..−10%` across the board. Static-file CPU `+0.8..+1.8%` (within noise); h2-hit p99 `+20%` is a noisy metric. HPACK encode `4.73 → 1.34 µs`, cookie `SetEnvIf` `29 → 1 µs`. Relative A/B, not production throughput. |

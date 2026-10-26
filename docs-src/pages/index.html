@@ -1,5 +1,5 @@
     <section id="top">
-      <p class="eyebrow reveal d1">httpjet · documentation · v0.1.5</p>
+      <p class="eyebrow reveal d1">httpjet · documentation · v0.1.10</p>
       <h1 class="reveal d1" style="font-size:clamp(40px,8vw,76px);line-height:1"><span style="background:var(--brand);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent">httpjet</span></h1>
       <p class="lede reveal d2">A from-scratch <strong>Rust web server</strong> that is a <strong>drop-in LiteSpeed replacement</strong>: it reads the same <code>conf/httpd_config.xml</code> tree, speaks native LSAPI to <code>lsphp</code>, evaluates the same <code>.htaccess</code> files, and adds native HTTP/2 and HTTP/3, reverse-proxy and FastCGI gateways, an opt-in LSCache-protocol page cache, optional ACME and OCSP, and a loopback admin API — all on one io_uring transport.</p>
 
@@ -65,7 +65,7 @@
         <div class="stat accent"><div class="v">101<span class="u">×</span></div><div class="l">cache hit vs full PHP render of the same page (19,912 vs 196 rps)</div></div>
         <div class="stat"><div class="v">146<span class="u">/146</span></div><div class="l">h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs</div></div>
         <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's share of production request latency — ~138 µs/req; PHP owns the rest</div></div>
-        <div class="stat accent"><div class="v">3,000<span class="u">+</span></div><div class="l">test functions across 20 crates; full workspace suite green at v0.1.5</div></div>
+        <div class="stat accent"><div class="v">3,000<span class="u">+</span></div><div class="l">test functions across 20 crates; full workspace suite green at v0.1.10 (3,068 tests)</div></div>
       </div>
     </section>
 
@@ -73,15 +73,15 @@
       <h2 id="status">Project status</h2>
       <div class="tablewrap">
         <table>
-          <thead><tr><th>Aspect</th><th>State (2026-10-24)</th></tr></thead>
+          <thead><tr><th>Aspect</th><th>State (2026-10-26)</th></tr></thead>
           <tbody>
-            <tr><td>Version</td><td><strong>0.1.5</strong> — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3).</td></tr>
+            <tr><td>Version</td><td><strong>0.1.10</strong> (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3).</td></tr>
             <tr><td>Configuration</td><td>LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. <code>check --strict</code> is the deploy gate.</td></tr>
             <tr><td>Transport</td><td>Pure io_uring (monoio) for H1/H2/H3 — the <em>only</em> transport; there is no epoll fallback and no Windows/macOS port.</td></tr>
             <tr><td>PHP</td><td>Native LSAPI; the operator supplies <code>lsphp</code>. Production runs the persistent external pool with zero-downtime generation reloads.</td></tr>
             <tr><td>Page cache</td><td>Off by default; LSCache-protocol opt-in, private tier, per-URL cookie vary, tmpfs file tier, per-vhost dictionaries, generation-scoped namespaces. Live in production.</td></tr>
             <tr><td>Optional features</td><td><code>acme</code>, <code>ocsp</code>, <code>otel</code>, <code>ktls</code>, <code>profiling</code> — build features that still need explicit runtime opt-in.</td></tr>
-            <tr><td>Security posture</td><td>Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1; see <a href="security.html#audit">audit posture</a>); fail-closed defaults throughout.</td></tr>
+            <tr><td>Security posture</td><td>Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1, then a five-round review in 0.1.10 that closed 23 issues; see <a href="security.html#audit">audit posture</a>); fail-closed defaults throughout.</td></tr>
             <tr><td>Release</td><td>Source builds on <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>, generic systemd units, and a hardened OCI example. Signed public packages and a supported-platform matrix are still release work.</td></tr>
           </tbody>
         </table>

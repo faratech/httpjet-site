@@ -1821,6 +1821,39 @@
           "LSAPI PacketReader::take_body_bytes hands out zero-copy Bytes slices when a response fits the pooled 64 KiB read buffer, eliminating per-chunk heap allocations.",
           "File-tier HJPC mmaps now pass MAP_POPULATE so page tables prefault in one kernel pass instead of per-PTE faults during zstd dictionary decode."
         ]
+      },
+      {
+        id: "b14", tag: "v0.1.10", short: "Bug/Perf Bash", date: "2026-10-26", commit: "c07d345", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
+        regime: "loopback A/B, both run orders, 5 blocks, 16 workloads · x86_64 shared 8-core host · vs public v0.1.5 · 3,068 workspace tests green",
+        title: "v0.1.10 — Bug/Perf Bash: 0 of 80 metric rows worse than v0.1.5",
+        summary: "A five-round review closed 23 issues (22 fixed, 1 closed by decision). Run back to back against the public v0.1.5 build, each with its production flags, no metric row got worse. These are relative changes from a controlled A/B, not production throughput.",
+        kpis: [
+          { v: "0 / 80", d: "metric rows worse", n: false, l: "16 workloads × 5 blocks, both run orders" },
+          { v: "−61%", d: "CPU per request", n: false, l: "Page-cache miss → store (throughput +16%)" },
+          { v: "−29%", d: "p99 latency", n: false, l: "Open-loop realistic mix at a fixed rate" },
+          { v: "−8..−10%", d: "RSS", n: false, l: "Across the dynamic workloads" }
+        ],
+        chart: {
+          title: "v0.1.10 CPU per Request, Indexed (v0.1.5 = 100)",
+          sub: "loopback A/B, both run orders · x86_64 · CPU µs per request relative to v0.1.5 (lower is better)",
+          unit: "index",
+          series: ["v0.1.5 (public)", "v0.1.10"],
+          rows: [
+            ["Page-cache miss → store", [100, 39]],
+            ["Warmer burst (fresh TLS)", [100, 62]],
+            ["Open-loop realistic mix", [100, 83]],
+            ["Uncached PHP", [100, 94]],
+            ["Cookied page-cache serve", [100, 94]],
+            ["Beacon POST to PHP", [100, 95]],
+            ["h2 cache hits", [100, 97]]
+          ],
+          foot: "Static-file CPU is +0.8..+1.8% (within noise); the h2-hit p99 row (+20%) is a noisy metric. Loopback on a shared host: direction, not capacity."
+        },
+        notes: [
+          "Against v0.1.9 alone the release changes measured CPU per request by −4.7% (uncached PHP), −4.3% (beacon POST), −4.2% (cookied page-cache serve) and −1.8% (h2 hits); most of the miss→store and warmer gain is the v0.1.7 egress-at-rest work that v0.1.5 predates.",
+          "HPACK header-block encode went from 4.73 µs to 1.34 µs (word-at-a-time Huffman plus a long-literal memo); cookie SetEnvIf evaluation on the production .htaccess went from 29 µs to 1 µs.",
+          "Sandbox fix: under systemd RestrictSUIDSGID=yes, openat2 returns ENOSYS and static files of a sandboxed vhost answered 404; a no-follow component walk now resolves beneath the docroot (v0.1.9: 404, v0.1.10: 200)."
+        ]
       }
     ];
 
@@ -1975,7 +2008,7 @@
       return out.join("");
     }
 
-    var curIdx = BUILDS.length - 1; /* start on latest build v0.1.5 or allow user to step from 0 */
+    var curIdx = BUILDS.length - 1; /* start on latest build v0.1.10 or allow user to step from 0 */
     curIdx = 0; /* start at slide 1 (0.0.1) so the user can step chronologically through the story */
     var curMode = "deck";
     var curLens = 0;

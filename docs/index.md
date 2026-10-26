@@ -7,7 +7,7 @@
 
 ---
 
-httpjet · documentation · v0.1.5
+httpjet · documentation · v0.1.10
 
 # httpjet
 
@@ -77,13 +77,13 @@ Headline figures from the checked-in benchmark record — every number names its
           101 ×   cache hit vs full PHP render of the same page (19,912 vs 196 rps)
           146 /146   h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs
           0.2 %   httpjet's share of production request latency — ~138 µs/req; PHP owns the rest
-          3,000 +   test functions across 20 crates; full workspace suite green at v0.1.5
+          3,000 +   test functions across 20 crates; full workspace suite green at v0.1.10 (3,068 tests)
 
 ## Project status
 
-| Aspect | State (2026-10-24) |
+| Aspect | State (2026-10-26) |
 
-| Version | **0.1.5** — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
+| Version | **0.1.10** (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
 
 | Configuration | LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. `check --strict` is the deploy gate. |
 
@@ -95,7 +95,7 @@ Headline figures from the checked-in benchmark record — every number names its
 
 | Optional features | `acme`, `ocsp`, `otel`, `ktls`, `profiling` — build features that still need explicit runtime opt-in. |
 
-| Security posture | Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1; see audit posture ); fail-closed defaults throughout. |
+| Security posture | Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1, then a five-round review in 0.1.10 that closed 23 issues; see audit posture ); fail-closed defaults throughout. |
 
 | Release | Source builds on github.com/faratech/httpjet , generic systemd units, and a hardened OCI example. Signed public packages and a supported-platform matrix are still release work. |
 

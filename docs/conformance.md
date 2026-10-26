@@ -66,9 +66,9 @@ Suffix routing and the `.html`→PHP decision follow OpenLiteSpeed's order, incl
 
 | scripts | Real-server fixtures on isolated loopback listeners: h2spec, ACME/OCSP/admin runtime tests, the cache gates, memo parity, OCI smoke. | see each page |
 
-The last full runs: the whole workspace suite green at the 0.1.5 release (3,019 passed / 0 failed); 2,028 at 0.0.5. A failure is a regression, not "pre-existing." Timing-flaky meta-assertions were deleted in June 2026 so the concurrency tests are deterministic.
+The last full runs: the whole workspace suite green at the 0.1.10 release (3,068 passed / 0 failed; 3,019 at 0.1.5); 2,028 at 0.0.5. A failure is a regression, not "pre-existing." Timing-flaky meta-assertions were deleted in June 2026 so the concurrency tests are deterministic.
 
-> [Diagram: verification-pyramid] Four-layer verification stack. Every change passes ~3,019 unit and integration tests, bounded corpus and ASan fuzz targets, protocol interoperability suites (h2spec 146/146, aioquic, Pebble ACME, OTel), and live loopback deploy gates before cutover.
+> [Diagram: verification-pyramid] Four-layer verification stack. Every change passes ~3,068 unit and integration tests, bounded corpus and ASan fuzz targets, protocol interoperability suites (h2spec 146/146, aioquic, Pebble ACME, OTel), and live loopback deploy gates before cutover.
 
 ## CI and interoperability jobs
 
