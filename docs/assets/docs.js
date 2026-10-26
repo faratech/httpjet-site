@@ -2150,7 +2150,7 @@
           id: "c-rewrite",
           name: "1 · Heavy .htaccess (H1 & H2 RPS)",
           title: "All-Builds Speed Curve — Heavy .htaccess Static (/robots.txt) vs LiteSpeed, OpenLiteSpeed & nginx",
-          sub: "806/477-line forum .htaccess chain across all 13 builds + reference baselines · k req/s (click any node to inspect that build)",
+          sub: "806/477-line forum .htaccess chain across all 14 builds + reference baselines · k req/s (click any node to inspect that build)",
           unit: "k rps",
           ymax: 320,
           ystep: 80,
@@ -2167,7 +2167,8 @@
             { idx: 9, tag: "v0.0.9", h2: 308.0, h1: 174.5, note: "access-rule memo" },
             { idx: 10, tag: "v0.0.10", h2: 309.5, h1: 175.0, note: "TLS idle + dict L3" },
             { idx: 11, tag: "v0.1.2", h2: 314.0, h1: 178.0, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", h2: 316.0, h1: 179.2, note: "BODY_BUFS zero-fault" }
+            { idx: 12, tag: "v0.1.5", h2: 316.0, h1: 179.2, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 317.2, h1: 179.6, note: "Bug/perf bash" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2180,13 +2181,13 @@
             { val: 145.6, label: "nginx H1 (145.6k) / H2 (125.4k)", color: "#8b95ad" },
             { val: 84.3, label: "LiteSpeed 6.3.5 H1 (84.3k)", color: "#c2cadd" }
           ],
-          foot: "June builds (0.0.1–LSCache) measured on shared host vs LSWS 6.3.5; v0.0.1+ measured on dedicated host with 806-line chain vs OLS & nginx (compare-rewrite-memo-vary-pgo.csv) + subsequent PGO A/B deltas."
+          foot: "June builds (0.0.1–LSCache) measured on shared host vs LSWS 6.3.5; v0.0.1+ measured on dedicated host with 806-line chain vs OLS & nginx (compare-rewrite-memo-vary-pgo.csv) + subsequent PGO A/B deltas. v0.1.10 = v0.1.5 × the measured v0.1.5→v0.1.10 throughput ratio (loopback A/B, both run orders, 5 blocks)."
         },
         {
           id: "c-static",
           name: "2 · H2 & H1 Static Small-Object (RPS)",
           title: "All-Builds Speed Curve — HTTP/2 & HTTP/1.1 Static Throughput vs OpenLiteSpeed, LiteSpeed & nginx",
-          sub: "small-object static serving (empty / 1 KB, c=50..200) across all 13 builds + reference servers · k req/s",
+          sub: "small-object static serving (empty / 1 KB, c=50..200) across all 14 builds + reference servers · k req/s",
           unit: "k rps",
           ymax: 1000,
           ystep: 250,
@@ -2203,7 +2204,8 @@
             { idx: 9, tag: "v0.0.9", h2: 948.0, h1: 206.0, note: "readlink skip" },
             { idx: 10, tag: "v0.0.10", h2: 950.0, h1: 206.5, note: "TLS ticketless" },
             { idx: 11, tag: "v0.1.2", h2: 962.0, h1: 209.0, note: "Recycled H2 tasks" },
-            { idx: 12, tag: "v0.1.5", h2: 965.0, h1: 210.0, note: "BODY_BUFS zero-fault" }
+            { idx: 12, tag: "v0.1.5", h2: 965.0, h1: 210.0, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 929.9, h1: 212.6, note: "Bug/perf bash (h2 within noise)" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 peak (k rps)", color: "#22d3ee" },
@@ -2215,13 +2217,13 @@
             { val: 183.4, label: "OpenLiteSpeed H1 (183.4k)", color: "#34d399" },
             { val: 119.6, label: "nginx H2 c=1000 (119.6k)", color: "#8b95ad" }
           ],
-          foot: "Source: httpjet-sweep-fixed.csv (June shared-box vs LSWS 6.3.5) and versus5-dedicated-final-20260827.csv (dedicated-host vs OLS & nginx)."
+          foot: "Source: httpjet-sweep-fixed.csv (June shared-box vs LSWS 6.3.5) and versus5-dedicated-final-20260827.csv (dedicated-host vs OLS & nginx). v0.1.10 = v0.1.5 × the measured v0.1.5→v0.1.10 throughput ratio (loopback A/B, both run orders, 5 blocks)."
         },
         {
           id: "c-php",
           name: "3 · PHP/LSAPI & Origin Page Cache (RPS)",
           title: "All-Builds Speed Curve — PHP/LSAPI & Origin Page Cache vs LiteSpeed 6.3.5",
-          sub: "PHP hello-world (H1 c=40) and 152 KB XenForo page-cache hits across all 13 builds · k req/s",
+          sub: "PHP hello-world (H1 c=40) and 152 KB XenForo page-cache hits across all 14 builds · k req/s",
           unit: "k rps",
           ymax: 52,
           ystep: 13,
@@ -2238,7 +2240,8 @@
             { idx: 9, tag: "v0.0.9", php: 46.8, cache: 29.5, note: "Cookied early bridge" },
             { idx: 10, tag: "v0.0.10", php: 47.0, cache: 30.1, note: "ARM dict L3 (5.3×)" },
             { idx: 11, tag: "v0.1.2", php: 48.2, cache: 31.0, note: "LSAPI buf pools (+2.5%)" },
-            { idx: 12, tag: "v0.1.5", php: 48.6, cache: 31.8, note: "Zero-copy PacketReader" }
+            { idx: 12, tag: "v0.1.5", php: 48.6, cache: 31.8, note: "Zero-copy PacketReader" },
+            { idx: 13, tag: "v0.1.10", php: 51.5, cache: 32.4, note: "Bug/perf bash (+6% PHP)" }
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
@@ -2249,7 +2252,7 @@
             { val: 38.5, label: "LiteSpeed 6.3.5 PHP c=40 (38.5k)", color: "#e879f9" },
             { val: 0.2, label: "Uncached XenForo DB-backed PHP (0.196k)", color: "#8b95ad" }
           ],
-          foot: "Source: httpjet-php-fixed.csv, litespeed-php-run1.csv, httpjet-cache-run1.csv, httpjet-0.0.3-vs-previous-h3-20260927.csv, and PR #1157/#1163."
+          foot: "Source: httpjet-php-fixed.csv, litespeed-php-run1.csv, httpjet-cache-run1.csv, httpjet-0.0.3-vs-previous-h3-20260927.csv, and PR #1157/#1163. v0.1.10 = v0.1.5 × the measured v0.1.5→v0.1.10 throughput ratio (loopback A/B, both run orders, 5 blocks)."
         }
       ];
 
