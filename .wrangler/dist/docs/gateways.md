@@ -15,7 +15,7 @@ Everything that hands a request to another process: the **reverse proxy** (HTTP/
 
 ## How a request reaches a backend
 
-Three routes select a gateway, in dispatch order: a **WebSocket map** (` `) when the request carries an upgrade, a **proxy ``** whose URI prefix matches and whose `handler` names a `proxy` extProcessor, and a **rewrite `[P]`** target (deferred so it can still participate in the page cache). Script suffixes (`scriptHandler`) route to LSAPI or FastCGI. A proxy context that cannot resolve its processor falls through to static; a script handler that cannot resolve its pool hard-fails 503.
+Three routes select a gateway, in dispatch order: a **rewrite `[P]`** target (deferred until after the page-cache lookup so it can still participate in the cache), a **WebSocket map** (` `) when the request carries an upgrade, and a **proxy ``** whose URI prefix matches and whose `handler` names a `proxy` extProcessor. Script suffixes (`scriptHandler`) route to LSAPI or FastCGI. A proxy context whose handler is missing, unknown or not a `proxy` extProcessor fails closed with 503, and so does a script handler that cannot resolve its pool; neither falls through to static.
 
 | Target form | Protocol to the backend |
 
@@ -27,10 +27,10 @@ Three routes select a gateway, in dispatch order: a **WebSocket map** (` `) when
 
 | `h2s://host[:443]` httpjet | HTTP/2 over TLS, ALPN fail-closed |
 
-Pool keys are scheme-scoped, so an h1 and an h2 target at the same address never share a connection. Forwarded requests to h2 upstreams are re-absolutized (the h2 client derives `:scheme`/`:authority` from the URI). Proxied *responses* may not assert `X-LiteSpeed-Purge`/`-Cache-Control`/`-Vary` — those are stripped so a remote backend cannot inject cache policy. Named upstreams receive a W3C `traceparent` when tracing is on.
+Pool keys are scheme-scoped, so an h1 and an h2 target at the same address never share a connection. Forwarded requests to h2 upstreams are re-absolutized (the h2 client derives `:scheme`/`:authority` from the URI). Proxied *responses* may not assert `X-LiteSpeed-Purge`/`-Cache-Control`/`-Tag`/`-Vary` — those are stripped so a remote backend cannot inject cache policy. Named upstreams receive a W3C `traceparent` when tracing is on.
 
         !   [P] targets are screened
-Since 2026-09-16 a rewrite `[P]` URL that resolves (after DNS — `/etc/hosts` pins cannot bypass the screen, and concurrent DNS lookups are bounded so slow resolvers fail fast) to loopback, link-local or a Unix socket is refused unless it matches an operator-configured extProcessor address. Forwarding to a foreign `[P]` origin also withholds client `Authorization` and `Cookie` headers. This closes the class where a `.htaccess` author reaches the local trust plane (metrics, admin, purge endpoints) or leaks origin credentials through the server.
+Since 2026-09-16 a rewrite `[P]` URL that resolves (after DNS — `/etc/hosts` pins cannot bypass the screen, and concurrent DNS lookups are bounded so slow resolvers fail fast) to any non-public-unicast address (loopback, unspecified, link-local, RFC 1918 private, CGNAT, multicast or documentation ranges) is refused unless it exactly matches an operator-configured extProcessor or WebSocket-map address; a Unix-socket `[P]` target is always refused. When the request can choose the upstream host (the `[P]` scheme or authority comes from a `$N`/`%N`/`%{…}` substitution), client `Authorization`, `Proxy-Authorization` and `Cookie` headers are withheld. This closes the class where a `.htaccess` author reaches the local trust plane (metrics, admin, purge endpoints) or leaks origin credentials through the server.
 
 ## Upstream groups & selection
 
@@ -57,7 +57,7 @@ Upstream responses are **never buffered** (`respBuffer` is parsed but always str
 
 ## WebSocket relay
 
-A ` ` map (`uri` → `address`) or an upgrade request on a proxy context performs the HTTP/1 handshake with the backend and then relays raw frames both ways. The relay supports **plain TCP HTTP/1 upstreams only** — not TLS, H2 or Unix-socket targets. Maps carry a stable `websocket: ` target identity scoped to their vhost, so named-target trace propagation applies; the client span covers the handshake, not the potentially unbounded relay. TCP keepalive keeps a vanished peer from pinning fds and permits forever.
+A ` ` map (`uri` → `address`) or a rewrite `[P]` to a `ws://` target that receives an upgrade request performs the HTTP/1 handshake with the backend and then relays raw frames both ways; an upgrade that reaches an ordinary proxy ` ` with no matching map is refused with 426. The relay supports **plain TCP HTTP/1 upstreams only** — not TLS, H2 or Unix-socket targets. Maps carry a stable `websocket: ` target identity scoped to their vhost, so named-target trace propagation applies; the client span covers the handshake, not the potentially unbounded relay. TCP keepalive keeps a vanished peer from pinning fds and permits forever.
 
 ## FastCGI gateway opt-in
 

@@ -39,10 +39,10 @@ cargo build <span class="t-k">--release</span> -p httpjet <span class="t-k">--fe
         <pre><code><span class="t-c"># parse the tree and print a summary (check is also the default subcommand)</span>
 target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" check
 
-<span class="t-c"># strict: lint topology and exit non-zero on findings — the deploy gate</span>
+<span class="t-c"># strict: exit non-zero on lint errors (warnings never fail) — the deploy gate</span>
 target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" check <span class="t-k">--strict</span></code></pre>
       </div>
-      <p><code>check --strict</code> hard-errors on a docroot shared by two vhosts, a vhost whose docroot is missing, and a vhost with no exact <code>vhostMap</code> domain; it warns on an apex mapped without its <code>www.</code> twin, TLS over a Unix socket, PROXY protocol on a public bind, geo rules without a database, ignored LiteSpeed anti-abuse elements, generic CGI contexts, and every other directive that would parse but do nothing. It also prints each vhost's fast-memo verdict (<code>fast_memo: eligible [vary: …]</code>) and a <code>vhost-map-fingerprint</code> for comparing check output over time. Always use an absolute <code>--root</code>.</p>
+      <p><code>check --strict</code> hard-errors on a docroot shared by two vhosts, a vhost whose docroot is missing, and a mapped vhost whose config file did not load (geo rules without a database fail even a plain <code>check</code>); it warns, without failing, on a vhost with no exact <code>vhostMap</code> domain, an apex mapped without its <code>www.</code> twin, TLS over a Unix socket, PROXY protocol on a public bind, ignored LiteSpeed anti-abuse elements, generic CGI contexts, and every other directive that would parse but do nothing. It also prints each vhost's fast-memo verdict (<code>fast_memo: eligible [vary: …]</code>) and a <code>vhost-map-fingerprint</code> for comparing check output over time. Always use an absolute <code>--root</code>.</p>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Parsed ≠ equivalent</span><p>httpjet accepts LiteSpeed XML leniently so real trees load. A warning means the directive is <em>not</em> enforced — review every one before assuming parity. The <a href="capabilities.html">capability matrix</a> lists what is implemented.</p></div></div>
     </section>
 

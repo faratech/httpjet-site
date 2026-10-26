@@ -84,7 +84,7 @@ window.DOCS_INDEX = [
    {
     "id": "workspace",
     "t": "Workspace shape",
-    "kw": "hj-log hj-geo hj-cache hj- hj-rewrite hj-compress htaccess hj-pagecache"
+    "kw": "hj-log hj-geo hj- hj-config hj-acme hj-ocsp hj-cache tuning hj-rewrite hj-compress htaccess hj-pagecache"
    },
    {
     "id": "dag",
@@ -124,7 +124,7 @@ window.DOCS_INDEX = [
    {
     "id": "conventions",
     "t": "Code conventions",
-    "kw": "cargo fmt --all --check thiserror hj-h2 hj-pagecache diskstore.rs hj-lsapi pool.rs FuturesUnordered rustc-hash mi_collect --mimalloc-trim- MIMALLOC_PURGE_DELAY hj_core::recycle Recycled BODY_BUFS TieredPool Vec Bytes Bytes::from_owner"
+    "kw": "cargo fmt --all --check thiserror hj-h2 hj-pagecache diskstore.rs hj-lsapi pool.rs FuturesUnordered rustc-hash htaccess mi_collect --mimalloc-trim- MIMALLOC_PURGE_DELAY hj_core::recycle Recycled BODY_BUFS TieredPool Vec Bytes Bytes::from_owner"
    }
   ]
  },
@@ -137,7 +137,7 @@ window.DOCS_INDEX = [
    {
     "id": "matrix",
     "t": "Capability matrix",
-    "kw": "CONNECT Upgrade: h2c --features acme ocsp sendfile ktls --ktls auto tls-hw-tx-offload example.test example. h2: h2s: fcgi fastcgi cgi htaccess set append add merge unset setifempty ExpiresActive ExpiresDefault ExpiresByType Header edit RequestHeader check --strict apr1 SHA otel HTTPJET_OTEL"
+    "kw": "CONNECT Upgrade: h2c --features acme ocsp sendfile ktls --ktls auto tls-hw-tx-offload a.example.test example.test example. check h2: h2s: fcgi fastcgi cgi htaccess set append add merge unset ExpiresActive ExpiresDefault ExpiresByType Header edit setifempty echo RequestHeader --strict apr1 SHA --auth-user-file-roots otel HTTPJET_OTEL"
    },
    {
     "id": "unsupported",
@@ -192,12 +192,12 @@ window.DOCS_INDEX = [
    {
     "id": "http1",
     "t": "HTTP/1.1 & h2c detection",
-    "kw": "httparse Content-Length maxKeepAliveReq Host CONNECT authority Link multipart byteranges --request-decompression-extra Body::Full bandwidthLimit"
+    "kw": "httparse Content-Length maxKeepAliveReq Host CONNECT authority Link multipart byteranges --request-decompression-extra Body::Full bandwidthLimit connTimeout"
    },
    {
     "id": "http2",
     "t": "Native HTTP/2",
-    "kw": "hj-h2 FuturesUnordered connTimeout RST_STREAM CANCEL Bytes monoio-rustls writev CONTINUATION REFUSED_STREAM httpjet_h2_rapid_reset_drops_total"
+    "kw": "hj-h2 FuturesUnordered connTimeout RST_STREAM CANCEL Bytes monoio-rustls writev CONTINUATION NO_ERROR REFUSED_STREAM httpjet_h2_rapid_reset_goaways_total"
    },
    {
     "id": "hpack",
@@ -212,12 +212,12 @@ window.DOCS_INDEX = [
    {
     "id": "sendfile",
     "t": "File egress: sendfile & kTLS",
-    "kw": "Body::File sendfile Content-Length --features ktls --ktls auto off tls-hw-tx-offload fixed bench-results httpjet-sendfile- csv httpjet-ktls-sendfile-"
+    "kw": "Body::File sendfile Content-Length connTimeout --features ktls --ktls auto off tls-hw-tx-offload fixed bench-results httpjet-sendfile- csv httpjet-ktls-sendfile-"
    },
    {
     "id": "tls",
     "t": "TLS in one paragraph",
-    "kw": "hj-tls rustls::ServerConfig TLS_AES_128_GCM_SHA256"
+    "kw": "hj-tls rustls::ServerConfig TLS_AES_128_GCM_SHA256 --tls-session-tickets"
    }
   ]
  },
@@ -235,7 +235,7 @@ window.DOCS_INDEX = [
    {
     "id": "posture",
     "t": "Handshake posture",
-    "kw": "TLS_AES_128_GCM_SHA256 httpjet_tls_handshakes_resumed_total --tls-session-tickets --trusted-proxy-idle-secs clientVerify --no-mtls CertReloadHandle CACertFile"
+    "kw": "TLS_AES_128_GCM_SHA256 clientVerify --tls-session-tickets httpjet_tls_handshakes_resumed_total --trusted-proxy-idle-secs --no-mtls CertReloadHandle CACertFile"
    },
    {
     "id": "acme",
@@ -278,7 +278,7 @@ window.DOCS_INDEX = [
    {
     "id": "pool",
     "t": "The UDS connection pool",
-    "kw": "lsphp retryTimeout EAGAIN httpjet_lsapi_eagain_ UNIX_DIAG proc setsid httpjet_lsapi_generation_advances_total httpjet_lsapi_stale_idle_drops_total _stale_checked_out_drops_total httpjet_lsapi_stale_worker_retire_signals_total _failures_total httpjet_lsapi_worker_attribution_failures_total httpjet_lsapi_acquire_seconds _dispatch_seconds _ttfb_seconds"
+    "kw": "lsphp httpjet_lsapi_reset_replays_total _reset_replay_exhaustions_total retryTimeout EAGAIN httpjet_lsapi_eagain_ UNIX_DIAG proc setsid httpjet_lsapi_generation_advances_total httpjet_lsapi_stale_idle_drops_total _stale_checked_out_drops_total httpjet_lsapi_stale_worker_retire_signals_total _failures_total httpjet_lsapi_worker_attribution_failures_total httpjet_lsapi_acquire_seconds _dispatch_seconds _ttfb_seconds"
    },
    {
     "id": "supervisor",
@@ -293,7 +293,7 @@ window.DOCS_INDEX = [
    {
     "id": "cgi-env",
     "t": "The CGI environment",
-    "kw": "LsapiScript SCRIPT_FILENAME REQUEST_URI SCRIPT_NAME QUERY_STRING ctx.env index.php REMOTE_ADDR SERVER_NAME HTTPS CONTENT_LENGTH HTTP_AUTHORIZATION PHP_VALUE PHP_ADMIN_VALUE htaccess SetEnv env HTTP_ Proxy CF-Connecting-IP X-Forwarded- X-Real-IP True-Client-IP Forwarded HTTP_TRACEPARENT REMOTE_USER php_flag php_admin_flag lsphp"
+    "kw": "LsapiScript SCRIPT_FILENAME REQUEST_URI SCRIPT_NAME QUERY_STRING ctx.env index.php REMOTE_ADDR SERVER_NAME HTTPS CONTENT_LENGTH HTTP_AUTHORIZATION PHP_VALUE PHP_ADMIN_VALUE htaccess SetEnv env HTTP_ Proxy CF-Connecting-IP X-Forwarded- X-Real-IP True-Client-IP Forwarded HTTP_TRACEPARENT Host Content-Type Content-Length Transfer-Encoding HJ_LSAPI_FULL_HEADER_ENV REMOTE_USER php_flag php_admin_flag lsphp"
    },
    {
     "id": "jail",
@@ -316,7 +316,7 @@ window.DOCS_INDEX = [
    {
     "id": "overview",
     "t": "How a request reaches a backend",
-    "kw": "websocketList context handler proxy scriptHandler host:port ip:port uds: path http: https: clientCertFile clientKeyFile h2: h2s: host scheme authority X-LiteSpeed-Purge Cache-Control Vary traceparent etc hosts Authorization Cookie htaccess"
+    "kw": "websocketList context handler proxy scriptHandler host:port ip:port uds: path http: https: clientCertFile clientKeyFile h2: h2s: host scheme authority X-LiteSpeed-Purge Cache-Control Tag Vary traceparent etc hosts Authorization Proxy-Authorization Cookie htaccess"
    },
    {
     "id": "groups",
@@ -331,7 +331,7 @@ window.DOCS_INDEX = [
    {
     "id": "websocket",
     "t": "WebSocket relay",
-    "kw": "websocketList websocket uri address websocket:"
+    "kw": "websocketList websocket uri address ws: context websocket:"
    },
    {
     "id": "fastcgi",
@@ -364,7 +364,7 @@ window.DOCS_INDEX = [
    {
     "id": "loading",
     "t": "Per-directory loading",
-    "kw": "HtaccessCache accessFileName htaccess allowOverride autoLoadHtaccess"
+    "kw": "HtaccessCache accessFileName htaccess stat allowOverride autoLoadHtaccess"
    },
    {
     "id": "prefilter",
@@ -374,7 +374,7 @@ window.DOCS_INDEX = [
    {
     "id": "matching",
     "t": "Linear vs backtracking matching",
-    "kw": "CompiledRegex regex_automata::meta::Regex fancy-regex regex_automata::meta"
+    "kw": "CompiledRegex regex_automata::meta::Regex fancy-regex regex_automata::meta SetEnvIf"
    },
    {
     "id": "outcome-cache",
@@ -409,7 +409,7 @@ window.DOCS_INDEX = [
    {
     "id": "directives",
     "t": "Directives reference",
-    "kw": "END code QSA QSD HTTP:Name ENV:NAME LA-U: LA-F: TIME env all granted valid-user user apr1 SHA always onsuccess NAME Files Directory REQUEST_URI merge finalize docs header-directive-compatibility.md Disabled application x-httpd-php Remove AddType ForceType Content-Type CacheKeyModify IfModule hj-compress expires htaccess check --strict"
+    "kw": "HTTP:Name ENV:NAME LA-U: LA-F: TIME RewriteMap map:key htaccess DPI env all granted valid-user user apr1 SHA always onsuccess NAME Files Directory REQUEST_URI merge finalize docs header-directive-compatibility.md Disabled application x-httpd-php Remove AddType ForceType Content-Type CacheKeyModify IfModule hj-compress expires check --strict"
    },
    {
     "id": "context-overrides",
@@ -436,7 +436,7 @@ window.DOCS_INDEX = [
    {
     "id": "network-acls",
     "t": "Network ACLs",
-    "kw": "security accessControl allow deny accessDenyDir fileAccessControl followSymbolLink openat2 RESOLVE_BENEATH RESOLVE_NO_SYMLINKS"
+    "kw": "security accessControl allow deny accessDenyDir fileAccessControl followSymbolLink openat2 RESOLVE_BENEATH RESOLVE_NO_SYMLINKS RestrictSUIDSGID O_NOFOLLOW"
    },
    {
     "id": "throttle",
@@ -481,7 +481,7 @@ window.DOCS_INDEX = [
    {
     "id": "audit",
     "t": "Audit posture",
-    "kw": "htaccess Connected AuthUserFile qpack_decode proxy_protocol_parse lscache_control Expires Header merge cache-entries __mimalloc-stats lsapilib-hardening.patch BEGIN_REQUEST SECURITY.md"
+    "kw": "htaccess Connected AuthUserFile qpack_decode proxy_protocol_parse lscache_control Expires Header merge cache-entries __mimalloc-stats lsapilib-hardening.patch BEGIN_REQUEST openat2 SECURITY.md"
    }
   ]
  },
@@ -499,7 +499,7 @@ window.DOCS_INDEX = [
    {
     "id": "opt-in",
     "t": "Opt-in by the app",
-    "kw": "cache enableCache cachePolicy htaccess CacheLookup no-cache --page-cache-standard-vhosts a.example b.example checkPublicCache Cache-Control: public max-age X-LiteSpeed-"
+    "kw": "cache enableCache cachePolicy respectCacheable enablePostCache htaccess CacheLookup no-cache --page-cache-standard-vhosts a.example b.example checkPublicCache Cache-Control: public max-age X-LiteSpeed-"
    },
    {
     "id": "lookup",
@@ -522,7 +522,7 @@ window.DOCS_INDEX = [
    {
     "id": "tiers",
     "t": "Storage tiers & the file tier",
-    "kw": "--page-cache-mem --page-cache-disk-mem unlink --page-cache-store-path dev shm jetcache default PageStore::store --page-cache-integrity-key cacheStorePath __hj_cache_ready x-hj-cache-ready: x-hj-cache-loaded: disk_read_err httpjet_pagecache_dict_recompress_ total skipped_total reason --page-cache-hot-mem ALLOW_PAGE_CACHE_FILE_TIER --page-cache-dict-vhost --page-cache-dict --page-cache-dict-level scripts train-pagecache-dict.sh dict_gen --page-cache-vary-default name value xf_style_id --page-cache-opt-in-status --page-cache-303-prefixes X-LiteSpeed-Cache-Control: public --page-cache-stream-fill-vhosts"
+    "kw": "--page-cache-mem --page-cache-disk-mem unlink --page-cache-store-path dev shm jetcache default PageStore::store --page-cache-integrity-key cacheStorePath __hj_cache_ready x-hj-cache-ready: x-hj-cache-loaded: disk_read_err httpjet_pagecache_dict_recompress_ total skipped_total reason --page-cache-egress-at-rest-vhosts --page-cache-hot-mem --page-cache-integrity-required ALLOW_PAGE_CACHE_FILE_TIER --page-cache-dict-vhost --page-cache-dict --page-cache-dict-level scripts train-pagecache-dict.sh dict_gen --page-cache-vary-default name value xf_style_id --page-cache-opt-in-status --page-cache-303-prefixes X-LiteSpeed-Cache-Control: public --page-cache-stream-fill-vhosts --xf-capsule-dedicated-store"
    },
    {
     "id": "variants",
@@ -574,7 +574,7 @@ window.DOCS_INDEX = [
    {
     "id": "codecs",
     "t": "Codecs and negotiation",
-    "kw": "zstd enableZstdCompress enableDynZstdCompress zstdCompressLevel brotli enableBrCompress enableDynBrCompress brCompressLevel flate2 enableGzipCompress enableDynGzipCompress compressibleTypes Vary: Accept-Encoding ZSTD_CCTX hj_core::recycle::BODY_BUFS Body::Stream CompressStream"
+    "kw": "zstd enableZstdCompress enableDynZstdCompress zstdCompressLevel brotli brCompressLevel enableBrCompress enableDynBrCompress flate2 enableGzipCompress enableDynGzipCompress gzipCompressLevel compressibleTypes Vary: Accept-Encoding ZSTD_CCTX hj_core::recycle::BODY_BUFS Body::Stream CompressStream"
    },
    {
     "id": "cf-zstd",
@@ -611,12 +611,12 @@ window.DOCS_INDEX = [
    {
     "id": "config-tree",
     "t": "The configuration tree",
-    "kw": "--root usr local lsws hj-config SERVER_ROOT HOSTNAME VH_ROOT VH_NAME VAR setUIDMode chrootMode true followSymbolLink allowSymbolLink check --strict httpd_config.xml virtualHostConfig context htaccess MemoClass httpjet"
+    "kw": "--root usr local lsws hj-config SERVER_ROOT HOSTNAME VH_ROOT VH_NAME DOC_ROOT VH_DOMAIN VAR setUIDMode chrootMode true followSymbolLink allowSymbolLink check allowOverride clientVerify rewrite phpIniOverride enableHotlinkCtrl forceStrictOwnership httpd_config.xml virtualHostConfig context htaccess MemoClass httpjet"
    },
    {
     "id": "server",
     "t": "Server and tuning",
-    "kw": "serverName HOSTNAME localhost user group nobody indexFiles index.html useIpInProxyHeader CF-Connecting-IP quic quicEnable Alt-Svc tuning maxConnections connTimeout keepAliveTimeout maxKeepAliveReq maxReqURLLen maxReqHeaderSize maxReqBodySize perIpRate perIpRateWindowSecs bandwidthLimit maxCachedFileSize totalInMemCacheSize CacheCaps maxMMapFileSize totalMMapCacheSize fileETag size-mtime-inode enable Gzip Zstd Compress Dyn zstdCompressLevel brCompressLevel expires enableExpires expiresByType image A604800 text css M86400 htaccess ExpiresActive"
+    "kw": "serverName HOSTNAME localhost user group nobody indexFiles index.html useIpInProxyHeader CF-Connecting-IP quic quicEnable Alt-Svc tuning maxConnections connTimeout keepAliveTimeout maxKeepAliveReq maxReqURLLen maxReqHeaderSize maxReqBodySize perIpRate perIpRateWindowSecs bandwidthLimit maxCachedFileSize totalInMemCacheSize CacheCaps maxMMapFileSize totalMMapCacheSize --page-cache fileETag size-mtime-inode enable Gzip Zstd Compress Dyn zstdCompressLevel brCompressLevel expires enableExpires expiresByType image A604800 text css M86400 htaccess"
    },
    {
     "id": "security",
@@ -626,7 +626,7 @@ window.DOCS_INDEX = [
    {
     "id": "listeners",
     "t": "Listeners and TLS",
-    "kw": "name address ip:port host:port unix: path uds: secure keyFile certFile certChain CACertFile clientVerify verifyDepth crlFile enableStapling --features ocsp --ocsp-responder proxyProtocol vhostMapList vhostMap vhost domain example.com example."
+    "kw": "name address ip:port host:port unix: path uds: check secure keyFile certFile certChain CACertFile clientVerify verifyDepth crlFile enableStapling --features ocsp --ocsp-responder proxyProtocol vhostMapList vhostMap vhost domain port www. a.example.com example.com example."
    },
    {
     "id": "extprocessor",
@@ -641,7 +641,7 @@ window.DOCS_INDEX = [
    {
     "id": "contexts",
     "t": "Contexts",
-    "kw": "static proxy redirect php lsapi handler type uri location enabled extraHeaders addDefaultCharset addDefaultCharsetCustomized cachePolicy checkPublicCache checkPrivateCache respectCacheable enableCache enablePrivateCache enablePostCache maxReqBodySize responseTimeout bandwidthLimit subFilter subFilterOnce subFilterTypes subFilterMaxBody text html SEARCH REPLACEMENT"
+    "kw": "static proxy redirect php lsapi handler type uri location enabled extraHeaders Name: value NONE addDefaultCharset addDefaultCharsetCustomized cachePolicy enablePostCache checkPublicCache checkPrivateCache respectCacheable enableCache enablePrivateCache maxReqBodySize responseTimeout bandwidthLimit subFilter subFilterOnce subFilterTypes subFilterMaxBody text html SEARCH REPLACEMENT"
    },
    {
     "id": "checking",
@@ -669,17 +669,17 @@ window.DOCS_INDEX = [
    {
     "id": "serve",
     "t": "serve flags",
-    "kw": "legacy coop defer unix: auto --features ktls tls-hw-tx-offload off --ktls perIpRate httpjet_tls_handshakes_resumed_total htaccess PHP_LSAPI_CHILDREN maxConns httpjet lsphp maxProcessTime cache enableCache CacheLookup X-LiteSpeed-Cache-Control cache_store vhost path level name value xf_style_id X-LiteSpeed-Cache-Control: public whats-new X-LiteSpeed-Vary: cookie private max-age PARAM proxy.php image wf-unfurl Cache-Control: checkPublicCache prefixes all-get-classified pipeline::fast_memo HJ_FAST_MEMO Content-Encoding: zstd"
+    "kw": "legacy coop defer unix: auto --features ktls tls-hw-tx-offload off --ktls perIpRate httpjet_tls_handshakes_resumed_total htaccess PHP_LSAPI_CHILDREN maxConns httpjet lsphp maxProcessTime cache enableCache CacheLookup X-LiteSpeed-Cache-Control cache_store vhost path level name value xf_style_id X-LiteSpeed-Cache-Control: public whats-new --cf-send-zstd X-LiteSpeed-Vary: cookie private max-age PARAM proxy.php image wf-unfurl Cache-Control: checkPublicCache prefixes all-get-classified pipeline::fast_memo HJ_FAST_MEMO shadow"
    },
    {
     "id": "env",
     "t": "Environment variables",
-    "kw": "HTTPJET_ACCESS_LOG_FORMAT json HTTPJET_ERROR_LOG_FORMAT schema_version HTTPJET_ACCESS_ROLLING_BYTES HTTPJET_ACCESS_KEEP_DAYS HTTPJET_LOG_DIR HTTPJET_URING_NO_IOWAIT IORING_FEAT_NO_IOWAIT HTTPJET_SYSLOG_TARGET udp: host:514 host:port run systemd journal syslog HTTPJET_SYSLOG_FACILITY _SEVERITY _RFC _HOSTNAME _APP_NAME daemon info httpjet CF_SEND_ZSTD --cf-send-zstd HJ_FAST_MEMO --no-fast-memo HTTPJET_OTEL HTTPJET_OTEL_METRICS --features otel HTTPJET_OTEL_SAMPLE_RATIO HTTPJET_OTEL_TRUSTED_PARENTS traceparent OTEL_EXPORTER_OTLP_TRACES_ENDPOINT OTEL_EXPORTER_OTLP_METRICS_ENDPOINT http: traces RUST_LOG debug hj_rewrite trace HJ_ROOT HJ_URING_ HJ_PEBBLE_ HTTPJET_"
+    "kw": "HTTPJET_ACCESS_LOG_FORMAT json HTTPJET_ERROR_LOG_FORMAT schema_version HTTPJET_ACCESS_ROLLING_BYTES HTTPJET_ACCESS_KEEP_DAYS HTTPJET_LOG_DIR HTTPJET_URING_NO_IOWAIT IORING_ENTER_NO_IOWAIT IORING_FEAT_NO_IOWAIT HTTPJET_SYSLOG_TARGET udp: host:514 host:port run systemd journal syslog HTTPJET_SYSLOG_FACILITY _SEVERITY _RFC _HOSTNAME _APP_NAME daemon info httpjet CF_SEND_ZSTD --cf-send-zstd HJ_FAST_MEMO --no-fast-memo HJ_FAST_EARLY_BRIDGE off shadow --fast-early-bridge HJ_LSAPI_FULL_HEADER_ENV HTTP_ _SERVER HTTPJET_OTEL HTTPJET_OTEL_METRICS --features otel HTTPJET_OTEL_SAMPLE_RATIO HTTPJET_OTEL_TRUSTED_PARENTS traceparent OTEL_EXPORTER_OTLP_TRACES_ENDPOINT OTEL_EXPORTER_OTLP_METRICS_ENDPOINT http: traces"
    },
    {
     "id": "exit",
     "t": "Exit behavior and signals",
-    "kw": "TimeoutStopSec --admin-token-file --admin-resource-root --page-cache-shared-paths --page-cache-vary-default --page-cache-dict-level --page-cache-integrity-required --workers"
+    "kw": "debug RUST_LOG TimeoutStopSec --admin-token-file --admin-resource-root --page-cache-shared-paths --page-cache-vary-default --page-cache-dict-level --page-cache-integrity-required --workers"
    }
   ]
  },
@@ -745,7 +745,7 @@ window.DOCS_INDEX = [
    {
     "id": "metrics",
     "t": "Prometheus metrics",
-    "kw": "--metrics-addr metrics httpjet check _real httpjet_cache_ hits misses _by_vhost vhost httpjet_pagecache_evictions_total httpjet_disp_ httpjet_cache_admit_ratio httpjet_pagecache_integrity_active cache-entries"
+    "kw": "--metrics-addr metrics httpjet check _real httpjet_cache_ hits misses _by_vhost vhost httpjet_pagecache_evictions_total httpjet_disp_ httpjet_cache_admit_ratio httpjet_pagecache_integrity_active scope group peer cache-entries"
    },
    {
     "id": "cache-entries",
@@ -755,7 +755,7 @@ window.DOCS_INDEX = [
    {
     "id": "logs",
     "t": "Logs",
-    "kw": "reqid httpjet_log_access_dropped_lines_total O_NOFOLLOW HTTPJET_ACCESS_ROLLING_BYTES HTTPJET_ACCESS_KEEP_DAYS HTTPJET_ACCESS_LOG_FORMAT json unix: x-litespeed-cache httpjet_error.log HTTPJET_ERROR_LOG_FORMAT schema_version timestamp_unix_ms level target message fields OVERSIZED RUST_LOG HTTPJET_SYSLOG_TARGET udp: host:514 host:port run systemd journal syslog logging useServer fileName logHeaders"
+    "kw": "reqid httpjet_log_access_dropped_lines_total O_NOFOLLOW HTTPJET_ACCESS_ROLLING_BYTES HTTPJET_ACCESS_KEEP_DAYS HTTPJET_ACCESS_LOG_FORMAT json unix: x-litespeed-cache httpjet_error.log HTTPJET_ERROR_LOG_FORMAT schema_version timestamp_unix_ms level target message fields OVERSIZED RUST_LOG HTTPJET_SYSLOG_TARGET udp: host:514 host:port run systemd journal syslog logging useServer fileName logHeaders Host"
    },
    {
     "id": "request-id",
@@ -863,7 +863,7 @@ window.DOCS_INDEX = [
   "url": "performance",
   "section": "Running it",
   "title": "Performance",
-  "blurb": "Measured throughput by regime: loopback three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.",
+  "blurb": "Measured throughput by regime: three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.",
   "headings": [
    {
     "id": "framing",
@@ -876,7 +876,8 @@ window.DOCS_INDEX = [
    },
    {
     "id": "loopback",
-    "t": "Loopback throughput"
+    "t": "Loopback throughput",
+    "kw": "htaccess"
    },
    {
     "id": "release-0-1-10",
@@ -916,7 +917,7 @@ window.DOCS_INDEX = [
    {
     "id": "build-ledger",
     "t": "All builds & benchmark receipts ledger",
-    "kw": "dcf4ca1e htaccess RESULTS.md litespeed- run1.csv Tier e1db15 statx FileCache StatCache RegexSet robots.txt og-image.png Batches d80a25 Cow zstd gzip Batch dfc target-cpu native mimalloc scripts build-pgo.sh LSCache Fix dc38d640 open_beneath openat p50 jetcache httpjet-sweep-fixed.csv httpjet-cache-run1.csv httpjet-cache-jetfile.csv io_uring b7fda monoio monoio-rustls writev CLAUDE.md v0.0.1 versus5-dedicated-final-20260827.csv compare-rewrite-memo-vary-pgo.csv v0.0.2 f987d7cd sendfile --ktls"
+    "kw": "dcf4ca1e htaccess RESULTS.md litespeed- run1.csv Tier fc2088 statx FileCache StatCache RegexSet robots.txt og-image.png Batches d80a25 Cow zstd gzip Batch dfc target-cpu native mimalloc scripts build-pgo.sh LSCache Fix open_beneath openat p50 jetcache httpjet-sweep-fixed.csv httpjet-cache-run1.csv httpjet-cache-jetfile.csv io_uring c4930ff6 monoio monoio-rustls writev CLAUDE.md v0.0.1 c5e7c2 versus5-dedicated-final-20260827.csv compare-rewrite-memo-vary-pgo.csv v0.0.2 f987d7cd sendfile --ktls"
    }
   ]
  },

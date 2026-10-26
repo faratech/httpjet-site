@@ -51,7 +51,7 @@
         <li><strong>Ubuntu 22.04 x86_64 and Ubuntu 24.04 ARM64</strong>: compile all features, replay H1, run the real io_uring UDS H1/H2 test — selected compatibility probes on GitHub-hosted runners, not a full kernel matrix.</li>
         <li><strong>Protocol interoperability</strong>: an OTel-enabled binary, h2spec 2.6.0 over TLS against a fresh example configuration (archive SHA-256 pinned, exactly 146/146 required), H1 WebSocket / H2 dispatch tracing, and the aioquic 1.3.0 QUIC test in an isolated venv.</li>
         <li><strong>Dependency advisories</strong>: a daily job fails on any RustSec finding and on a newer compatible transport-critical crate (quinn, rustls, aws-lc-rs, tokio, httparse, io-uring, zstd, brotli, h2, hyper, http, mio, socket2, openssl, bcrypt, libc).</li>
-        <li><strong>Nightly/manual fuzz</strong>: all eight parser targets with bounded time, input size, memory and artifact retention.</li>
+        <li><strong>Weekly/manual fuzz</strong>: all eight parser targets with bounded time, input size, memory and artifact retention.</li>
       </ul>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>local reproduction</b></span></div><pre><code>cargo test --locked -p httpjet --test h1_corpus -- --nocapture
 cargo build --locked -p httpjet --features otel --bin httpjet

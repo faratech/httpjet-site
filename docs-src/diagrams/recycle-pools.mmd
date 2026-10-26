@@ -5,8 +5,8 @@ flowchart LR
   subgraph CORE ["per-worker / thread-local pools (MIMALLOC_PURGE_DELAY=0 safe)"]
     direction TB
     T1["Recycled<T> task boxes<br/>hj-h2 stream futures + uring::bridge futures"]:::pool
-    T2["TieredPool<Vec<u8>> (BODY_BUFS)<br/>64 KiB / 256 KiB / 1 MiB tiers"]:::pool
-    T3["LSAPI pools<br/>4 KiB BEGIN scratch + 16–64 KiB read buffers"]:::pool
+    T2["TieredPool<Vec<u8>> (BODY_BUFS)<br/>buffers ≤ 256 KiB · 2 per thread + 16 shared"]:::pool
+    T3["LSAPI pools<br/>BEGIN encode buffers (kept ≤ 16 KiB) + 64 KiB packet read buffers"]:::pool
     T4["per-thread codec scratch<br/>zstd CCtx/DCtx + flate2 Compress"]:::pool
     T5["monoio-rustls write pool<br/>64 KiB TLS record buffers (cap 32/core, 0 idle RSS)"]:::tls
   end

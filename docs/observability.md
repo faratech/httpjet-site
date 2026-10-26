@@ -13,7 +13,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 ## Prometheus metrics
 
-`--metrics-addr` (default `127.0.0.1:9090`; empty disables) serves `/metrics` in the Prometheus text format. Over 130 series today; the families that matter, grouped:
+`--metrics-addr` (default `127.0.0.1:9090`; empty disables) serves `/metrics` in the Prometheus text format. Over 180 metric families today; the families that matter, grouped:
 
 | Metric | Type | Meaning |
 
@@ -31,7 +31,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 | httpjet_tls_handshakes_{full,resumed}_total · httpjet_conn_{idle,peer}_closes_total | counter | Full vs resumed TLS handshakes; connection closes by idle timeout vs peer FIN/RST. |
 
-| httpjet_h2_rapid_reset_drops_total · httpjet_h3_send_stall_resets_total | counter | H2 connections dropped on rapid-reset budget exhaustion; H3 response streams reset on send stall. |
+| httpjet_h2_rapid_reset_goaways_total · httpjet_h2_send_stall_resets_total · httpjet_h3_send_stall_resets_total | counter | H2 connections closed with ENHANCE_YOUR_CALM when cancellations outrun the time-refilled rapid-reset budget; H2 and H3 response streams reset on send stall. |
 
 | httpjet_throttle_{allowed,rejected}_total | counter | Per-IP throttle decisions (0 when disabled). |
 
@@ -59,7 +59,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 | httpjet_pagecache_shared_path_{public_routes,canary_skipped}_total · _shared_paths_{matchers,canary_percent} | counter / gauge | Shared-paths routing. |
 
-| httpjet_xf_capsule_{hits,misses,stale_hits,dedicated_stores,canary_filtered}_total · _hits_by_class_total · _shell_age_secs | counter / histogram | XenForo capsule tier. |
+| httpjet_xf_capsule_{hits,misses,stale_hits,dedicated_stores,canary_filtered}_total · _hits_by_class_total · _shell_age_secs | counter / summary | XenForo capsule tier. |
 
 | httpjet_process_rss_bytes · httpjet_process_rss_anon_bytes · httpjet_pagecache_unaccounted_rss_anon_bytes | gauge | Process RSS and the part the cache accounting cannot explain. |
 
@@ -67,15 +67,15 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 | httpjet_lsapi_{acquire,dispatch,ttfb}_seconds | histogram | Pool contention · backend call · request-committed-to-first-byte. |
 
-| httpjet_lsapi_generation_advances_total · _stale_{idle,checked_out}_drops_total · _stale_worker_retire_{signals,failures}_total · _worker_attribution_failures_total · _eagain_{retries,terminal_exhaustions}_total | counter | External-pool generation lifecycle and backlog pressure. |
+| httpjet_lsapi_generation_advances_total · _stale_{idle,checked_out}_drops_total · _stale_worker_retire_{signals,failures}_total · _worker_attribution_failures_total · _eagain_{retries,terminal_exhaustions}_total · _reset_replays_total · _reset_replay_exhaustions_total | counter | External-pool generation lifecycle, backlog pressure, and fresh-dial replays of requests a retiring worker reset before any response byte. |
 
 | Proxy |
 
-| httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total} · httpjet_proxy_failover_total | labeled | Per-peer (scope, group, ordinal) health and selection; failovers served by a non-primary peer. |
+| httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total} · httpjet_proxy_failover_total | labeled | Per-peer (labels `scope`, `group`, `peer` = ordinal) health and selection; failovers served by a non-primary peer. |
 
 | Logging, OTel, debug |
 
-| httpjet_log_{access,vhost}_dropped_lines_total | counter | Unified and per-vhost log lines shed by the bounded writer queues (65,536 lines / 64 MiB per logger). |
+| httpjet_log_{access,error,vhost}_dropped_lines_total | counter | Access (unified + per-vhost), per-vhost error, and per-vhost writer log lines shed by the bounded writer queues (65,536 lines / 64 MiB per logger). |
 
 | httpjet_otel_spans_{queue,dropped_total,exported_total,export_failed_total} · httpjet_otel_http_{exports,export_failures}_total | gauge / counter | Span queue depth and loss; collector HTTP outcomes (observable even when the collector is down). |
 
@@ -89,7 +89,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
           Access log  Error log  Syslog tap  Per-vhost logs
 
-The unified access log (path from the XML; combined format with a trailing `reqid=` token) writes from a dedicated non-blocking task with a bounded queue (65,536 lines and 64 MiB per logger; `httpjet_log_access_dropped_lines_total` counts sheds), opens and rotates without following symlinks (`O_NOFOLLOW`), rolls asynchronously at 50 MB and prunes after 30 days (`HTTPJET_ACCESS_ROLLING_BYTES`, `HTTPJET_ACCESS_KEEP_DAYS`). `HTTPJET_ACCESS_LOG_FORMAT=json` emits one object per line with a fixed field order:
+The unified access log (path from the XML; combined format with a trailing `reqid=` token) writes from a dedicated non-blocking task with a bounded queue (65,536 lines and 64 MiB per logger; `httpjet_log_access_dropped_lines_total` counts sheds), opens and rotates without following symlinks (`O_NOFOLLOW`), rolls asynchronously at 50 MiB and prunes after 30 days (`HTTPJET_ACCESS_ROLLING_BYTES`, `HTTPJET_ACCESS_KEEP_DAYS`). `HTTPJET_ACCESS_LOG_FORMAT=json` emits one object per line with a fixed field order:
 
                access · json
 ```
@@ -102,7 +102,7 @@ The rolling `httpjet_error.log` (and captured backend stderr) is text by default
 
 `HTTPJET_SYSLOG_TARGET` mirrors every rendered access line as an RFC 5424 (or 3164) datagram from the writer task — request path untouched, file logging unaffected, send failures counted. The MSG part is the rendered line itself, so existing parsers keep working. Targets: `udp://host:514`, bare `host:port`, or a unix-dgram path like `/run/systemd/journal/syslog`. Facility/severity/hostname/app-name knobs are on the CLI page .
 
-A vhost's ` ` block with `useServer=0` and a `fileName` gives it its own access and error files (rolling size and keep-days per file; `logHeaders` 7 = combined format with request headers). Log paths are boot-owned: they cannot be changed through the write API.
+A vhost's ` ` block with `useServer=0` and a `fileName` gives it its own access and error files (rolling size and keep-days per file; `logHeaders` 7 = combined format plus the quoted `Host`). Log paths are boot-owned: they cannot be changed through the write API.
 
 ## Request ids
 
@@ -112,7 +112,7 @@ Every request gets a 64-bit correlation id (a per-process seed mixed into a lock
 
 - **`--telemetry-file logs/telemetry.tsv`**: Appends a cumulative snapshot row of the in-RAM aggregates every `--telemetry-flush-secs` (30): durability across restarts and a self-contained time series (~1 MB/day). The `:9090` endpoint works without it.
 
-- **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — the per-URL / user-class attribution behind `httpjet_lsapi_ttfb_seconds`. Rolls at 64 MiB, gzip archives, 30-day prune.
+- **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — the per-URL / user-class attribution behind `httpjet_lsapi_ttfb_seconds`. Rolls at 64 MiB, gzip archives, 7-day prune.
 
 These two files are what produced the production attribution on the Performance page: mean request 9.99 ms, of which 8.96 ms is inside PHP.
 

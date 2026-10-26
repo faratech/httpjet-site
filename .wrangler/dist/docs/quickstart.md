@@ -55,11 +55,11 @@ httpjet is configured by a *server root* containing `conf/httpd_config.xml`, opt
 # parse the tree and print a summary (check is also the default subcommand)
 target/release/httpjet --root "$PWD/examples/litespeed" check
 
-# strict: lint topology and exit non-zero on findings — the deploy gate
+# strict: exit non-zero on lint errors (warnings never fail) — the deploy gate
 target/release/httpjet --root "$PWD/examples/litespeed" check --strict
 ```
 
-`check --strict` hard-errors on a docroot shared by two vhosts, a vhost whose docroot is missing, and a vhost with no exact `vhostMap` domain; it warns on an apex mapped without its `www.` twin, TLS over a Unix socket, PROXY protocol on a public bind, geo rules without a database, ignored LiteSpeed anti-abuse elements, generic CGI contexts, and every other directive that would parse but do nothing. It also prints each vhost's fast-memo verdict (`fast_memo: eligible [vary: …]`) and a `vhost-map-fingerprint` for comparing check output over time. Always use an absolute `--root`.
+`check --strict` hard-errors on a docroot shared by two vhosts, a vhost whose docroot is missing, and a mapped vhost whose config file did not load (geo rules without a database fail even a plain `check`); it warns, without failing, on a vhost with no exact `vhostMap` domain, an apex mapped without its `www.` twin, TLS over a Unix socket, PROXY protocol on a public bind, ignored LiteSpeed anti-abuse elements, generic CGI contexts, and every other directive that would parse but do nothing. It also prints each vhost's fast-memo verdict (`fast_memo: eligible [vary: …]`) and a `vhost-map-fingerprint` for comparing check output over time. Always use an absolute `--root`.
 
         !   Parsed ≠ equivalent
 httpjet accepts LiteSpeed XML leniently so real trees load. A warning means the directive is *not* enforced — review every one before assuming parity. The capability matrix lists what is implemented.

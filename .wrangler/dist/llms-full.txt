@@ -61,7 +61,7 @@ httpjet is a complete origin server on a memory-safe Rust core, built so that an
 - Loopback status + transactional config API , WAF sidecar , compile-time extensions
 
         i   Where it runs
-httpjet serves WindowsForum.com on an x86_64 origin and MoonTimeNow.com + ThisDayInHistory.ai on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version **0.1.5**, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See Capabilities & limits for the honest matrix.
+httpjet serves WindowsForum.com on an x86_64 origin and MoonTimeNow.com + ThisDayInHistory.ai on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version **0.1.10**, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See Capabilities & limits for the honest matrix.
 
 ## How the pieces fit
 
@@ -71,20 +71,20 @@ Every wire protocol lands in the same request pipeline. Click a node to jump to 
 
 ## By the numbers
 
-Headline figures from the checked-in benchmark record — every number names its regime (see Performance for methodology and the raw CSVs).
+Headline figures from the checked-in benchmark record — every number names its regime (see Performance for methodology and the receipt names).
 
-          ~908 k rps   h2 static, dedicated-host loopback — vs OpenLiteSpeed's ~793k (2026-08-27)
+          ~908 k rps   h2 static c=50, dedicated load-generator client, mean of 4 runs — interleaved with OpenLiteSpeed: ~891k vs ~838k (2026-08-27)
           44.8 k rps   PHP/LSAPI over h1, PGO loopback — vs LiteSpeed's ~38.5k (2026-06)
-          101 ×   cache hit vs full PHP render of the same page (19,912 vs 196 rps)
+          40 ×   cache hit vs full PHP render of the same page (19,215 vs 480 rps; p50 2 ms vs 34 ms)
           146 /146   h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs
-          0.2 %   httpjet's share of production request latency — ~138 µs/req; PHP owns the rest
+          0.2 %   httpjet's request phases in June 2026 production telemetry (~138 µs/req: rewrite, cache lookup, compression); PHP render was 86.5–98.8% of wall time
           3,000 +   test functions across 20 crates; full workspace suite green at v0.1.10 (3,068 tests)
 
 ## Project status
 
 | Aspect | State (2026-10-26) |
 
-| Version | **0.1.10** (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
+| Version | **0.1.10** (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
 
 | Configuration | LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. `check --strict` is the deploy gate. |
 
@@ -165,11 +165,11 @@ httpjet is configured by a *server root* containing `conf/httpd_config.xml`, opt
 # parse the tree and print a summary (check is also the default subcommand)
 target/release/httpjet --root "$PWD/examples/litespeed" check
 
-# strict: lint topology and exit non-zero on findings — the deploy gate
+# strict: exit non-zero on lint errors (warnings never fail) — the deploy gate
 target/release/httpjet --root "$PWD/examples/litespeed" check --strict
 ```
 
-`check --strict` hard-errors on a docroot shared by two vhosts, a vhost whose docroot is missing, and a vhost with no exact `vhostMap` domain; it warns on an apex mapped without its `www.` twin, TLS over a Unix socket, PROXY protocol on a public bind, geo rules without a database, ignored LiteSpeed anti-abuse elements, generic CGI contexts, and every other directive that would parse but do nothing. It also prints each vhost's fast-memo verdict (`fast_memo: eligible [vary: …]`) and a `vhost-map-fingerprint` for comparing check output over time. Always use an absolute `--root`.
+`check --strict` hard-errors on a docroot shared by two vhosts, a vhost whose docroot is missing, and a mapped vhost whose config file did not load (geo rules without a database fail even a plain `check`); it warns, without failing, on a vhost with no exact `vhostMap` domain, an apex mapped without its `www.` twin, TLS over a Unix socket, PROXY protocol on a public bind, ignored LiteSpeed anti-abuse elements, generic CGI contexts, and every other directive that would parse but do nothing. It also prints each vhost's fast-memo verdict (`fast_memo: eligible [vary: …]`) and a `vhost-map-fingerprint` for comparing check output over time. Always use an absolute `--root`.
 
         !   Parsed ≠ equivalent
 httpjet accepts LiteSpeed XML leniently so real trees load. A warning means the directive is *not* enforced — review every one before assuming parity. The capability matrix lists what is implemented.
@@ -247,11 +247,11 @@ SUMMARY: The httpjet workspace: 19 hj-* library crates under one binary, the fro
 
 # Architecture
 
-httpjet is a Cargo workspace: **one binary crate** (`httpjet`) over **nineteen `hj-*` library crates**. The graph is acyclic, `hj-config` is the root, and `hj-core` is the small frozen seam every handler programs against. Two crates (`hj-acme`, `hj-ocsp`) only link in behind build features. Roughly 3,000 test functions span the workspace (3,019 green at v0.1.5).
+httpjet is a Cargo workspace: **one binary crate** (`httpjet`) over **nineteen `hj-*` library crates**. The graph is acyclic, `hj-config` is the root, and `hj-core` is the small frozen seam every handler programs against. Two crates (`hj-acme`, `hj-ocsp`) only link in behind build features. Roughly 3,100 test functions span the workspace (3,068 green at v0.1.10).
 
 ## Workspace shape
 
-Responsibilities are split so the contract a handler depends on stays tiny while transports, protocols, gateways and the cache evolve behind it. Three libraries are completely isolated — `hj-log`, `hj-geo` and `hj-cache` take no `hj-*` dependency — while `hj-rewrite` depends only on `hj-compress` so `.htaccess` and XML expiry directives share one `A/M` time grammar. `hj-pagecache` is transport-agnostic and builds on `hj-cache`'s sharded LRU; its request-aware glue lives in the binary.
+Responsibilities are split so the contract a handler depends on stays tiny while transports, protocols, gateways and the cache evolve behind it. Two libraries are completely isolated — `hj-log` and `hj-geo` take no `hj-*` dependency (nor do the root `hj-config` and the feature-gated `hj-acme`/`hj-ocsp`); `hj-cache` depends only on `hj-config` for its ` ` sizing — while `hj-rewrite` depends only on `hj-compress` so `.htaccess` and XML expiry directives share one `A/M` time grammar. `hj-pagecache` is transport-agnostic and builds on `hj-cache`'s sharded LRU; its request-aware glue lives in the binary.
 
            Browse workspace on GitHub ↗
            1 binary + 19 libraries
@@ -264,7 +264,7 @@ Responsibilities are split so the contract a handler depends on stays tiny while
 
 `hj-config` parses the LiteSpeed XML tree into one normalized model; `hj-core` re-exports it so every downstream crate imports the configuration model *through* core — one import surface, never inverted. The binary is the only crate that sees everything.
 
-- hj-config XML tree → model · parse_bundle hj-core the frozen contract · ReqCtx · Router · budgets handlers & transports (depend on hj-core) hj-tls hj-h2 hj-lsapi hj-fastcgi hj-static hj-compress hj-proxy hj-acl hj-extension hj-http (ServeConfig) hj-pagecache (uses hj-cache) hj-cache sharded byte-LRU hj-acme · hj-ocsp --features acme / ocsp isolated (no hj-* deps) hj-rewrite hj-log hj-geo hj-cache httpjet uring transport · pipeline · lscache glue · admin config_transaction · resource_generation · waf · otel hj-config → hj-core → handlers/transports → the httpjet binary. Isolated crates converge at the binary; `hj-geo` feeds `hj-acl`'s `GeoRules`; the two feature-gated crates hang off `hj-tls`'s resolver handles. ## Crate map Crate Role hj-core Protocol-agnostic `Request`/`Response`/`Body`, `ReqCtx`, the vhost `Router`, shared budgets (`BodyBufferBudget` leases, `BandwidthThrottle`, `ResponseCompletion`, `body_deadline`), and `recycle` (`TieredPool` transient buffer and task pooling) — the seam every handler programs against. hj-config LiteSpeed XML → one normalized model (`$VAR` substitution, OLS-faithful value semantics, fail-closed defaults). `parse_bundle` is the in-memory variant used by the transactional API . hj-tls One rustls `ServerConfig` for TCP + QUIC: SNI resolver (no cert-name-match, like OLS), dual ECDSA/RSA chains, mTLS verifier with CRLs, generation-bound staple slots, certificate reload handles. hj-acme feature RFC 8555 HTTP-01/DNS-01 issuance and renewal (instant-acme), the 0700 `PrivateStore` with atomic snapshots, challenge registry, DNS webhook adapter with durable cleanup journal. hj-ocsp feature Bounded OCSP fetch + OpenSSL 3.x signature/issuer/freshness validation; status lifecycle with revocation enforcement. hj-http The shared `ServeConfig` connection-tuning struct derived from ` `. Its old hyper-H1/quinn-H3 adapters were removed when io_uring became the only transport. hj-h2 The **native HTTP/2 server**: one task per connection, send flow control, streaming bodies, one vectored write per wake, RFC 9113 validation, and the zero-allocation HPACK codec (`hj_h2::hpack`). hj-lsapi Native LSAPI wire codec (vendored `lsapidef.h` constants), UDS client pool with generation epochs, the `lsphp` supervisor and subreaper, the CGI env builder, and the fail-closed jail. hj-fastcgi Bounded FastCGI record codec, connection pool (poison-by-default), strict CGI response parser and streaming handler for explicit `fcgi`/`fastcgi` processors. hj-static Static files: `openat2(RESOLVE_BENEATH)` resolution, `fileETag` ETags, conditional requests, single + multipart ranges, precompressed `.br`/`.gz` siblings, `Body::File` with pinned inodes for sendfile. hj-cache The shared `ShardedCache` byte-weighted LRU primitive and `CacheCaps` sizing (the former mmap file cache was removed — it had no consumers). hj-pagecache The **origin page store**: sharded byte-LRU index with W-TinyLFU admission, keys + vary + tags + TTL/stale windows, the LSCache header classifier, the HJPC file tier with boot scan, dictionary recompression, single teardown path. hj-compress gzip/brotli/zstd response encoders, server-priority negotiation, streaming `CompressStream`, per-thread zstd contexts, and the per-vhost `PageDictRegistry` the page cache uses for internal dedup. hj-rewrite Apache mod_rewrite / `.htaccess`: dense-DFA prefilter, linear-first regex with `fancy-regex` fallback, access control, scoped Basic auth, header ops, LSCache directives, memo-eligibility classification. hj-proxy Reverse proxy (h1, `h2://`, `h2s://`), upstream groups with weighted selection and active health checks, passive circuit breaker, WebSocket relay, SSE streaming, upstream mTLS. hj-acl Allow/deny ACLs with trusted-proxy (`T`) marking, real-IP resolution and anti-spoofing, the sharded per-IP throttle, and `GeoRules` (geo/ASN resolved to CIDR sets at state build). hj-geo Offline GeoIP/ASN sources: the CidrList text format and binary-search interval sets. No runtime fetches. hj-log Non-blocking access + error logging: common/combined/JSON access lines, text or JSON error events with redaction, size rolling with day pruning, the syslog tap. hj-extension `ExtensionRegistry` for compile-time pre-handlers and response transforms (the shipped registry is empty). httpjet The binary: listener planning and adoption, the `uring/` transport, `pipeline/`, `lscache/` glue, the fast-path memo, metrics, admin listeners, config transactions and resource generations, WAF client, OTel, PHP slow log, memory trim. ## Transport paths The pure io_uring transport is the only serving transport. There is no runtime switch and no `URING=0` rollback build; reverting is a rebuild from an older revision. One monoio runtime runs per inherited or self-bound `SO_REUSEPORT` listener fd, pinned to its core when the worker count equals the CPU count (`--no-core-pinning` is the kill switch). > [Diagram: transport] One transport, three protocols, one pipeline. Cheap work stays on the monoio core: the H1 codec, the native h2 task, the QUIC driver, and the on-core fast path (finished-response memo, static files, page-cache hits). Anything else crosses uring::bridge into the tokio runtime that owns ServerState, the LSAPI pool, the page cache and reload state, then returns to the monoio core for framing and writes. Bodies ≤ 256 KiB are buffered; larger ones stream on H1, H2 and H3 alike. Ring setup is tunable but deliberately plain: `--uring-ring legacy` (default) uses flagless rings because the measured `coop` and `defer` variants were noise or a ~2% loss on the virtualized production guest; ring size stays at the default because ring memory is memlock-charged. Multishot accept is on by default (`--no-multishot-accept` reverts to one SQE per connection). ## The frozen contract — hj-core This is the seam that lets handlers compose without knowing the transport. Changing these signatures means updating every dependent, so they are treated as frozen: **hj-core** · the seam ``` enum Body { Empty, Full(Bytes), Stream(BoxBody), File(FileBody) } type Request = http::Request ; type Response = http::Response ; // every terminal handler (StaticFiles, Lsapi, FastCgi, ProxyHandler) trait Handler { async fn handle(&self, &mut ReqCtx, Request) -> Result ; } // every post-handler munger (promote → expires → sub_filter → compress → deny-CDN-cache → Alt-Svc) trait ResponseTransform { async fn transform(&self, &ReqCtx, &mut Response); } ``` `FileBody` may carry an open descriptor that pins the selected inode across a concurrent cache version swap, recompression or unlink — that is what lets sendfile and the file tier coexist safely. `ReqCtx` carries the per-request state: `server`/`vhost` (Arcs of the pinned generation), `peer_ip`/`client_ip` (post-forwarding, or `peer_unix`), `is_tls`, `protocol`, `trusted_proxy`, and an `env` vec that holds rewrite `[E=]` sets *and* CGI overrides. `Router::resolve(listener, key)` maps SNI/Host to a vhost. i Extending without touching handle() New terminal handlers `impl Handler` and register in `pipeline/mod.rs::dispatch()`; new response munging `impl ResponseTransform` and is pushed into `state.rs::build_transforms`. Out-of-tree code uses the same traits through the compile-time extension registry . ## The request pipeline `pipeline::handle()` is the integration point: vhost resolution → mTLS trust boundary → client-IP/ACL/geo/throttle → optional WAF inspection → extension pre-handlers → `dispatch()` → response transforms → access log, metrics and spans. `dispatch()` mirrors OpenLiteSpeed's ordering with the page-cache seams inserted once rewrite and access state are known: The terminals are intentionally *not* a uniform matcher registry. Their predicates differ (request headers for WebSocket, URI prefix for proxy contexts, script-path split for suffix routing), their fall-through rules differ, and their post-processing differs, so an explicit `if/return` chain keeps the security-relevant ordering legible. Two fall-throughs matter: a proxy context that cannot resolve its ext-processor falls through to static, while a script whose handler has no pool **hard-fails 503 and must never fall through** — falling through would serve the raw PHP source. ! Load-bearing detail A rewrite to `index.php` keeps the **original** `REQUEST_URI`: the resolved script is pinned separately via the `LsapiScript` request extension, with `SCRIPT_NAME`/`QUERY_STRING` pushed into `ctx.env`. That is what makes XenForo-style front-controller routing correct — and why the page cache must key by the *original* URI, never the rewrite-resolved path. The cache seams are inert unless `serve` runs with `--page-cache`: `lscache::cache_lookup` runs after rewrite/ACL but before any backend (a hit short-circuits dispatch), and `lscache::cache_store` runs after `finalize_response` at each terminal return. Both key off a single `CacheCtx` built once per dispatch. ## Module organization Path Contents `crates/httpjet/src/uring/` The transport: `mod.rs` (accept loops, sniff, TLS), `codec.rs` (H1), `h3.rs` (QUIC driver), `bridge.rs`, `ktls.rs` + `ktls_policy.rs`, `proxy_protocol.rs`, `request_body.rs` (decompression), `worker_group.rs` (listener generations). `crates/httpjet/src/pipeline/` `mod.rs` (`handle`/`dispatch`/`finalize_response`), `rewrite_glue`, `proxy_glue` (incl. `ProxyHandler`), `htaccess_apply`, `suffix_routing`, `scoped_auth`, `fast_memo`, `response_util`, and the in-file e2e/security regression tests. `crates/httpjet/src/lscache/` `mod.rs` (`CacheCtx`, `cache_lookup`/`cache_store`), `hit.rs` (hit-response construction + precompress), `singleflight.rs`. `crates/httpjet/src/{admin*,config_transaction,resource_generation,serving_generation,listener_plan,tcp_candidate}.rs` The read-only status API, the authenticated write API, the publication coordinator, and the listener/resource generation model behind SIGHUP and transactional reloads. `crates/httpjet/src/{acme_runtime,ocsp_runtime,otel,waf,extensions,metrics,telemetry,phpslow,memtrim}.rs` Feature runtimes and observability. `crates/hj-h2/src/server/` `state`/`recv`/`send` + `serve()`; HPACK is the `hpack` submodule. `crates/hj-rewrite/src/` `rules/{parse,eval}`, `htaccess/{parse,mod_access,auth_scope,cache,php,scope_index}`, `auth.rs` (htpasswd). `crates/hj-lsapi/src/` `proto/{frame,builder}`, `pool.rs`, `supervisor`, and the security-critical `jail`. ## Configuration generations Live state is published as immutable *generations* behind an `ArcSwap`. A SIGHUP or an API transaction builds a complete candidate (config, rewrite caches, health schedulers) with background work inactive, validates it, then publishes it atomically under one coordinator; requests already in flight finish on the generation they pinned at acceptance. > [Diagram: generations] Candidate → published → retired. A rejected candidate never touches the serving generation. Trust changes (TLS material, mTLS policy, PROXY protocol) retire the old listener group and drain its connections under their pinned policy; boot-owned resources (listener topology, PHP pools, cache stores, privileges) are restart_required. The full ownership inventory and the transactional replacement sequence are on Admin API & reload . ## Code conventions **Formatting:** rustfmt-clean (default settings, edition 2024); `cargo fmt --all --check` is a CI gate.
+- hj-config XML tree → model · parse_bundle hj-core the frozen contract · ReqCtx · Router · budgets handlers & transports (depend on hj-core) hj-tls hj-h2 hj-lsapi hj-fastcgi hj-static hj-compress hj-proxy hj-acl hj-extension hj-http (ServeConfig) hj-pagecache (uses hj-cache) hj-cache sharded byte-LRU hj-acme · hj-ocsp --features acme / ocsp no direct hj-core dep hj-rewrite hj-log hj-geo hj-cache httpjet uring transport · pipeline · lscache glue · admin config_transaction · resource_generation · waf · otel hj-config → hj-core → handlers/transports → the httpjet binary. Isolated crates converge at the binary; `hj-geo` feeds `hj-acl`'s `GeoRules`; the two feature-gated crates hang off `hj-tls`'s resolver handles. ## Crate map Crate Role hj-core Protocol-agnostic `Request`/`Response`/`Body`, `ReqCtx`, the vhost `Router`, shared budgets (`BodyBufferBudget` leases, `BandwidthThrottle`, `ResponseCompletion`, `body_deadline`), and `recycle` (`TieredPool` transient buffer and task pooling) — the seam every handler programs against. hj-config LiteSpeed XML → one normalized model (`$VAR` substitution, OLS-faithful value semantics, fail-closed defaults). `parse_bundle` is the in-memory variant used by the transactional API . hj-tls One rustls `ServerConfig` for TCP + QUIC: SNI resolver (no cert-name-match, like OLS), dual ECDSA/RSA chains, mTLS verifier with CRLs, generation-bound staple slots, certificate reload handles. hj-acme feature RFC 8555 HTTP-01/DNS-01 issuance and renewal (instant-acme), the 0700 `PrivateStore` with atomic snapshots, challenge registry, DNS webhook adapter with durable cleanup journal. hj-ocsp feature Bounded OCSP fetch + OpenSSL 3.x signature/issuer/freshness validation; status lifecycle with revocation enforcement. hj-http The shared `ServeConfig` connection-tuning struct derived from ` `. Its old hyper-H1/quinn-H3 adapters were removed when io_uring became the only transport. hj-h2 The **native HTTP/2 server**: one task per connection, send flow control, streaming bodies, one vectored write per wake, RFC 9113 validation, and the zero-allocation HPACK codec (`hj_h2::hpack`). hj-lsapi Native LSAPI wire codec (vendored `lsapidef.h` constants), UDS client pool with generation epochs, the `lsphp` supervisor and subreaper, the CGI env builder, and the fail-closed jail. hj-fastcgi Bounded FastCGI record codec, connection pool (poison-by-default), strict CGI response parser and streaming handler for explicit `fcgi`/`fastcgi` processors. hj-static Static files: `openat2(RESOLVE_BENEATH)` resolution, `fileETag` ETags, conditional requests, single + multipart ranges, precompressed `.br`/`.gz` siblings, `Body::File` with pinned inodes for sendfile. hj-cache The shared `ShardedCache` byte-weighted LRU primitive and `CacheCaps` sizing (the former mmap file cache was removed — it had no consumers). hj-pagecache The **origin page store**: sharded byte-LRU index with W-TinyLFU admission, keys + vary + tags + TTL/stale windows, the LSCache header classifier, the HJPC file tier with boot scan, dictionary recompression, single teardown path. hj-compress gzip/brotli/zstd response encoders, server-priority negotiation, streaming `CompressStream`, per-thread zstd contexts, and the per-vhost `PageDictRegistry` the page cache uses for internal dedup. hj-rewrite Apache mod_rewrite / `.htaccess`: dense-DFA prefilter, linear-first regex with `fancy-regex` fallback, access control, scoped Basic auth, header ops, LSCache directives, memo-eligibility classification. hj-proxy Reverse proxy (h1, `h2://`, `h2s://`), upstream groups with weighted selection and active health checks, passive circuit breaker, WebSocket relay, SSE streaming, upstream mTLS. hj-acl Allow/deny ACLs with trusted-proxy (`T`) marking, real-IP resolution and anti-spoofing, the sharded per-IP throttle, and `GeoRules` (geo/ASN resolved to CIDR sets at state build). hj-geo Offline GeoIP/ASN sources: the CidrList text format and binary-search interval sets. No runtime fetches. hj-log Non-blocking access + error logging: common/combined/JSON access lines, text or JSON error events with redaction, size rolling with day pruning, the syslog tap. hj-extension `ExtensionRegistry` for compile-time pre-handlers and response transforms (the shipped registry is empty). httpjet The binary: listener planning and adoption, the `uring/` transport, `pipeline/`, `lscache/` glue, the fast-path memo, metrics, admin listeners, config transactions and resource generations, WAF client, OTel, PHP slow log, memory trim. ## Transport paths The pure io_uring transport is the only serving transport. There is no runtime switch and no `URING=0` rollback build; reverting is a rebuild from an older revision. One monoio runtime runs per inherited or self-bound `SO_REUSEPORT` listener fd, pinned to its core when the worker count equals the CPU count (`--no-core-pinning` is the kill switch). > [Diagram: transport] One transport, three protocols, one pipeline. Cheap work stays on the monoio core: the H1 codec, the native h2 task, the QUIC driver, and the on-core fast path (finished-response memo, static files, page-cache hits). Anything else crosses uring::bridge into the tokio runtime that owns ServerState, the LSAPI pool, the page cache and reload state, then returns to the monoio core for framing and writes. Bodies ≤ 256 KiB are buffered; larger ones stream on H1, H2 and H3 alike. Ring setup is tunable but deliberately plain: `--uring-ring legacy` (default) uses flagless rings because the measured `coop` and `defer` variants were noise or a ~2% loss on the virtualized production guest; ring size stays at the default because ring memory is memlock-charged. Multishot accept is on by default (`--no-multishot-accept` reverts to one SQE per connection). ## The frozen contract — hj-core This is the seam that lets handlers compose without knowing the transport. Changing these signatures means updating every dependent, so they are treated as frozen: **hj-core** · the seam ``` enum Body { Empty, Full(Bytes), Stream(BoxBody), File(FileBody) } type Request = http::Request ; type Response = http::Response ; // every terminal handler (StaticFiles, Lsapi, FastCgi, ProxyHandler) trait Handler { async fn handle(&self, &mut ReqCtx, Request) -> Result ; } // every post-handler munger (promote → expires → sub_filter → compress → deny-CDN-cache → Alt-Svc) trait ResponseTransform { async fn transform(&self, &ReqCtx, &mut Response); } ``` `FileBody` may carry an open descriptor that pins the selected inode across a concurrent cache version swap, recompression or unlink — that is what lets sendfile and the file tier coexist safely. `ReqCtx` carries the per-request state: `server`/`vhost` (Arcs of the pinned generation), `peer_ip`/`client_ip` (post-forwarding, or `peer_unix`), `is_tls`, `protocol`, `trusted_proxy`, and an `env` vec that holds rewrite `[E=]` sets *and* CGI overrides. `Router::resolve(listener, key)` maps SNI/Host to a vhost. i Extending without touching handle() New terminal handlers `impl Handler` and register in `pipeline/mod.rs::dispatch()`; new response munging `impl ResponseTransform` and is pushed into `state.rs::build_transforms`. Out-of-tree code uses the same traits through the compile-time extension registry . ## The request pipeline `pipeline::handle()` is the integration point: vhost resolution → mTLS trust boundary → client-IP/ACL/geo/throttle → optional WAF inspection → extension pre-handlers → `dispatch()` → response transforms → access log, metrics and spans. `dispatch()` mirrors OpenLiteSpeed's ordering with the page-cache seams inserted once rewrite and access state are known: The terminals are intentionally *not* a uniform matcher registry. Their predicates differ (request headers for WebSocket, URI prefix for proxy contexts, script-path split for suffix routing), their fall-through rules differ, and their post-processing differs, so an explicit `if/return` chain keeps the security-relevant ordering legible. Two fall-throughs matter: a proxy context that cannot resolve its ext-processor falls through to static, while a script whose handler has no pool **hard-fails 503 and must never fall through** — falling through would serve the raw PHP source. ! Load-bearing detail A rewrite to `index.php` keeps the **original** `REQUEST_URI`: the resolved script is pinned separately via the `LsapiScript` request extension, with `SCRIPT_NAME`/`QUERY_STRING` pushed into `ctx.env`. That is what makes XenForo-style front-controller routing correct — and why the page cache must key by the *original* URI, never the rewrite-resolved path. The cache seams are inert unless `serve` runs with `--page-cache`: `lscache::cache_lookup` runs after rewrite/ACL but before any backend (a hit short-circuits dispatch), and `lscache::cache_store` runs after `finalize_response` at each terminal return. Both key off a single `CacheCtx` built once per dispatch. ## Module organization Path Contents `crates/httpjet/src/uring/` The transport: `mod.rs` (accept loops, sniff, TLS), `codec.rs` (H1), `h3.rs` (QUIC driver), `bridge.rs`, `ktls.rs` + `ktls_policy.rs`, `proxy_protocol.rs`, `request_body.rs` (decompression), `worker_group.rs` (listener generations). `crates/httpjet/src/pipeline/` `mod.rs` (`handle`/`dispatch`/`finalize_response`), `rewrite_glue`, `proxy_glue` (incl. `ProxyHandler`), `htaccess_apply`, `suffix_routing`, `scoped_auth`, `fast_memo`, `response_util`, and the in-file e2e/security regression tests. `crates/httpjet/src/lscache/` `mod.rs` (`CacheCtx`, `cache_lookup`/`cache_store`), `hit.rs` (hit-response construction + precompress), `singleflight.rs`. `crates/httpjet/src/{admin*,config_transaction,resource_generation,serving_generation,listener_plan,tcp_candidate}.rs` The read-only status API, the authenticated write API, the publication coordinator, and the listener/resource generation model behind SIGHUP and transactional reloads. `crates/httpjet/src/{acme_runtime,ocsp_runtime,otel,waf,extensions,metrics,telemetry,phpslow,memtrim}.rs` Feature runtimes and observability. `crates/hj-h2/src/server/` `state`/`recv`/`send` + `serve()`; HPACK is the `hpack` submodule. `crates/hj-rewrite/src/` `rules/{parse,eval}`, `htaccess/{parse,mod_access,auth_scope,cache,php,scope_index}`, `auth.rs` (htpasswd). `crates/hj-lsapi/src/` `proto/{frame,builder}`, `pool.rs`, `supervisor`, and the security-critical `jail`. ## Configuration generations Live state is published as immutable *generations* behind an `ArcSwap`. A SIGHUP or an API transaction builds a complete candidate (config, rewrite caches, health schedulers) with background work inactive, validates it, then publishes it atomically under one coordinator; requests already in flight finish on the generation they pinned at acceptance. > [Diagram: generations] Candidate → published → retired. A rejected candidate never touches the serving generation. Trust changes (TLS material, mTLS policy, PROXY protocol) retire the old listener group and drain its connections under their pinned policy; boot-owned resources (listener topology, PHP pools, cache stores, privileges) are restart_required. The full ownership inventory and the transactional replacement sequence are on Admin API & reload . ## Code conventions **Formatting:** rustfmt-clean (default settings, edition 2024); `cargo fmt --all --check` is a CI gate.
 
 - **Errors:** `thiserror` types at system boundaries; internal invariant violations panic with a message rather than pretending to recover.
 
@@ -272,7 +272,7 @@ Responsibilities are split so the contract a handler depends on stays tiny while
 
 - **Async:** tokio tasks for independent work, `FuturesUnordered` for multiplexing with coordinated shutdown, no per-stream spawn on hot paths.
 
-- **Hashing:** `rustc-hash` only for internal maps keyed by trusted values (h2 stream ids); anything keyed by untrusted input keeps SipHash.
+- **Hashing:** `rustc-hash` only where keys are trusted (h2 stream ids, page-cache hot-tier body ids, configured vhost names) or the map is hard-capped (the per-`.htaccess` access-match memo: 16 shards × 512 entries, keys ≤ 1 KiB); unbounded maps keyed by untrusted input keep SipHash.
 
 - **Allocator & pooling:** mimalloc globally, with a background `mi_collect` trim that only runs above an RSS threshold (`--mimalloc-trim-*`). Because production sets `MIMALLOC_PURGE_DELAY=0` so freed pages return to the OS immediately, transient per-request buffers and task boxes are pooled in `hj_core::recycle` (`Recycled ` and `BODY_BUFS` `TieredPool >`) and per-core TLS write pools to keep steady-state page faults at zero.
 
@@ -310,7 +310,7 @@ What the current source tree does, what it does only behind a build feature, wha
 
 | kTLS / sendfile | partial | Plain-TCP H1 file bodies use `sendfile(2)` always; a `--features ktls` build adds TLS 1.3 H1 sendfile only when `--ktls=auto` finds a physical NIC with active `tls-hw-tx-offload`. H2/H3/UDS/TLS 1.2 keep userspace paths. → |
 
-| Virtual hosts | supported | Listener + exact Host/SNI maps, OLS wildcard domain patterns (`*.example.test` and `example.*` with exact > longest-match precedence), and a bare `*` fallback. |
+| Virtual hosts | supported | Listener + exact Host/SNI maps, nearest-configured-parent-domain fallback (an unmapped `a.example.test` reaches the vhost that maps `example.test`), and a bare `*` fallback. Glob patterns such as `*.example.test` or `example.*` are not matched: `check` warns and those hosts fall to `*`. |
 
 | Static content | supported | Conditional requests, LiteSpeed ETags, ranges, in-memory small-file promotion, precompressed `.br`/`.gz` siblings, traversal-safe opens. → |
 
@@ -326,13 +326,13 @@ What the current source tree does, what it does only behind a build feature, wha
 
 | CGI execution, uWSGI | unsupported | Design contracts exist; nothing is routable. A `cgi` handler without an explicit FastCGI processor fails closed (never serves source). → |
 
-| Rewrites & `.htaccess` | partial | Common rewrite, access, auth, header (`set`/`append`/`add`/`merge`/`unset`/`setifempty`), expiry (`ExpiresActive`/`ExpiresDefault`/`ExpiresByType`), cache and env directives. `Header edit` and `RequestHeader` are ignored. Run `check --strict`. → |
+| Rewrites & `.htaccess` | partial | Common rewrite, access, auth, header (`set`/`append`/`add`/`merge`/`unset`), expiry (`ExpiresActive`/`ExpiresDefault`/`ExpiresByType`), cache and env directives. `Header edit`, `Header setifempty`, `Header echo` and `RequestHeader` are ignored. Run `check --strict`. → |
 
 | Compression | supported | Dynamic gzip/brotli/zstd + precompressed siblings. Gzip *request* decoding on by default; brotli/zstd request decoding opt-in and bounded. → |
 
 | Origin page cache | supported opt-in | Public/private tiers, vary (including per-URL cookie vary), purge tags, stale policies, single flight, admission, RAM/file tiers, dictionaries, restart scan, generation-scoped keys. A first-class route-level *microcache policy* is specified, not implemented. → |
 
-| Access controls | supported | Peer ACLs, trusted-proxy client IP, GeoIP/ASN CIDR rules, per-IP rate limit, body limits, Basic auth (bcrypt, APR1 `$apr1$`, MD5-crypt `$1$` and `{SHA}` htpasswd in constant time; bcrypt cost capped at 14, files confined to the docroot). → |
+| Access controls | supported | Peer ACLs, trusted-proxy client IP, GeoIP/ASN CIDR rules, per-IP rate limit, body limits, Basic auth (bcrypt, APR1 `$apr1$`, MD5-crypt `$1$` and `{SHA}` htpasswd in constant time; bcrypt cost capped at 14, files confined to the docroot or an operator-listed `--auth-user-file-roots` directory). → |
 
 | WAF | external opt-in | Bounded request-inspection sidecar over Unix socket (peer-UID verified) or loopback TCP, fail-closed by default. No embedded ModSecurity/CRS engine. → |
 
@@ -410,7 +410,7 @@ Request limits come from the LiteSpeed ` ` block and per-context overrides; insp
 
 | sub_filter buffering | 4 MiB default (`subFilterMaxBody`); beyond it the stream passes through raw |
 
-| WAF sidecar | Body ≤ 1 MiB inspected (`--waf-body-max`), total timeout ≤ 30 s, concurrency ≤ 4096, 4 KiB response head, 64 MiB process-wide serialization budget |
+| WAF sidecar | Body inspected up to `--waf-body-max` (default 64 KiB, cap 1 MiB), total timeout default 100 ms (cap 30 s), concurrency default 128 (cap 4096), 4 KiB response head, 64 MiB process-wide serialization budget |
 
 | Admin APIs | Read: 4 KiB/32 header fields, 4 connections, 5 s deadlines, 1 MiB response. Write: 8 KiB/32 fields, 1 MiB body, ≤128 vhosts, ≤64 XML nesting, 4 connections, one candidate build, 5 s lock / 10 s wait |
 
@@ -481,7 +481,7 @@ Unlike OpenLiteSpeed's server-level trusted-peer ACL, httpjet binds PROXY trust 
 
 ### HTTP over Unix sockets
 
-A listener whose address is `unix:/path/sock` (or `uds:`), or the `--http-uds` flag, serves plain HTTP over a Unix-domain socket: H1 and h2c prior knowledge, one accept core (SO_REUSEPORT does not exist for AF_UNIX), socket mode 0600 group-writable, socket-activated fds adopted by path. A stale socket file is unlinked only after a `connect(2)` proves it dead, and cleanup is bound to the owned directory and socket identity. Peers have no address: ACLs, the per-IP throttle and `REMOTE_ADDR` see a fabricated loopback value and the access log renders `unix:`. TLS over UDS is unsupported and linted.
+A listener whose address is `unix:/path/sock` (or `uds:`), or the `--http-uds` flag, serves plain HTTP over a Unix-domain socket: H1 and h2c prior knowledge, one accept core (SO_REUSEPORT does not exist for AF_UNIX), socket mode 0660 (owner and group read/write), socket-activated fds adopted by path. A stale socket file is unlinked only after a `connect(2)` proves it dead, and cleanup is bound to the owned directory and socket identity. Peers have no address: ACLs, the per-IP throttle and `REMOTE_ADDR` see a fabricated loopback value and the access log renders `unix:`. TLS over UDS is unsupported and linted.
 
 ## HTTP/1.1 & h2c detection
 
@@ -515,7 +515,7 @@ Beyond framing, the H1 path implements the newer semantics end to end:
 
 - **Bandwidth pacing** — a per-connection token bucket (burst 2× rate) paces `Body::Full` as 64 KiB slices and streams per chunk when `bandwidthLimit` is set; a matched context overrides the server-wide rate.
 
-- **Explicit `CONNECT` rejection** (405) and stalled-sendfile backoff with a 60 s zero-progress bound.
+- **Explicit `CONNECT` rejection** (405) and a minimum send-progress rate on every response write, sendfile included: under 16 KiB delivered per `connTimeout` window ends the response.
 
 ## Native HTTP/2
 
@@ -529,7 +529,7 @@ Beyond framing, the H1 path implements the newer semantics end to end:
 
 - **One vectored write per wake**; large bodies are zero-copy from page-cache `Bytes`. The vendored `monoio-rustls` fork adds a real `writev`, flushes all queued TLS records in one socket write, and pools per-record buffers per core so records do not page-fault.
 
-- **Inbound RFC 9113 validation** with graceful GOAWAY drain; `CONTINUATION` without an open header block and stream-id reuse are connection errors; over-cap decoded header blocks become a **stream error** (`RST_STREAM(REFUSED_STREAM)`, decoding the block with emission suppressed so the HPACK dynamic table stays in sync on pooled CDN connections); the time-refilled rapid-reset budget (`httpjet_h2_rapid_reset_drops_total`), HTTP/2 Bomb pattern (CVE-2026-49975) and no-forward-progress cases are bounded.
+- **Inbound RFC 9113 validation** with graceful GOAWAY drain; `CONTINUATION` without an open header block and stream-id reuse are connection errors; an over-cap decoded header block gets a complete, bodiless **431** response (an over-cap body gets 413), followed by `RST_STREAM(NO_ERROR)` while the client is still sending. The block is still decoded with emission suppressed, so the HPACK dynamic table stays in sync on pooled CDN connections. `RST_STREAM(REFUSED_STREAM)` is kept for streams refused by the concurrency or pending-header budget; the time-refilled rapid-reset budget (200 resets, refilled 10/s; past it the connection is closed with GOAWAY(ENHANCE_YOUR_CALM), counted in `httpjet_h2_rapid_reset_goaways_total`), HTTP/2 Bomb pattern (CVE-2026-49975) and no-forward-progress cases are bounded.
 
 - **Egress pacing** is per connection at the OutQueue flush with the server-wide rate (a per-response override is ill-defined under multiplexing). HTTP/3 is not paced.
 
@@ -539,7 +539,7 @@ The native stack passes **146 of 146** h2spec 2.6.0 cases over TLS (three consec
 
 ## HPACK
 
-Header compression is RFC 7541 HPACK, implemented as the `hpack` submodule of `hj-h2` (once a standalone crate, folded in so the codec and the connection state evolve together). It is **zero-allocation** — fields are decoded and encoded by slicing frame bytes in place — and pure safe Rust with `#![forbid(unsafe_op_in_unsafe_fn)]`. Both the decoder and the round-trip are fuzz targets ( Conformance ).
+Header compression is RFC 7541 HPACK, implemented as the `hpack` submodule of `hj-h2` (once a standalone crate, folded in so the codec and the connection state evolve together). It is **zero-allocation** — fields are decoded and encoded by slicing frame bytes in place — and pure safe Rust with `#![forbid(unsafe_op_in_unsafe_fn)]`. The Huffman decoder resolves every code of up to 11 bits from a 4 KiB root table that stays cache-resident between requests, with three 32-entry sub-tables for 12–16-bit codes (0.1.7; the 256 KiB flat table it replaced was evicted at production rates, and cold decode of a Cloudflare-shaped header set fell from 16.6 to 4.6 µs). The encoder packs Huffman output a word at a time and remembers the last eight long literals (257+ bytes) per thread (0.1.10; 4.73 → 1.34 µs per header block). Both the decoder and the round-trip are fuzz targets ( Conformance ).
 
 ## HTTP/3 & QUIC
 
@@ -554,7 +554,7 @@ The same numeric HTTPS port must be reachable over TCP (h1/h2) *and* UDP (h3). P
 
 ## File egress: sendfile & kTLS
 
-An uncached `Body::File` keeps its pinned inode and byte range across the tokio→monoio bridge. On **plain TCP HTTP/1** it is sent with bounded nonblocking `sendfile(2)`; unsupported descriptor/filesystem combinations resume at the exact offset with positional io_uring reads, and short files or client aborts close the connection rather than completing an incorrect `Content-Length`. A stalled sendfile backs off exponentially and gives up after 60 s of zero progress.
+An uncached `Body::File` keeps its pinned inode and byte range across the tokio→monoio bridge. On **plain TCP HTTP/1** it is sent with bounded nonblocking `sendfile(2)`; unsupported descriptor/filesystem combinations resume at the exact offset with positional io_uring reads, and short files or client aborts close the connection rather than completing an incorrect `Content-Length`. A stalled sendfile backs off exponentially (100 µs doubling to 12.8 ms). It is cut off by the same minimum send-progress rule as any slow H1 reader: under 16 KiB delivered per `connTimeout` window.
 
 A `--features ktls` build extends this to **TLS 1.3 H1**: after the rustls handshake the socket is upgraded to kernel TLS, so the same sendfile writer feeds ciphertext without a userspace AEAD copy. A peer KeyUpdate queued during a transfer is applied before the next response writes, fencing TX rekey from sendfile. Policy is `--ktls=auto|on|off`: `auto` (default in feature builds) resolves the IPv4 default-route interface, reads its driver and features via ethtool ioctls, refuses known virtual NICs, and enables kTLS only when `tls-hw-tx-offload` is active — otherwise it logs one reason and stays on rustls. TLS 1.2, H2, H3 and UDS keep their userspace paths.
 
@@ -564,7 +564,7 @@ Plaintext sendfile: 5,000 × 1 MiB at c=50 → **4,852 req/s**, 10.08 ms mean, z
 
 ## TLS in one paragraph
 
-`hj-tls` builds **one** `rustls::ServerConfig` for TCP and QUIC with aws-lc-rs as the crypto provider. SNI maps directly to configured chains (no cert-name-match, like OLS), with dual ECDSA+RSA chains per name; client verification is optional mTLS against the *listener* CA with CRL enforcement; TLS 1.3 offers exactly `TLS_AES_128_GCM_SHA256`; resumption uses single-use tickets with 0-RTT off. Certificates, ACME and OCSP have their own page: TLS, ACME & OCSP .
+`hj-tls` builds **one** `rustls::ServerConfig` for TCP and QUIC with aws-lc-rs as the crypto provider. SNI maps directly to configured chains (no cert-name-match, like OLS), with dual ECDSA+RSA chains per name; client verification is optional mTLS against the *listener* CA with CRL enforcement; TLS 1.3 offers exactly `TLS_AES_128_GCM_SHA256`; resumption (only on listeners without client verification; a client-certificate listener always runs a full handshake) uses single-use stateful tickets (`--tls-session-tickets`, default 2 per handshake) with 0-RTT off. Certificates, ACME and OCSP have their own page: TLS, ACME & OCSP .
 
 ==============================================================================
 PAGE: TLS, ACME & OCSP (https://httpjet.net/docs/certificates)
@@ -587,7 +587,7 @@ How httpjet selects certificates, verifies clients, and resumes sessions — plu
 
 | per-vhost ` ` | The SNI identity for that vhost's domains — server *chain* material, never a client-verify root. Configure an ECDSA and an RSA pair for the same names to serve modern clients the smaller chain (ECDSA is chosen when the client offers ECDSA signature algorithms). |
 
-| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | Mutual TLS: 0 none · 1 optional · 2 required · 3 optional without CA check. The verifier is built from the **listener** CA only. Positive chain verdicts are memoized off the hot path. |
+| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | Mutual TLS: 0 none · 1 optional · 2 required · 3 optional, treated like 1 (a presented certificate is still validated against the listener CA). The verifier is built from the **listener** CA only. Positive chain verdicts are memoized off the hot path. |
 
 | `crlFile` httpjet | PEM CRL or bundle enforced by the webpki verifier. Absent = no revocation checking. Loaded at config build; rotating means a reload of the trust generation. |
 
@@ -599,7 +599,7 @@ How httpjet selects certificates, verifies clients, and resumes sessions — plu
 
 - **TLS 1.3 offers exactly `TLS_AES_128_GCM_SHA256`** (the RFC 8446 mandatory suite); TLS 1.2 keeps its full set. rustls negotiates by client order, and without this pin OpenSSL-family clients pick slower suites; the transcript moves to hardware SHA-NI.
 
-- **Resumption & certified-peer idle window** — single-use TLS 1.3 tickets, 0-RTT off, including on client-cert-verifying listeners. Cloudflare does not re-offer origin tickets, so `httpjet_tls_handshakes_resumed_total` stays low behind it. Ticket volume is tunable with `--tls-session-tickets` (rustls default 2); production mints **0** — each ticket was two extra handshake records plus a cached copy of CF's client-cert chain for a resumption that never comes. Instead, `--trusted-proxy-idle-secs` extends the idle window for connections that presented a verified client certificate (reducing full handshakes per request by 28% on x86 and 78% on ARM in production). Resumption is *disabled* whenever OCSP is enabled (status must be enforced per handshake).
+- **Resumption & certified-peer idle window** — 0-RTT is off everywhere. Listeners without client verification (`clientVerify` 0) issue single-use, stateful TLS 1.3 tickets — `--tls-session-tickets` sets how many per full handshake (rustls default 2; 0 also shrinks the session cache from 32,768 entries to 256 TLS 1.2 session IDs). Listeners with `clientVerify` 1–3 issue no tickets and keep no session cache, so every connection is a full handshake that re-runs the client-certificate verifier (an abbreviated handshake would restore an old identity without re-verifying it); `httpjet_tls_handshakes_resumed_total` stays 0 there. Instead, `--trusted-proxy-idle-secs` extends the idle window for connections that presented a verified client certificate (reducing full handshakes by 28% per second, about 30% per request, on x86 and by 78% per request on ARM in production). Resumption is *disabled* whenever OCSP is enabled (status must be enforced per handshake).
 
 - **mTLS trust boundary** — on a listener with `clientVerify=2`, a plaintext request for an mTLS-protected vhost is refused from the request head unless it arrives from loopback; `--no-mtls` relaxes the requirement for local testing only.
 
@@ -725,7 +725,7 @@ httpjet speaks the **native LSAPI wire protocol** to an operator-configured `lsp
 
 When suffix routing maps a request to a PHP handler (` ` or an `lsapi` `extProcessor` bound by a `scriptHandler`, or a `.htaccess` `SetHandler application/x-httpd-php`), httpjet talks LSAPI directly to `lsphp`. PHP is optional: static, proxy and FastCGI deployments need no LSAPI executable.
 
-- client HTTP/1·2·3 HTTP httpjet LSAPI handler · CGI env LSAPI · UDS lsphp pool — capped by --php-children / maxConns php #1 php #2 … php #N streamed response · php-slow log · lsapi_ttfb histogram Native LSAPI over a Unix socket. The pool may be owned by the web process (spawn mode) or run as a separate `httpjet lsphp` process (external mode, the production shape). Native LSAPI · vendored `lsapidef.h` Operator-supplied `lsphp` Generation-tracked UDS pool Candidate-first zero-downtime reload Fail-closed jail ## The LSAPI wire codec `proto/{frame,builder}` implement the protocol straight from the vendored php-src `lsapidef.h` constants (BSD-3-Clause), so frames match byte-for-byte what `lsphp` reads. One sharp edge deserves stating precisely: every env key/value and known header value is length-prefixed with a big-endian `u16` that **includes the trailing NUL**, so the largest safe field is `u16::MAX − 1` bytes. A longer field would wrap the prefix and desync `lsphp`'s parser for every subsequent frame; the builder rejects it. **proto** · the NUL-inclusive length prefix ``` // each env/header field: [u16 BE = byte_len + 1] [bytes…] [0x00] const MAX_FIELD: usize = (u16::MAX as usize) - 1; // 65534 ``` The response-header parser is one of the eight fuzz targets (`lsapi_resp_header`). Request bodies are scanned before transmission and refused if they embed an `lsphp` `BEGIN_REQUEST` frame signature, negative env counts are rejected at the builder, and the repository ships a verified `packaging/lsphp/lsapilib-hardening.patch` for upstream `lsapilib.c`. If a worker dies before emitting an `LSAPI_RESP_END` packet, the response body is aborted rather than silently truncated. Inbound tracing context reaches PHP as `HTTP_TRACEPARENT` in the unknown-header table when OpenTelemetry is on. ## The UDS connection pool Requests reach `lsphp` over a Unix-domain socket fronted by a pool that carries a **generation epoch**. In owned mode the epoch is process-local; in external mode it is the 16-byte generation file below, mapped read-only. A bodyless idempotent request whose pooled connection dies before the send gets one transparent retry on a *fresh* dial, bounded by the processor's `retryTimeout`. A fresh-dial `EAGAIN` under backlog pressure is retried and counted (`httpjet_lsapi_eagain_*`). Accepted connections keep TCP keepalive so a vanished client cannot pin pool permits. Attribution is what makes generation retirement safe: for every connection the pool identifies the accepting worker through `UNIX_DIAG` peer-inode lookup plus `/proc`, pins it with a pidfd, and — after the response completes — retires a stale-generation worker through that pidfd rather than by pid (workers call `setsid()` and are not reliably in the master's tree). Failures to attribute are counted, never guessed. Metric Meaning `httpjet_lsapi_generation_advances_total` Epoch advances this web process observed. `httpjet_lsapi_stale_idle_drops_total` / `_stale_checked_out_drops_total` Idle sockets discarded / checked-out sockets refused re-pooling after an advance. `httpjet_lsapi_stale_worker_retire_signals_total` / `_failures_total` Old-generation workers retired via pinned pidfd after their response completed / signals that failed. `httpjet_lsapi_worker_attribution_failures_total` Connections whose worker could not be pinned. `httpjet_lsapi_acquire_seconds` · `_dispatch_seconds` · `_ttfb_seconds` Pool contention · backend call time · request-committed-to-first-byte (worker pickup + render start). ## The lsphp supervisor In spawn mode (`serve` without `--lsphp-external`) `hj-lsapi` spawns and supervises `lsphp` itself: the listen socket is passed on **fd 0**, inherited socket-activation listeners are kept out of PHP children via `FD_CLOEXEC` and `close_range(..., CLOSE_RANGE_CLOEXEC)`, `setsid()` detaches the pool from any controlling terminal, `PR_SET_PDEATHSIG` ties a worker's life to its parent, and the `pre_exec` closure between fork and exec calls only async-signal-safe syscalls. The process is a subreaper (reaping all adopted PHP orphan zombies) and tracks each generation family by an injected `LSAPI_Z_HTTPJET_GENERATION_MARKER` plus pidfds. The config's `LSAPI_CHILDREN` env is stripped so `--php-children` / `maxConns` is the only cap (values below 2 normalize to 2). Two refusals are unconditional (2026-09-16): the supervisor **never runs workers as root** (resolve_credentials rejects uid/gid 0 even if suEXEC would compute it) and **refuses to spawn a setuid `lsphp` binary**. `--php-max-process-time-ms` sets a total per-request deadline: exceeded → 504. In spawn mode the monitor also kills and restarts the worker; under `--lsphp-external` there is no monitor in the web process, so only the 504 applies and a wedged worker is not auto-reclaimed here — keep the value conservative. ! Packaging boundary httpjet ships no PHP runtime. The executable, its extensions, `php.ini`, opcache settings and writable application paths are operator-managed. For the pool unit's sandboxing the repository ships a **validated hardening runbook** (`systemd/httpjet-lsphp.service.d/hardening.conf`: a bounded capability set, the standard Protect*/Restrict* family, and `MemoryDenyWriteExecute=no` because opcache JIT needs RWX, with the opcache helper steps run via `+`-prefixed ExecStartPre/Reload) — validated against a live pool, but not applied by any unit by default; adopting it is the operator's call. ## Zero-downtime deploys: the external pool Spawn mode couples PHP's lifetime to the web process — a binary deploy cold-starts opcache. The `httpjet lsphp` subcommand instead runs a **persistent pool as its own systemd unit** (`httpjet-lsphp.service`, `Type=notify`, socket-activated through `httpjet-lsphp.socket`); the web tier dials it with `serve --lsphp-external --lsphp-generation-file ` and never spawns workers itself. Both halves then deploy independently: ### Web tier deploy `systemctl restart httpjet`
+- client HTTP/1·2·3 HTTP httpjet LSAPI handler · CGI env LSAPI · UDS lsphp pool — capped by --php-children / maxConns php #1 php #2 … php #N streamed response · php-slow log · lsapi_ttfb histogram Native LSAPI over a Unix socket. The pool may be owned by the web process (spawn mode) or run as a separate `httpjet lsphp` process (external mode, the production shape). Native LSAPI · vendored `lsapidef.h` Operator-supplied `lsphp` Generation-tracked UDS pool Candidate-first zero-downtime reload Fail-closed jail ## The LSAPI wire codec `proto/{frame,builder}` implement the protocol straight from the vendored php-src `lsapidef.h` constants (BSD-3-Clause), so frames match byte-for-byte what `lsphp` reads. One sharp edge deserves stating precisely: every env key/value and known header value is length-prefixed with a big-endian `u16` that **includes the trailing NUL**, so the largest safe field is `u16::MAX − 1` bytes. A longer field would wrap the prefix and desync `lsphp`'s parser for every subsequent frame; the handler answers 431 before the frame is built. **proto** · the NUL-inclusive length prefix ``` // each env/header field: [u16 BE = byte_len + 1] [bytes…] [0x00] const MAX_FIELD: usize = (u16::MAX as usize) - 1; // 65534 ``` The response-header parser is one of the eight fuzz targets (`lsapi_resp_header`). Request bodies are scanned before transmission and refused if they embed an `lsphp` `BEGIN_REQUEST` frame signature, negative env counts are rejected at the builder, and the repository ships a verified `packaging/lsphp/lsapilib-hardening.patch` for upstream `lsapilib.c`. If a worker dies before emitting an `LSAPI_RESP_END` packet, the response body is aborted rather than silently truncated. Inbound tracing context reaches PHP as `HTTP_TRACEPARENT` in the unknown-header table when OpenTelemetry is on. ## The UDS connection pool Requests reach `lsphp` over a Unix-domain socket fronted by a pool that carries a **generation epoch**. In owned mode the epoch is process-local; in external mode it is the 16-byte generation file below, mapped read-only. Idle connections are reused newest-first and expire oldest-first (0.1.10), so traffic after a surge stays off the workers lsphp has marked to retire. A GET/HEAD whose connection resets before any response byte is replayed up to twice, each time on a *fresh* dial after a 25 ms pause (0.1.9; `httpjet_lsapi_reset_replays_total` / `_reset_replay_exhaustions_total`). Since 0.1.10 a request of any method that a retiring worker dropped unread is replayed the same way if it is bodiless or its body was already read whole (a non-multipart POST up to 64 KiB). Refused or missing-socket dials retry within the processor's `retryTimeout` (capped at 15 s). A fresh-dial `EAGAIN` under backlog pressure is retried and counted (`httpjet_lsapi_eagain_*`). Accepted connections keep TCP keepalive so a vanished client cannot pin pool permits. Attribution is what makes generation retirement safe: for every connection the pool identifies the accepting worker through `UNIX_DIAG` peer-inode lookup plus `/proc`, pins it with a pidfd, and — after the response completes — retires a stale-generation worker through that pidfd rather than by pid (workers call `setsid()` and are not reliably in the master's tree). Failures to attribute are counted, never guessed. Metric Meaning `httpjet_lsapi_generation_advances_total` Epoch advances this web process observed. `httpjet_lsapi_stale_idle_drops_total` / `_stale_checked_out_drops_total` Idle sockets discarded / checked-out sockets refused re-pooling after an advance. `httpjet_lsapi_stale_worker_retire_signals_total` / `_failures_total` Old-generation workers retired via pinned pidfd after their response completed / signals that failed. `httpjet_lsapi_worker_attribution_failures_total` Connections whose worker could not be pinned. `httpjet_lsapi_acquire_seconds` · `_dispatch_seconds` · `_ttfb_seconds` Pool contention · backend call time · request-committed-to-first-byte (worker pickup + render start). ## The lsphp supervisor In spawn mode (`serve` without `--lsphp-external`) `hj-lsapi` spawns and supervises `lsphp` itself: the listen socket is passed on **fd 0**, inherited socket-activation listeners are kept out of PHP children via `FD_CLOEXEC` and `close_range(..., CLOSE_RANGE_CLOEXEC)`, `setsid()` detaches the pool from any controlling terminal, `PR_SET_PDEATHSIG` ties a worker's life to its parent, and the `pre_exec` closure between fork and exec calls only async-signal-safe syscalls. The process is a subreaper (reaping all adopted PHP orphan zombies) and tracks each generation family by an injected `LSAPI_Z_HTTPJET_GENERATION_MARKER` plus pidfds. The config's `LSAPI_CHILDREN` env is stripped so `--php-children` / `maxConns` is the only cap (values below 2 normalize to 2). Two refusals are unconditional (2026-09-16): the supervisor **never runs workers as root** (resolve_credentials rejects uid/gid 0 even if suEXEC would compute it) and **refuses to spawn a setuid `lsphp` binary**. `--php-max-process-time-ms` sets a total per-request deadline: exceeded → 504. In spawn mode the monitor also kills and restarts the worker; under `--lsphp-external` there is no monitor in the web process, so only the 504 applies and a wedged worker is not auto-reclaimed here — keep the value conservative. ! Packaging boundary httpjet ships no PHP runtime. The executable, its extensions, `php.ini`, opcache settings and writable application paths are operator-managed. For the pool unit's sandboxing the repository ships a **validated hardening runbook** (`systemd/httpjet-lsphp.service.d/hardening.conf`: a bounded capability set, the standard Protect*/Restrict* family, and `MemoryDenyWriteExecute=no` because opcache JIT needs RWX, with the opcache helper steps run via `+`-prefixed ExecStartPre/Reload) — validated against a live pool, but not applied by any unit by default; adopting it is the operator's call. ## Zero-downtime deploys: the external pool Spawn mode couples PHP's lifetime to the web process — a binary deploy cold-starts opcache. The `httpjet lsphp` subcommand instead runs a **persistent pool as its own systemd unit** (`httpjet-lsphp.service`, `Type=notify`, socket-activated through `httpjet-lsphp.socket`); the web tier dials it with `serve --lsphp-external --lsphp-generation-file ` and never spawns workers itself. Both halves then deploy independently: ### Web tier deploy `systemctl restart httpjet`
 - systemd holds the :80/:443 fds — no RST for new or queued connections
 - PHP workers and opcache stay warm
 
@@ -770,7 +770,7 @@ The env builder assembles the CGI/LSAPI environment per request. The load-bearin
 
 | `REMOTE_ADDR`, `SERVER_NAME`, `HTTPS`, `CONTENT_LENGTH`, `HTTP_AUTHORIZATION`, `PHP_VALUE`, `PHP_ADMIN_VALUE`, … | Server-computed or special-env only. Since 2026-09-16 a `.htaccess` `[E=…]`/`SetEnv` or processor `env` entry that names one of these is **denied** (shared deny-list with FastCGI) — a directory cannot override the server's view of the client or inject PHP ini overrides through the regular environment. |
 
-| `HTTP_*` | Request headers after name/value validation, under one forwarding rule (2026-10-06, applied identically to the CGI env table, the LSAPI wire header block and FastCGI params): the `Proxy` header and underscore-named headers never pass, and forwarding-authority names (`CF-Connecting-IP`, `X-Forwarded-*`, `X-Real-IP`, `True-Client-IP`, `Forwarded`) pass only from a peer that is *both* a trusted proxy and — on a client-cert listener — presented one. `HTTP_TRACEPARENT` when OTel is enabled. |
+| `HTTP_*` | Request headers after name/value validation, under one forwarding rule (2026-10-06, applied identically to the CGI env table, the LSAPI wire header block and FastCGI params): the `Proxy` header and underscore-named headers never pass, and forwarding-authority names (`CF-Connecting-IP`, `X-Forwarded-*`, `X-Real-IP`, `True-Client-IP`, `Forwarded`) pass only from a peer that is *both* a trusted proxy and — on a client-cert listener — presented one. `HTTP_TRACEPARENT` when OTel is enabled. Since 0.1.8, lsphp builds these entries from the LSAPI header block. Only the copies it cannot take from there also go in the env table: `Host`, `Content-Type`/`Content-Length`, `Transfer-Encoding`, names over 250 bytes and repeated headers. `HJ_LSAPI_FULL_HEADER_ENV=1` restores every copy, and FastCGI keeps them all. |
 
 | `REMOTE_USER` | Set by a successful Basic auth realm. |
 
@@ -807,7 +807,7 @@ Everything that hands a request to another process: the **reverse proxy** (HTTP/
 
 ## How a request reaches a backend
 
-Three routes select a gateway, in dispatch order: a **WebSocket map** (` `) when the request carries an upgrade, a **proxy ``** whose URI prefix matches and whose `handler` names a `proxy` extProcessor, and a **rewrite `[P]`** target (deferred so it can still participate in the page cache). Script suffixes (`scriptHandler`) route to LSAPI or FastCGI. A proxy context that cannot resolve its processor falls through to static; a script handler that cannot resolve its pool hard-fails 503.
+Three routes select a gateway, in dispatch order: a **rewrite `[P]`** target (deferred until after the page-cache lookup so it can still participate in the cache), a **WebSocket map** (` `) when the request carries an upgrade, and a **proxy ``** whose URI prefix matches and whose `handler` names a `proxy` extProcessor. Script suffixes (`scriptHandler`) route to LSAPI or FastCGI. A proxy context whose handler is missing, unknown or not a `proxy` extProcessor fails closed with 503, and so does a script handler that cannot resolve its pool; neither falls through to static.
 
 | Target form | Protocol to the backend |
 
@@ -819,10 +819,10 @@ Three routes select a gateway, in dispatch order: a **WebSocket map** (` `) when
 
 | `h2s://host[:443]` httpjet | HTTP/2 over TLS, ALPN fail-closed |
 
-Pool keys are scheme-scoped, so an h1 and an h2 target at the same address never share a connection. Forwarded requests to h2 upstreams are re-absolutized (the h2 client derives `:scheme`/`:authority` from the URI). Proxied *responses* may not assert `X-LiteSpeed-Purge`/`-Cache-Control`/`-Vary` — those are stripped so a remote backend cannot inject cache policy. Named upstreams receive a W3C `traceparent` when tracing is on.
+Pool keys are scheme-scoped, so an h1 and an h2 target at the same address never share a connection. Forwarded requests to h2 upstreams are re-absolutized (the h2 client derives `:scheme`/`:authority` from the URI). Proxied *responses* may not assert `X-LiteSpeed-Purge`/`-Cache-Control`/`-Tag`/`-Vary` — those are stripped so a remote backend cannot inject cache policy. Named upstreams receive a W3C `traceparent` when tracing is on.
 
         !   [P] targets are screened
-Since 2026-09-16 a rewrite `[P]` URL that resolves (after DNS — `/etc/hosts` pins cannot bypass the screen, and concurrent DNS lookups are bounded so slow resolvers fail fast) to loopback, link-local or a Unix socket is refused unless it matches an operator-configured extProcessor address. Forwarding to a foreign `[P]` origin also withholds client `Authorization` and `Cookie` headers. This closes the class where a `.htaccess` author reaches the local trust plane (metrics, admin, purge endpoints) or leaks origin credentials through the server.
+Since 2026-09-16 a rewrite `[P]` URL that resolves (after DNS — `/etc/hosts` pins cannot bypass the screen, and concurrent DNS lookups are bounded so slow resolvers fail fast) to any non-public-unicast address (loopback, unspecified, link-local, RFC 1918 private, CGNAT, multicast or documentation ranges) is refused unless it exactly matches an operator-configured extProcessor or WebSocket-map address; a Unix-socket `[P]` target is always refused. When the request can choose the upstream host (the `[P]` scheme or authority comes from a `$N`/`%N`/`%{…}` substitution), client `Authorization`, `Proxy-Authorization` and `Cookie` headers are withheld. This closes the class where a `.htaccess` author reaches the local trust plane (metrics, admin, purge endpoints) or leaks origin credentials through the server.
 
 ## Upstream groups & selection
 
@@ -849,7 +849,7 @@ Upstream responses are **never buffered** (`respBuffer` is parsed but always str
 
 ## WebSocket relay
 
-A ` ` map (`uri` → `address`) or an upgrade request on a proxy context performs the HTTP/1 handshake with the backend and then relays raw frames both ways. The relay supports **plain TCP HTTP/1 upstreams only** — not TLS, H2 or Unix-socket targets. Maps carry a stable `websocket: ` target identity scoped to their vhost, so named-target trace propagation applies; the client span covers the handshake, not the potentially unbounded relay. TCP keepalive keeps a vanished peer from pinning fds and permits forever.
+A ` ` map (`uri` → `address`) or a rewrite `[P]` to a `ws://` target that receives an upgrade request performs the HTTP/1 handshake with the backend and then relays raw frames both ways; an upgrade that reaches an ordinary proxy ` ` with no matching map is refused with 426. The relay supports **plain TCP HTTP/1 upstreams only** — not TLS, H2 or Unix-socket targets. Maps carry a stable `websocket: ` target identity scoped to their vhost, so named-target trace propagation applies; the client span covers the handshake, not the potentially unbounded relay. TCP keepalive keeps a vanished peer from pinning fds and permits forever.
 
 ## FastCGI gateway opt-in
 
@@ -901,7 +901,7 @@ The rewrite stage runs the vhost's inline ` ` rules first, then the `.htaccess` 
 
 ## Per-directory loading
 
-An `HtaccessCache` loads each directory's file (name from `accessFileName`, default `.htaccess`; bare file names only — `/` and `..` are rejected) with **mtime invalidation**, so an edit takes effect on the next request without a reload. The parsed form holds the directive list, compiled regexes, scoping blocks, a per-file memo of which access rules match, the auth realm map and the memo-eligibility verdict. The chain from docroot to the request's directory is bounded at **64** levels; past that a deny-all sentinel applies. Since 2026-09-16 an **unreadable or non-UTF-8 `.htaccess` also fails closed** to that sentinel rather than being skipped.
+An `HtaccessCache` loads each directory's file (name from `accessFileName`, default `.htaccess`; bare file names only — `/` and `..` are rejected) with **mtime invalidation** (each file is re-`stat`ed at most once a second), so an edit takes effect within about a second, without a reload. The parsed form holds the directive list, compiled regexes, scoping blocks, a per-file memo of which access rules match, the auth realm map and the memo-eligibility verdict. The chain from docroot to the request's directory is bounded at **64** levels; past that a deny-all sentinel applies. Since 2026-09-16 an **unreadable `.htaccess` (or one that fails to parse or exceeds 16 MiB) also fails closed** to that sentinel rather than being skipped. A non-UTF-8 byte is decoded lossily, so a legacy-encoded comment cannot downgrade a protected directory to "no rules".
 
 Vhost-level switches: ` 0` disables the whole chain (even with `autoLoadHtaccess`), while `autoLoadHtaccess` alone loads files without enabling general overrides. Candidate configuration generations own their own htaccess, rewrite-outcome and UA caches, so a reload never reintroduces stale results.
 
@@ -929,6 +929,8 @@ A flagged rule runs through a `CompiledRegex` that prefers `regex_automata::meta
 | Lookahead `(?=…)` / `(?!…)`, lookbehind | `fancy-regex` | Not expressible as a finite automaton. |
 
 | In-pattern backreference `\1` | `fancy-regex` | Requires backtracking. |
+
+| Pure lookahead conjunction `^(?=.*A)(?=.*B)…` | `regex_automata::meta` per part | Each lookahead runs as one linear search; `fancy-regex` is kept only for captures (0.1.10: a cookie `SetEnvIf` fell from 29 to 1 µs). |
 
 A regex that errors at match time **fails closed toward the rule's polarity**: a deny that cannot evaluate counts as matched; an allow that cannot evaluate is withheld (hardened 2026-09-06 alongside the spoofing checks).
 
@@ -1007,7 +1009,7 @@ htpasswd hashes: **bcrypt** (`$2y$`/`$2b$`/`$2a$`, `htpasswd -B`, cost capped at
 
 | RewriteEngine · RewriteBase | supported | Toggle and base-path resolution. |
 
-| RewriteCond · RewriteRule | supported | Flags: `L END R R=code F G P PT E= N NC QSA QSD NE C S=n`, `OR` on conditions; `-f -d -l -s -x` file tests. Variables: `REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME`, `%{HTTP:Name}`, `%{ENV:NAME}`, `%{LA-U:…}`/`%{LA-F:…}`. `%{TIME*}` and map lookups yield the empty string. Unknown flags are ignored, as Apache does. |
+| RewriteCond · RewriteRule | supported | Flags: `L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F`, `OR` on conditions; `-f/-F -d -e -l/-L/-h -s -x` file tests (`-U` always matches). Variables: `REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME`, `%{HTTP:Name}`, `%{ENV:NAME}`, `%{LA-U:…}`/`%{LA-F:…}`. `%{TIME*}` yields the empty string. `RewriteMap`, `${map:key}` lookups and the forced type/handler flags `T=`/`H=` are refused at parse time, so an `.htaccess` carrying one fails closed. Other unrecognized flags (e.g. `DPI`, `CO=`) are ignored. |
 
 | SetEnvIf · SetEnvIfNoCase | supported | Lazy header access; server-computed CGI names are protected. |
 
@@ -1017,11 +1019,11 @@ htpasswd hashes: **bcrypt** (`$2y$`/`$2b$`/`$2a$`, `htpasswd -B`, cost capped at
 
 | AuthType · AuthName · AuthUserFile | supported | Basic only; bcrypt, APR1 (`$apr1$`), MD5-crypt (`$1$`) and `{SHA}` hashes. |
 
-| Header set / add / append / merge / unset / setifempty | supported | `always`/`onsuccess`, case-insensitive `env=`/`env=!` guards, `%{NAME}e` interpolation, ` `/` `/` ` scopes (merged in Apache order: directory-level across the chain, then ` ` against the resolved target file, then ` `). `merge` deduplicates trimmed comma-separated values. Applied in `finalize`, before cache storage and compression. CR/LF rejected. |
+| Header set / add / append / merge / unset | supported | `always`/`onsuccess`, case-insensitive `env=`/`env=!` guards, `%{NAME}e` interpolation, ` `/` `/` ` scopes (merged in Apache order: directory-level across the chain, then ` ` against the resolved target file, then ` `). `merge` deduplicates trimmed comma-separated values. Applied in `finalize`, before cache storage and compression. CR/LF rejected. |
 
 | Header echo | partial | Parses without error; emits nothing. |
 
-| Header edit / edit* / note · RequestHeader * | ignored | Line ignored. See the header-directive compatibility inventory in the source tree (`docs/header-directive-compatibility.md`) for the exact boundary and the executable fixtures. |
+| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. See the header-directive compatibility inventory in the source tree (`docs/header-directive-compatibility.md`) for the exact boundary and the executable fixtures. |
 
 | Header condition expr= / value expr= | partial | Only a conjunction of `%{REQUEST_URI} =~ / !~` is evaluated; other expressions are not. Value expressions are not implemented. |
 
@@ -1094,7 +1096,7 @@ The admin write API classifies `useIpInProxyHeader` and the whole ` ` block as *
 
 ## Network ACLs
 
-` ` evaluates `allow`/`deny` CIDR lists most-specific-wins; a trailing `T` on an *allow* rule marks a trusted proxy. ` ` globs are never served, and a malformed glob is a hard start/reload error rather than a warn-and-skip. ` ` mode `2` (owner-restricted) fails closed to never-follow. Static opens use `openat2(RESOLVE_BENEATH)` — plus `RESOLVE_NO_SYMLINKS` when policy denies symlinks — and refuse non-regular files so a planted FIFO cannot park an executor thread; a kernel without `openat2` fails closed to 404.
+` ` evaluates `allow`/`deny` CIDR lists most-specific-wins; a trailing `T` on an *allow* rule marks a trusted proxy. ` ` globs are never served, and a malformed glob is a hard start/reload error rather than a warn-and-skip. ` ` mode `2` (owner-restricted) fails closed to never-follow. Static opens use `openat2(RESOLVE_BENEATH)` — plus `RESOLVE_NO_SYMLINKS` when policy denies symlinks — and refuse non-regular files so a planted FIFO cannot park an executor thread; without `openat2` (older kernels, overlay/FUSE filesystems, or a seccomp sandbox such as systemd's `RestrictSUIDSGID=`) a no-symlink policy is enforced by walking the path one `O_NOFOLLOW` component at a time beneath the docroot, still refusing symlinks and `..` escapes (v0.1.10; earlier releases answered 404).
 
 ## Per-client-IP throttle
 
@@ -1128,7 +1130,7 @@ A listener with `proxyProtocol=1` requires a PROXY v2/v1 header on every connect
 
 - **Revocation** — `crlFile` adds PEM CRL enforcement; absent means none, stated plainly.
 
-- **Cipher and resumption discipline** — one TLS 1.3 suite, single-use tickets, 0-RTT off; resumption disabled when OCSP is on. TLS stream splitting was made memory-safe in the 2026-09-06 round.
+- **Cipher and resumption discipline** — one TLS 1.3 suite, 0-RTT off, single-use tickets only on listeners without client verification (client-cert listeners always run full handshakes); resumption disabled when OCSP is on. TLS stream splitting was made memory-safe in the 2026-09-06 round.
 
 - **One config, two transports** — a certificate, verifier or CRL change cannot land on TCP and miss QUIC. See TLS, ACME & OCSP .
 
@@ -1182,7 +1184,7 @@ suEXEC (` `, off by default, `uidMin`/`gidMin` floors; uid 0 always rejected), c
 
 ## Audit posture
 
-Seven whole-codebase review rounds plus the sixteen-round October bug-bash campaign have landed on top of the August hardening pass: **2026-08-30** (issues #362–#368: no exploitable High, five low/informational fixes), **2026-09-06** (five confirmed medium/low findings: H2/H3 body-reservation leaks, retained-body and gzip-expansion accounting, scoped Basic-auth merging, public caching of authenticated static responses, UA-classification memo dependencies), **2026-09-16** (twelve fixes: h2 monoio deadlines, sendfile stall bounds, unreadable `.htaccess` fail-closed, PROXY loopback claims, `[P]` target screening, CGI-var deny-list, never-root and setuid refusal, isolation-mode hard errors, restart-required trust fields, seccomp ptrace gating, Origin-varied cache entries, CPU_SETSIZE clamp and single Content-Length), **2026-10-06** (issues #560–#575, released as 0.0.4: the H3 connection budget is charged at `Connected` with stateless Retry under handshake pressure, RFC 9112 request-target/Host enforcement at the H1 intake, one rule for which client headers reach PHP, `AuthUserFile` confined to the docroot with constant-cost verification and a bcrypt cost cap, POST-only purge + validated integrity keys + bounded control surfaces, quinn GHSA-53rm-773f-4q8c, new `qpack_decode`/`proxy_protocol_parse`/`lscache_control` fuzz targets, and a daily RustSec dependency-advisory CI job), **0.0.5** (15 findings #579–#593), **0.0.6** (2026-10-13 audit #594–#611: truncated LSAPI/FastCGI response aborts, HPACK over-cap converted to a stream error so dynamic tables stay in sync on pooled CDN connections, H3 streaming backpressure, OCSP responder TLS SAN verification), and **0.0.7–0.1.5** (2026-10-14..24 bug-bash rounds 1–16 and audit #1138: OLS XML wildcard/routing parity, APR1/MD5-crypt htpasswd + per-client auth rate limit, `.htaccess` `Expires*` + `Header merge`, per-URL cookie vary, SHA-256 vary hashing, Unix-socket WAF peer-UID verification, Bearer token gating on `/cache-entries` and `/__mimalloc-stats`, `lsapilib-hardening.patch` + `BEGIN_REQUEST` body scan, time-refilled H2 rapid-reset budget and send-stall resets, rustls 0.23.46 and webpki emSign distrust). Each round's regressions are in the tree; gates re-run after each: full workspace suite (3,019 tests), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
+Seven whole-codebase review rounds plus the sixteen-round October bug-bash campaign have landed on top of the August hardening pass: **2026-08-30** (issues #362–#368: no exploitable High, five low/informational fixes), **2026-09-06** (five confirmed medium/low findings: H2/H3 body-reservation leaks, retained-body and gzip-expansion accounting, scoped Basic-auth merging, public caching of authenticated static responses, UA-classification memo dependencies), **2026-09-16** (twelve fixes: h2 monoio deadlines, sendfile stall bounds, unreadable `.htaccess` fail-closed, PROXY loopback claims, `[P]` target screening, CGI-var deny-list, never-root and setuid refusal, isolation-mode hard errors, restart-required trust fields, seccomp ptrace gating, Origin-varied cache entries, CPU_SETSIZE clamp and single Content-Length), **2026-10-06** (issues #560–#575, released as 0.0.4: the H3 connection budget is charged at `Connected` with stateless Retry under handshake pressure, RFC 9112 request-target/Host enforcement at the H1 intake, one rule for which client headers reach PHP, `AuthUserFile` confined to the docroot with constant-cost verification and a bcrypt cost cap, POST-only purge + validated integrity keys + bounded control surfaces, quinn GHSA-53rm-773f-4q8c, new `qpack_decode`/`proxy_protocol_parse`/`lscache_control` fuzz targets, and a daily RustSec dependency-advisory CI job), **0.0.5** (15 findings #579–#593), **0.0.6** (2026-10-13 audit #594–#611: truncated LSAPI/FastCGI response aborts, HPACK over-cap converted to a stream error so dynamic tables stay in sync on pooled CDN connections, H3 streaming backpressure, OCSP responder TLS SAN verification), and **0.0.7–0.1.5** (2026-10-14..24 bug-bash rounds 1–16 and audit #1138: OLS XML wildcard/routing parity, APR1/MD5-crypt htpasswd + per-client auth rate limit, `.htaccess` `Expires*` + `Header merge`, per-URL cookie vary, SHA-256 vary hashing, Unix-socket WAF peer-UID verification, Bearer token gating on `/cache-entries` and `/__mimalloc-stats`, `lsapilib-hardening.patch` + `BEGIN_REQUEST` body scan, time-refilled H2 rapid-reset budget and send-stall resets, rustls 0.23.46 and webpki emSign distrust), and **0.1.10** (2026-10-25 bug/perf bash: five review rounds, 23 issues, 22 fixed and one closed by decision — a no-follow component walk when a sandbox blocks `openat2`, per-write H1 send-progress deadlines, XML directives httpjet would not enforce refused at config load instead of silently ignored, replay of a POST that a retiring LSAPI worker dropped unread, and no per-address rescans when a throttle shard is full during a distinct-IP flood). Each round's regressions are in the tree; gates re-run after each: full workspace suite (3,068 tests at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
 
         i   Reporting
 Security issues: use private responsible disclosure per `SECURITY.md` in the repository, not a public issue. Findings are reconciled against source and regression tests; none of this is evidence of production exploitation or a proof of absence of other vulnerabilities.
@@ -1214,7 +1216,7 @@ Static files have a separate, default-on per-worker finished-response memo (1 s 
 
 ## Opt-in by the app
 
-The cache never guesses. A response is stored only when the application says so. Per-vhost ` ` (and the six LSWS gates on a context's `cachePolicy`), the `.htaccess` `CacheLookup` directive, and the `[E=no-cache]` env all gate lookups; the response header gates storage.
+The cache never guesses. A response is stored only when the application says so. Per-vhost ` ` (and the public and private pairs of a context's six-flag LSWS `cachePolicy`: `respectCacheable` and `enablePostCache` are parsed but not enforced), the `.htaccess` `CacheLookup` directive, and the `[E=no-cache]` env all gate lookups; the response header gates storage.
 
            **app → httpjet** · the cache protocol headers
 ```
@@ -1296,7 +1298,7 @@ By default the cache is in-RAM only and flushes on restart. `--page-cache-store-
 
 - **Durable purges.** Purges unlink eagerly and retain a purge-all stamp, so old data cannot be resurrected on restart.
 
-- **Dictionaries compress at store.** The birth copy is identity; a bounded background task then dict-recompresses it in place against the vhost's own zstd dictionary (~3.5–9× smaller) at store time — never inline on a response, and never triggered by a first hit. An admission filter rejects one-hit public content before it reaches this work, and incompressible Content-Types are never encoded. Judge by `httpjet_pagecache_dict_recompress_{total,skipped_total{reason}}`; the served bytes stay standard zstd/br/gzip either way.
+- **Dictionaries compress at store.** The birth copy is identity; a bounded background task then dict-recompresses it in place against the vhost's own zstd dictionary (~3.5–9× smaller) at store time — never inline on a response, and never triggered by a first hit. An admission filter rejects one-hit public content before it reaches this work, and incompressible Content-Types are never encoded. Judge by `httpjet_pagecache_dict_recompress_{total,skipped_total{reason}}`; the served bytes stay standard zstd/br/gzip either way. Vhosts listed in `--page-cache-egress-at-rest-vhosts` skip this job and keep plain zstd at rest (0.1.6).
 
 budget calculator — how many pages fit?
 
@@ -1306,7 +1308,7 @@ budget calculator — how many pages fit?
            typical page (KB, identity)
            dictionary ratio ×
 
-Rules of thumb only (≈6 KB of metadata per entry, ratio 3.5–9× measured on forum HTML). tmpfs *is* RAM — size the disk cap against the box's headroom. Production runs disk-mem 6 GiB, hot-mem 384 MiB.
+Rules of thumb only (≈6 KB of metadata per entry, ratio 3.5–9× measured on forum HTML). tmpfs *is* RAM — size the disk cap against the box's headroom. Production runs disk-mem 2 GiB on the x86 origin and 5.5 GiB on the ARM origin, hot-mem 384 MiB on both.
 
 | Flag | Default | Bounds |
 
@@ -1316,7 +1318,7 @@ Rules of thumb only (≈6 KB of metadata per entry, ratio 3.5–9× measured on 
 
 | `--page-cache-hot-mem` | 192 MiB | In-RAM hot bodies in front of the files: zero-syscall serves; cold hits pay one ~µs tmpfs read + decode. |
 
-| `--page-cache-store-path` | *none* | Enables the file tier. Requires the integrity key; deploy scripts gate it behind `ALLOW_PAGE_CACHE_FILE_TIER=1`. |
+| `--page-cache-store-path` | *none* | Enables the file tier. Containers are tagged with `--page-cache-integrity-key` (created on first use if absent; without `--page-cache-integrity-required` an unusable key leaves containers untagged instead of refusing to start); deploy scripts gate the tier behind `ALLOW_PAGE_CACHE_FILE_TIER=1`. |
 
 | `--page-cache-dict-vhost` / `--page-cache-dict` / `--page-cache-dict-level` | — | Per-vhost zstd dictionaries (train one per site with `scripts/train-pagecache-dict.sh`) / global fallback / per-vhost internal zstd level (1–19, default 12). Rotation needs a restart; old-generation entries become safe misses (each body records its `dict_gen`). |
 
@@ -1325,6 +1327,8 @@ Rules of thumb only (≈6 KB of metadata per entry, ratio 3.5–9× measured on 
 | `--page-cache-opt-in-status` / `--page-cache-303-prefixes` | *empty* | Opt-in caching of 303/404/410 — only on an explicit `X-LiteSpeed-Cache-Control: public`, TTL capped 300 s, no stale windows; a 303 only under a listed prefix. Default: only 200/301 are cached. |
 
 | `--page-cache-stream-fill-vhosts` | *empty* | Vhosts whose cacheable public 200 misses without a Content-Length stream to the client frame by frame and store when the backend finishes (~ms earlier first byte on progressive template output). Errors/short bodies/over-cap serve but never store. |
+
+| `--page-cache-egress-at-rest-vhosts` | *empty* | Vhosts whose buffered misses keep a dictionary-less zstd body and skip the background dictionary re-encode. A zstd miss stores the encode made for its own response (one encode instead of two). Any other miss stores identity and encodes it plain in the background. A hot entry later gains its L9 variant. The stored copy is larger than a dictionary-compressed one. With `--xf-capsule-dedicated-store`, capsule renders keep the dictionary path. |
 
         !   Dictionaries can retain content
 Train only on public, logged-out pages of one vhost; a dictionary trained on another site's boilerplate does little, and one trained on private pages can leak fragments. Served bytes are never dictionary-encoded — a missing compatible dictionary is a miss, never undecodable output.
@@ -1367,7 +1371,7 @@ The first successful API publication introduces a response-cache *epoch* derived
 
 ## Microcaching today, and what is missing
 
-Short TTLs already work: a backend that sends `X-LiteSpeed-Cache-Control: public,max-age=2` gets every guard above and a two-second hit window (`scripts/microcache_policy_example.sh` proves miss→hit→expiry→fresh render, distinct-query isolation and `no-store` respect on an isolated instance). What does not exist yet is a **first-class route-level policy**: named profiles with deterministic precedence, route TTL floors/ceilings, per-profile eligibility, bypass matchers, declarative key dimensions, profile budgets, and bounded collapse/refresh controls. The proposed ` ` contract is specified in the source tree (`docs/microcache-policy.md`) and the parser intentionally rejects it until implemented.
+Short TTLs already work: a backend that sends `X-LiteSpeed-Cache-Control: public,max-age=2` gets every guard above and a two-second hit window (`scripts/microcache_policy_example.sh` proves miss→hit→expiry→fresh render, distinct-query isolation and `no-store` respect on an isolated instance). What does not exist yet is a **first-class route-level policy**: named profiles with deterministic precedence, route TTL floors/ceilings, per-profile eligibility, bypass matchers, declarative key dimensions, profile budgets, and bounded collapse/refresh controls. The proposed ` ` contract is specified in the source tree (`docs/microcache-policy.md`) and the current parser does not implement it yet (like any unknown element, it is ignored).
 
 ## Observing the cache
 
@@ -1399,7 +1403,7 @@ These scripts must pass before `--page-cache` ships anywhere; they run against a
 
 - **`cache_persist_test.sh`** With a file tier: waits on `/__hj_cache_ready` and asserts the boot scan restored entries. It restarts the service — run once (five restarts a minute trip systemd's start limit).
 
-- **`cache_sie_test.sh` · `cache_capsule_purge_test.sh`** Stale-if-error (kills its own lsphp mid-test) and the capsule purge invariant.
+- **`cache_sie_test.sh` · `cache_capsule_purge_test.sh`** Stale-if-error (freezes its own lsphp tree mid-test, the production outage shape) and the capsule purge invariant.
 
         !   A cache bug outlives a rollback
 A wrong response cached at the CDN edge stays there for its edge TTL. If bad content shipped: confirm the origin is correct on loopback, then purge the CDN zone — a binary rollback does not remove objects already stored upstream.
@@ -1421,9 +1425,9 @@ SUMMARY: Response compression with gzip, brotli and zstd, server-priority negoti
 
 | zstd | `zstd` | 3 (1–22) | `enableZstdCompress`, `enableDynZstdCompress`, `zstdCompressLevel` |
 
-| brotli | `brotli` | 5 (0–11) | `enableBrCompress`, `enableDynBrCompress`, `brCompressLevel` |
+| brotli | `brotli` | 5 (0–11; without `brCompressLevel`, a LiteSpeed `enableBrCompress` level 1–6 sets it, 0 disables) | `enableBrCompress`, `enableDynBrCompress`, `brCompressLevel` |
 
-| gzip | `flate2` | 6 | `enableGzipCompress`, `enableDynGzipCompress` |
+| gzip | `flate2` | 6 (1–9) | `enableGzipCompress`, `enableDynGzipCompress`, `gzipCompressLevel` |
 
 > [Diagram: compression-negotiation] Choosing an encoder. Bodies of 200 bytes or fewer are never compressed (OpenLiteSpeed parity), the compressible-type set matches LiteSpeed's compressibleTypes, already-encoded and 206 responses are skipped, and every encoded response carries Vary: Accept-Encoding.
 
@@ -1482,7 +1486,7 @@ httpjet is configured by a **LiteSpeed-compatible XML tree** selected with `--ro
 
 With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) applies LiteSpeed value semantics faithfully:
 
-- Variables `$SERVER_ROOT`, `$HOSTNAME`, `$VH_ROOT`, `$VH_NAME` substitute in `$VAR` and `${VAR}` forms.
+- Variables `$SERVER_ROOT`, `$HOSTNAME`, `$VH_ROOT`, `$VH_NAME` (plus `$DOC_ROOT` and `$VH_DOMAIN` once the vhost resolves them) substitute in `$VAR` and `${VAR}` forms.
 
 - Sizes accept `K`/`M`/`G`/`B` suffixes; times are bare seconds.
 
@@ -1490,7 +1494,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 - Booleans are `1`, `2` or `true` (case-insensitive); `followSymbolLink`/`allowSymbolLink` treat `2` (owner-restricted) as fail-closed never-follow.
 
-- Unknown elements are ignored so real trees load; `check --strict` reports the ones that would silently do nothing.
+- Unknown elements are ignored so real trees load; `check` warns on the ones that would silently do nothing, and security-relevant ones httpjet cannot enforce (a partial `allowOverride` mask, vhost `clientVerify`, `rewrite` maps, `phpIniOverride`, `enableHotlinkCtrl`, `forceStrictOwnership`) refuse the load.
 
            **layout** · a server root
 ```
@@ -1532,9 +1536,9 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | `bandwidthLimit` httpjet | `0` | Per-connection egress throttle, bytes/s (0 = unlimited). H2 paces per connection; H3 unpaced. |
 
-| `maxCachedFileSize` / `totalInMemCacheSize` | `4M` / `4G` | Small-file in-memory promotion threshold and budget (`CacheCaps`). |
+| `maxCachedFileSize` / `totalInMemCacheSize` | `4M` / `4G` | Small-file in-memory promotion threshold and budget (`CacheCaps`); the budget is clamped to 1 GiB. |
 
-| `maxMMapFileSize` / `totalMMapCacheSize` | `256K` / `2G` | Parsed for compatibility; the mmap file cache was removed. |
+| `maxMMapFileSize` / `totalMMapCacheSize` | `256K` / `2G` | The mmap tier is gone, but both still size the static-file RAM store: the per-file cap is the larger of `maxCachedFileSize` and `maxMMapFileSize`, and without `--page-cache` the store budget is `totalInMemCacheSize` (clamped to 1 GiB) + `totalMMapCacheSize` (clamped to 2 GiB). |
 
 | `fileETag` | `28` | ETag bitmask (INODE|MTIME|SIZE → `"size-mtime-inode;;;"`); 0 = no ETag. |
 
@@ -1568,7 +1572,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | Directive | Default | Meaning |
 
-| `name`, `address` | `*:80` | `ip:port` / `host:port`. httpjet also `unix:/path` or `uds:/path` for an HTTP-over-Unix-socket listener (TLS over UDS is rejected). Listener names are the stable identity across reloads. |
+| `name`, `address` | `*:80` | `ip:port` / `host:port`. httpjet also `unix:/path` or `uds:/path` for an HTTP-over-Unix-socket listener (TLS over UDS is unsupported: `check` warns and the TLS half does not serve). Listener names are the stable identity across reloads. |
 
 | `secure`, `keyFile`, `certFile`, `certChain` | off | TLS material; `certChain=1` appends `CACertFile` to the served chain. |
 
@@ -1580,7 +1584,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | `proxyProtocol` httpjet | `0` | PROXY v2/v1 required on *this* listener; fail-closed; never on a public bind. |
 
-| `vhostMapList/vhostMap` `vhost`, `domain` | — | Host→vhost; domains lowercased; exact matches take precedence over longest-match leading (`*.example.com`) or suffix (`example.*`) wildcards, then the bare `*` catch-all. |
+| `vhostMapList/vhostMap` `vhost`, `domain` | — | Host→vhost; domains lowercased; a configured `:port` is ignored and a leading `www.` is stripped for the lookup key. Resolution is exact match, then the nearest configured parent domain (`a.example.com` → `example.com`, treated as a non-canonical foreign host), then the bare `*` catch-all. Glob patterns such as `*.example.com` or `example.*` are not supported: `check` warns and they never match. |
 
            **httpd_config.xml** · a TLS listener with h3
 ```
@@ -1624,7 +1628,7 @@ An ` ` (server-level ` ` or per-vhost) is a reverse-proxy upstream (`proxy`), an
 
 | `path`, `backlog`, `instances`, `autoStart`, `runOnStartUp` | — / `100` / `1` / `0` / `0` | LSAPI worker binary and supervision (`instances>1` warns: one fixed upstream). |
 
-| *`phpConfig` additionally:* `phpHandler` (`command`, `suffixes`), `memSoftLimit`/`memHardLimit`, `maxProcessTime` (0 = unlimited; `--php-max-process-time-ms` overrides), `procSoftLimit`/`procHardLimit`, `extMaxIdleTime`, `backlog` default 1024, `detachedMode`. |
+| *`phpConfig` additionally:* `phpHandler` (`command`, `suffixes`), `memSoftLimit`/`memHardLimit`, `maxProcessTime` (0 = unlimited; `--php-max-process-time-ms` overrides), `procSoftLimit`/`procHardLimit`, `extMaxIdleTime`, `backlog` default 1024, `pcKeepAliveTimeout` default 30 s (not 60), `detachedMode`. |
 
 ## Virtual hosts
 
@@ -1636,7 +1640,7 @@ Declarations live in `httpd_config.xml` (`name`, `vhRoot`, `configFile`, `allowS
 
 | ` ` `enable`, `autoLoadHtaccess`, `base`, `rules` | Inline rules run before the `.htaccess` chain. |
 
-| ` ` `allowOverride`, `accessFileName` | `allowOverride 0` kills the whole chain; the access file name defaults to `.htaccess`. |
+| ` ` `allowOverride`, `accessFileName` | Only `allowOverride` `0` (no `.htaccess`) or `31` (all categories) loads per vhost; a partial category mask refuses the load (the server-level block accepts only 31). The access file name defaults to `.htaccess`. |
 
 | ` ` `keyFile`, `certFile`, `certChain`, `CACertFile` | The SNI identity for this vhost's domains (chain material, not a client-verify root). |
 
@@ -1646,7 +1650,7 @@ Declarations live in `httpd_config.xml` (`name`, `vhRoot`, `configFile`, `allowS
 
 | ` ` `uri`, `address` | WebSocket relay maps (plain TCP HTTP/1 upstreams). |
 
-| ` ` `accessLog`/`errorLog` with `useServer=0`, `fileName`, `rollingSize`, `keepDays`, `logHeaders` httpjet | Per-vhost log files (default roll 50 MB, keep 30 days; `logHeaders` 7 = combined). Log paths are boot-owned. |
+| ` ` `accessLog`/`errorLog` with `useServer=0`, `fileName`, `rollingSize`, `keepDays`, `logHeaders` httpjet | Per-vhost log files (default roll 50 MB, keep 30 days; `logHeaders` default 3 = combined, 7 = combined + Host). Log paths are boot-owned. |
 
 | `setUIDMode` (0/1/2), `chrootMode` (0/1/2), `chrootPath`, `suexecUser`/`suexecGroup`, ` ` | Per-vhost PHP isolation (needs the server ` ` gate). Out-of-range modes are hard errors. → |
 
@@ -1660,11 +1664,11 @@ Contexts map URI prefixes to terminals (`static`, `proxy`, `redirect`, `php`/`ls
 
 | `type`, `uri`, `location`, `handler`, `enabled` | — | Kind, prefix, on-disk location (static), processor name (proxy/lsapi). |
 
-| `extraHeaders` | — | Additional response headers for the context. |
+| `extraHeaders` | — | Additional response headers for the context: `Name: value` lines only (header operations refuse the load); `NONE` sets none and stops inheritance. Not allowed on `proxy` contexts (load error). |
 
 | `addDefaultCharset` / `addDefaultCharsetCustomized` | off | Charset appended to text types. |
 
-| `cachePolicy/*` | on | `checkPublicCache`, `checkPrivateCache`, `respectCacheable`, `enableCache`, `enablePrivateCache`, `enablePostCache` — the six LSWS gates, enforced on both cache tiers. |
+| `cachePolicy/*` | on (`enablePostCache` off) | `checkPublicCache`, `checkPrivateCache`, `respectCacheable`, `enableCache`, `enablePrivateCache`, `enablePostCache` — the six LSWS gates, enforced on both cache tiers. |
 
 | `maxReqBodySize` httpjet | inherit | Per-context body cap (413) on every terminal. |
 
@@ -1692,7 +1696,7 @@ Contexts map URI prefixes to terminals (`static`, `proxy`, `redirect`, `php`/`ls
            **check**
 ```
 httpjet --root /abs/root check            # summary: listeners, vhost map, fast-memo verdicts, warnings
-httpjet --root /abs/root check --strict   # + topology lint, missing docroots, vhost-map-fingerprint; non-zero on findings
+httpjet --root /abs/root check --strict   # same lint output; exits non-zero on lint errors (warnings never fail)
 ```
 
 Run the check under the intended service identity as well as as root: readable-by-root is not proof the runtime user can read certificates or write logs and sockets. The same normalization runs for the write API 's in-memory bundle (`parse_bundle`), which additionally refuses DTDs, more than 64 nesting levels, more than 128 vhosts, and 1 MiB of XML. A config file read from disk is capped at 16 MiB per file (`ConfigError::TooLarge`, 2026-10-06) — a bound on all readers, `check` included.
@@ -1708,13 +1712,13 @@ SUMMARY: Every httpjet subcommand and serve flag, grouped and filterable, plus t
 
 # CLI reference
 
-One binary, four subcommands. `--root` is the only global option. Persistent policy lives in the XML; **everything on the command line is an operational override** — addresses, workers, PHP wiring, cache budgets, feature opt-ins. This page is generated from `httpjet serve --help` of v0.1.5 plus the feature-gated flags.
+One binary, four subcommands. `--root` is the only global option. Persistent policy lives in the XML; **everything on the command line is an operational override** — addresses, workers, PHP wiring, cache budgets, feature opt-ins. This page is generated from `httpjet serve --help` of v0.1.10 plus the feature-gated flags.
 
 ## Subcommands
 
            **httpjet** [--root DIR] <subcommand>
 ```
-httpjet --root /abs/root check [--strict]     # parse + summary; --strict lints topology and exits non-zero on findings (deploy gate)
+httpjet --root /abs/root check [--strict]     # parse + summary + lint; --strict exits non-zero on lint errors (deploy gate)
 httpjet --root /abs/root serve [flags…]       # bind the configured listeners and serve
 httpjet --root /abs/root lsphp [flags…]       # run a standalone persistent lsphp pool (the PHP half of a zero-downtime deploy)
 httpjet lsphp-reload [flags…]                 # ask a running pool to replace its worker generation without closing the listener
@@ -1725,7 +1729,7 @@ httpjet --version                             # httpjet 0.1.10
 
 | `--root ` (global) | `/usr/local/lsws` | Server root containing `conf/httpd_config.xml`. Use an absolute path. |
 
-| `check --strict` | off | Hard-error on shared docroots, missing docroots, vhosts without an exact `vhostMap` domain; warn on apex-without-www, TLS over UDS, PROXY protocol on public binds, geo lists without a db, inert LiteSpeed elements, generic CGI contexts, unsupported auth forms; print `vhost-map-fingerprint` and fast-memo verdicts. |
+| `check --strict` | off | Hard-error on shared docroots, missing docroots, mapped vhosts whose config did not load, and an unloadable first TLS listener; warn (never fail) on vhosts without an exact `vhostMap` domain, apex-without-www, wildcard map patterns, TLS over UDS, PROXY protocol on public binds, inert LiteSpeed elements, generic CGI contexts, unsupported auth forms. Geo rules without a db fail `check` even without `--strict`. Plain `check` prints the same lint lines, `vhost-map-fingerprint` and fast-memo verdicts; `--strict` only makes errors exit non-zero. |
 
 | `lsphp --php-socket` | `/tmp/php8-httpjet.sock` | Socket lsphp listens on — the path `serve --lsphp-external` dials. A systemd-activated fd at the same path is adopted. |
 
@@ -1761,7 +1765,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --http-uds   | — | Additionally serve plain HTTP on this unix domain socket (H1 + h2c prior knowledge, one accept core). Peers have no address: ACLs and logs see fabricated loopback and the access log renders `unix:` — the socket file's mode/owner is the real access boundary. A socket-activated fd at the same path (socket unit) is adopted for zero-downtime restarts |
 
-| --ktls [ ] | auto | Kernel-TLS on the io_uring TLS path: after the rustls handshake, upgrade the socket to kTLS so H1/H2 serve plaintext over the raw fd (kernel encrypt/decrypt), removing the userspace AEAD copy on large-body egress. Runs only on the io_uring TLS path (the default transport). `auto` (default) requires a `--features ktls` build, a physical default-route NIC, and active `tls-hw-tx-offload`; otherwise it logs one reason and stays on rustls. `on` forces kTLS for isolated benchmarking and fails when the feature is absent; `off` never enables it. A bare `--ktls` remains an alias for `--ktls=on`. TLS 1.3 only (1.2 falls back to userspace); peer KeyUpdate is handled (RX rekey + reply). STAGED — validate on an alt port before production Print help Values: `auto, on, off`. |
+| --ktls [ ] | auto | Kernel-TLS on the io_uring TLS path: after the rustls handshake, upgrade the socket to kTLS so H1/H2 serve plaintext over the raw fd (kernel encrypt/decrypt), removing the userspace AEAD copy on large-body egress. Runs only on the io_uring TLS path (the default transport). `auto` (default) requires a `--features ktls` build, a physical default-route NIC, and active `tls-hw-tx-offload`; otherwise it logs one reason and stays on rustls. `on` forces kTLS for isolated benchmarking and fails when the feature is absent; `off` never enables it. A bare `--ktls` remains an alias for `--ktls=on`. TLS 1.3 only (1.2 falls back to userspace); peer KeyUpdate is handled (RX rekey + reply). STAGED — validate on an alt port before production. Values: `auto, on, off`. |
 
 | Security & limits |
 
@@ -1823,6 +1827,8 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --page-cache-stream-fill-vhosts   | (empty) | Comma-separated vhost names whose cacheable page-cache misses WITHOUT a Content-Length (progressive template output) are sent to the client as the backend writes them and stored once the backend finishes, instead of being buffered whole first. Only identity-encoded public 200s; a body that errors, is cut short or grows past the object cap is served but never stored. Empty = off |
 
+| --page-cache-egress-at-rest-vhosts   | (empty) | Comma-separated vhost names whose stored misses keep a dictionary-less zstd body (plain zstd) instead of being re-encoded against the vhost dictionary in the background. A miss answered with zstd (a CDN peer under `--cf-send-zstd`) stores the encode made for its own response, one encode instead of two; any other miss stores the identity and encodes it plain in the background. A zstd hit is served the stored bytes until the entry is hot enough for its L9 variant. The stored copy is larger than a dictionary-compressed one. Buffered misses only (not --page-cache-stream-fill-vhosts); with --xf-capsule dedicated storage, capsule renders keep the dictionary path. Empty = off |
+
 | --page-cache-admit-threshold   | 2 | (W-TinyLFU) Base admission bar: minimum frequency a cacheable response must show before it is STORED. One request counts as ONE sighting — the on-core fast path probes uncounted and records only a hit it serves. 2 = store on the 2nd sighting (miss-miss-hit; rejects the long-tail of one-hit-wonders — the default). 1 = store on the 1st sighting (miss-hit; cache everything — now cheap with --page-cache-dict, with the store's byte LRU protecting the hot set). Size-weighting adds +1 per 256 KiB on top. Watch httpjet_cache_hit_ratio_real to tune |
 
 | --page-cache-vary-cookies   | xf_style_variation,xf_style_id,xf_language_id | Comma-separated public-vary cookie names: a cacheable public response may declare `X-LiteSpeed-Vary: cookie=NAME,...` and the entry is keyed by these cookies' values (shared, non-sensitive prefs). Default matches the XenForo style/language set |
@@ -1871,6 +1877,8 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --no-fast-memo | off | Disable the finished-response memo on the on-core static fast path (default ON; per-thread, 1 s TTL, byte-identity-gated — see `pipeline::fast_memo`). Env `HJ_FAST_MEMO=0` is equivalent |
 
+| --fast-early-bridge   | off | Bridge a cookieless request to the full pipeline before the on-core prefix when nothing on-core can serve it: the page cache cannot answer the path and the static branch would decline. `off` (default) is today's path; `shadow` only counts what `on` would do (`httpjet_fast_early_predicted_total`, `httpjet_fast_early_forfeit_total`). Env `HJ_FAST_EARLY_BRIDGE` is equivalent and takes precedence. Values: `off, shadow, on`. |
+
 | --cf-send-zstd | off | Compress responses to a trusted-proxy (Cloudflare) peer as zstd, ignoring the forwarded Accept-Encoding. CF asks the origin for br/gzip but decodes an origin `Content-Encoding: zstd` and re-encodes per browser at its edge — so this hands CF the cheapest-to-produce form (zstd ≪ brotli to compress) without changing what browsers receive. Officially unsupported CF↔origin; opt-in, default off. Never applies to untrusted (direct) clients. Off ⇒ byte-identical to today |
 
 | --rewrite-outcome-ttl-ms   | 1000 | TTL in milliseconds for the rewrite-outcome cache (memoized rewrite decisions for `path_cacheable` chains, keyed by vhost/scheme/ method/host/path/query + any keyable header vars). 0 disables the cache entirely. The default (1000 ms) matches the historical hard-coded TTL — it bounds `-f`/`-d` filesystem staleness exactly like the StatCache and lets `.htaccess` edits take effect within ~1 s |
@@ -1891,13 +1899,15 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --telemetry-flush-secs   | 30 | Snapshot flush interval in seconds (only used when --telemetry-file is set). Fixed RAM; ~1 MB/day on disk at the default |
 
-| --php-slow-log   | (empty) | Per-request PHP render log: a TSV line for every LSAPI request whose render TTFB exceeds --php-slow-threshold-ms, plus a 1-in-128 sample of ALL PHP requests as the population baseline — the per-URL / user-class attribution behind the lsapi_ttfb histogram. Rolls at 64 MiB, gzip archives, 30-day prune. Empty = disabled. e.g. logs/php-slow.tsv |
+| --php-slow-log   | (empty) | Per-request PHP render log: a TSV line for every LSAPI request whose render TTFB exceeds --php-slow-threshold-ms, plus a 1-in-128 sample of ALL PHP requests as the population baseline — the per-URL / user-class attribution behind the lsapi_ttfb histogram. Rolls at 64 MiB, gzip archives, 7-day prune. Empty = disabled. e.g. logs/php-slow.tsv |
 
 | --php-slow-threshold-ms   | 50 | "Slow" threshold in milliseconds for --php-slow-log |
 
 | --request-id-header | off | Echo the per-request correlation id (also in the access/error/php-slow logs) as an `X-Request-Id` response header, so a client/CDN can join a response to the server-side logs. Off by default |
 
 | --profile-token   | (empty) | Bearer secret required for profiling and sensitive metrics diagnostics. Empty disables those routes; ordinary metrics scraping stays available. Visible in /proc/*/cmdline; prefer `--profile-token-file` |
+
+| --profile-token-file   | — | File holding the --profile-token secret (single-link regular file owned by root or the serving user, no group/other permissions). Conflicts with `--profile-token`. |
 
 | Admin API |
 
@@ -1960,7 +1970,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 | --xf-capsule-dedicated-store | off | Also store every capsule-capable page under a DEDICATED (admission-exempt) key. Off by default since 2026-10-04: members are served from the shell-capable PUBLIC entry, which keeps one copy per page and lets the admission gate govern every store |
 
         !   Removed flags
-`--cache-peer` / `--cache-peer-fill*` (cross-node cache peers) and `--cache-purge-secret-file` are gone; the purge endpoint is loopback-gated. `--io-uring` / `--io-uring-h3` never existed as opt-ins — the io_uring transport is unconditional.
+`--cache-peer` / `--cache-peer-fill*` (cross-node cache peers) and `--cache-purge-secret-file` are gone; the purge endpoint is loopback-gated. `--io-uring` / `--io-uring-h3` were removed when the io_uring transport became unconditional (the tokio/epoll adapters were deleted with them).
 
 ## Environment variables
 
@@ -1974,7 +1984,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | `HTTPJET_LOG_DIR` | unset | Redirect every opened log file (unified and per-vhost) into this directory so isolated test or PGO runs never touch production log paths. |
 
-| `HTTPJET_URING_NO_IOWAIT` | unset | `1` sets `IORING_FEAT_NO_IOWAIT` on supported kernels so network-wait time on io_uring rings is not accounted as system iowait. |
+| `HTTPJET_URING_NO_IOWAIT` | unset | `1` passes `IORING_ENTER_NO_IOWAIT` on blocking ring waits when the kernel advertises `IORING_FEAT_NO_IOWAIT`, so network-wait time on io_uring rings is not accounted as system iowait. |
 
 | `HTTPJET_SYSLOG_TARGET` | unset | Mirror every rendered access line to syslog: `udp://host:514`, bare `host:port`, or a unix-dgram path such as `/run/systemd/journal/syslog`. Sent from the writer task; failures counted, never fatal. |
 
@@ -1983,6 +1993,10 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 | `CF_SEND_ZSTD` | unset | `1` ≡ `--cf-send-zstd`. |
 
 | `HJ_FAST_MEMO` | `1` | `0` ≡ `--no-fast-memo`. |
+
+| `HJ_FAST_EARLY_BRIDGE` | unset | `off` · `shadow` · `on` ≡ `--fast-early-bridge`; takes precedence over the flag when set. |
+
+| `HJ_LSAPI_FULL_HEADER_ENV` | unset | `1` also sends every request header's `HTTP_*` copy in the LSAPI env table (kill switch for the 0.1.8 dedupe; lsphp's `$_SERVER` is unchanged either way). Read once. |
 
 | `HTTPJET_OTEL` · `HTTPJET_OTEL_METRICS` | unset | `1` enables OTLP tracing / metrics (`--features otel`; startup fails if the feature is absent). |
 
@@ -2000,11 +2014,15 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 - **SIGHUP**: Reload configuration and certificates through the publication coordinator; a bad config keeps the current generation (see Admin API & reload ).
 
-- **SIGTERM / SIGINT**: Graceful shutdown: stop accepting, GOAWAY h2, drain within the unit's `TimeoutStopSec`, close the admin coordinator, flush logs and telemetry, bounded OTel shutdown.
+- **SIGUSR1**: Reopen the unified and per-vhost access/error logs and the PHP slow log (logrotate).
+
+- **SIGUSR2**: Toggle httpjet's own log level to `debug` and back to the boot `RUST_LOG` filter.
+
+- **SIGTERM / SIGINT**: Graceful shutdown: stop accepting, GOAWAY h2, drain in-flight connections for up to 15 s (inside the reference unit's `TimeoutStopSec=20`), close the admin coordinator, flush logs and telemetry, bounded OTel shutdown.
 
 - **Argument validation**: Public admin binds, missing companion options (`--admin-token-file`, `--admin-resource-root`, ACME requirements), malformed `--page-cache-shared-paths` or `--page-cache-vary-default` / `--page-cache-dict-level` pairs, an unopenable generation file, or a rejected WAF configuration fail startup before any socket is bound; `--page-cache-integrity-required` additionally refuses to start the file tier when the integrity key cannot be installed.
 
-- **Socket activation**: Inherited fds are adopted by address/path; their count must match `--workers` for TCP listeners.
+- **Socket activation**: Inherited fds are classified by port (TCP for the HTTP/HTTPS listeners, UDP for QUIC) or exact path (Unix socket); one io_uring core serves each inherited TCP fd, so the socket unit's fd count, not `--workers`, sets the core count.
 
 ==============================================================================
 PAGE: Operations (https://httpjet.net/docs/operations)
@@ -2030,7 +2048,9 @@ sudo install -m0755 target/release/httpjet /usr/local/httpjet/bin/httpjet
 sudo /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
 sudo -u httpjet /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
 
-# minimal loopback example unit (no TLS, no PHP, no cache)
+# minimal loopback example unit (no TLS, no PHP, no cache); it runs /usr/bin/httpjet on /etc/httpjet/litespeed
+sudo install -m0755 target/release/httpjet /usr/bin/httpjet
+sudo install -d /etc/httpjet && sudo cp -a examples/litespeed /etc/httpjet/litespeed
 sudo install -m0644 packaging/systemd/httpjet-example.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now httpjet-example
 ```
@@ -2040,7 +2060,7 @@ The example units bind loopback and use example document roots. Set listeners, d
 
 ## The systemd model
 
-> [Diagram: systemd-units] Five units. The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.
+> [Diagram: systemd-units] Five core units (plus the optional edge firewall). The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.
 
 | Unit | Role |
 
@@ -2147,7 +2167,7 @@ A seccomp denial is a startup/test failure — do not work around it with `--pri
 
 ## Release and upgrade discipline
 
-A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through `scripts/update-deps.sh` and the full suite (the 0.1.x sweeps refreshed tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13 and zstd 0.14.3; a daily dependency-advisory job fails the build on any RustSec finding).
+A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through `scripts/update-deps.sh` and the full suite (the 0.1.x sweeps refreshed tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3 and brotli 9.1 / brotli-decompressor 6.2; a daily dependency-advisory job fails the build on any RustSec finding).
 
 ==============================================================================
 PAGE: Observability (https://httpjet.net/docs/observability)
@@ -2160,7 +2180,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 ## Prometheus metrics
 
-`--metrics-addr` (default `127.0.0.1:9090`; empty disables) serves `/metrics` in the Prometheus text format. Over 130 series today; the families that matter, grouped:
+`--metrics-addr` (default `127.0.0.1:9090`; empty disables) serves `/metrics` in the Prometheus text format. Over 180 metric families today; the families that matter, grouped:
 
 | Metric | Type | Meaning |
 
@@ -2178,7 +2198,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 | httpjet_tls_handshakes_{full,resumed}_total · httpjet_conn_{idle,peer}_closes_total | counter | Full vs resumed TLS handshakes; connection closes by idle timeout vs peer FIN/RST. |
 
-| httpjet_h2_rapid_reset_drops_total · httpjet_h3_send_stall_resets_total | counter | H2 connections dropped on rapid-reset budget exhaustion; H3 response streams reset on send stall. |
+| httpjet_h2_rapid_reset_goaways_total · httpjet_h2_send_stall_resets_total · httpjet_h3_send_stall_resets_total | counter | H2 connections closed with ENHANCE_YOUR_CALM when cancellations outrun the time-refilled rapid-reset budget; H2 and H3 response streams reset on send stall. |
 
 | httpjet_throttle_{allowed,rejected}_total | counter | Per-IP throttle decisions (0 when disabled). |
 
@@ -2206,7 +2226,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 | httpjet_pagecache_shared_path_{public_routes,canary_skipped}_total · _shared_paths_{matchers,canary_percent} | counter / gauge | Shared-paths routing. |
 
-| httpjet_xf_capsule_{hits,misses,stale_hits,dedicated_stores,canary_filtered}_total · _hits_by_class_total · _shell_age_secs | counter / histogram | XenForo capsule tier. |
+| httpjet_xf_capsule_{hits,misses,stale_hits,dedicated_stores,canary_filtered}_total · _hits_by_class_total · _shell_age_secs | counter / summary | XenForo capsule tier. |
 
 | httpjet_process_rss_bytes · httpjet_process_rss_anon_bytes · httpjet_pagecache_unaccounted_rss_anon_bytes | gauge | Process RSS and the part the cache accounting cannot explain. |
 
@@ -2214,15 +2234,15 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 | httpjet_lsapi_{acquire,dispatch,ttfb}_seconds | histogram | Pool contention · backend call · request-committed-to-first-byte. |
 
-| httpjet_lsapi_generation_advances_total · _stale_{idle,checked_out}_drops_total · _stale_worker_retire_{signals,failures}_total · _worker_attribution_failures_total · _eagain_{retries,terminal_exhaustions}_total | counter | External-pool generation lifecycle and backlog pressure. |
+| httpjet_lsapi_generation_advances_total · _stale_{idle,checked_out}_drops_total · _stale_worker_retire_{signals,failures}_total · _worker_attribution_failures_total · _eagain_{retries,terminal_exhaustions}_total · _reset_replays_total · _reset_replay_exhaustions_total | counter | External-pool generation lifecycle, backlog pressure, and fresh-dial replays of requests a retiring worker reset before any response byte. |
 
 | Proxy |
 
-| httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total} · httpjet_proxy_failover_total | labeled | Per-peer (scope, group, ordinal) health and selection; failovers served by a non-primary peer. |
+| httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total} · httpjet_proxy_failover_total | labeled | Per-peer (labels `scope`, `group`, `peer` = ordinal) health and selection; failovers served by a non-primary peer. |
 
 | Logging, OTel, debug |
 
-| httpjet_log_{access,vhost}_dropped_lines_total | counter | Unified and per-vhost log lines shed by the bounded writer queues (65,536 lines / 64 MiB per logger). |
+| httpjet_log_{access,error,vhost}_dropped_lines_total | counter | Access (unified + per-vhost), per-vhost error, and per-vhost writer log lines shed by the bounded writer queues (65,536 lines / 64 MiB per logger). |
 
 | httpjet_otel_spans_{queue,dropped_total,exported_total,export_failed_total} · httpjet_otel_http_{exports,export_failures}_total | gauge / counter | Span queue depth and loss; collector HTTP outcomes (observable even when the collector is down). |
 
@@ -2236,7 +2256,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
           Access log  Error log  Syslog tap  Per-vhost logs
 
-The unified access log (path from the XML; combined format with a trailing `reqid=` token) writes from a dedicated non-blocking task with a bounded queue (65,536 lines and 64 MiB per logger; `httpjet_log_access_dropped_lines_total` counts sheds), opens and rotates without following symlinks (`O_NOFOLLOW`), rolls asynchronously at 50 MB and prunes after 30 days (`HTTPJET_ACCESS_ROLLING_BYTES`, `HTTPJET_ACCESS_KEEP_DAYS`). `HTTPJET_ACCESS_LOG_FORMAT=json` emits one object per line with a fixed field order:
+The unified access log (path from the XML; combined format with a trailing `reqid=` token) writes from a dedicated non-blocking task with a bounded queue (65,536 lines and 64 MiB per logger; `httpjet_log_access_dropped_lines_total` counts sheds), opens and rotates without following symlinks (`O_NOFOLLOW`), rolls asynchronously at 50 MiB and prunes after 30 days (`HTTPJET_ACCESS_ROLLING_BYTES`, `HTTPJET_ACCESS_KEEP_DAYS`). `HTTPJET_ACCESS_LOG_FORMAT=json` emits one object per line with a fixed field order:
 
                access · json
 ```
@@ -2249,7 +2269,7 @@ The rolling `httpjet_error.log` (and captured backend stderr) is text by default
 
 `HTTPJET_SYSLOG_TARGET` mirrors every rendered access line as an RFC 5424 (or 3164) datagram from the writer task — request path untouched, file logging unaffected, send failures counted. The MSG part is the rendered line itself, so existing parsers keep working. Targets: `udp://host:514`, bare `host:port`, or a unix-dgram path like `/run/systemd/journal/syslog`. Facility/severity/hostname/app-name knobs are on the CLI page .
 
-A vhost's ` ` block with `useServer=0` and a `fileName` gives it its own access and error files (rolling size and keep-days per file; `logHeaders` 7 = combined format with request headers). Log paths are boot-owned: they cannot be changed through the write API.
+A vhost's ` ` block with `useServer=0` and a `fileName` gives it its own access and error files (rolling size and keep-days per file; `logHeaders` 7 = combined format plus the quoted `Host`). Log paths are boot-owned: they cannot be changed through the write API.
 
 ## Request ids
 
@@ -2259,7 +2279,7 @@ Every request gets a 64-bit correlation id (a per-process seed mixed into a lock
 
 - **`--telemetry-file logs/telemetry.tsv`**: Appends a cumulative snapshot row of the in-RAM aggregates every `--telemetry-flush-secs` (30): durability across restarts and a self-contained time series (~1 MB/day). The `:9090` endpoint works without it.
 
-- **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — the per-URL / user-class attribution behind `httpjet_lsapi_ttfb_seconds`. Rolls at 64 MiB, gzip archives, 30-day prune.
+- **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — the per-URL / user-class attribution behind `httpjet_lsapi_ttfb_seconds`. Rolls at 64 MiB, gzip archives, 7-day prune.
 
 These two files are what produced the production attribution on the Performance page: mean request 9.99 ms, of which 8.96 ms is inside PHP.
 
@@ -2335,10 +2355,10 @@ $ curl -s http://127.0.0.1:9091/v1/status | jq .
 {
   "schema_version": 1,
   "generation": 3,                       # process-local, starts at 1; rejected candidates stay invisible
-  "config_fingerprint": "sha256:…",      # of the normalized model's Debug form — comparable within one binary version only
+  "config_fingerprint": "9f2c…",      # of the normalized model's Debug form — comparable within one binary version only
   "listeners": [{"name":"https","tls":true,"unix":false}],   # configured names + flags, NOT bound addresses
   "vhosts": ["example.test"],
-  "upstreams": [{"scope":"server","group":"application","peers":[{"ordinal":0,"healthy":true,"active":2,"selections":1290}]}],
+  "upstreams": [{"scope":"server","group":"application","peer":0,"healthy":true,"active":2,"selections":1290}],
   "page_cache": {"entries": 41210, "memory_bytes": 60817408, "hits": 1904411, "misses": 88123},   # or null when off
   "truncated": false
 }
@@ -2391,7 +2411,7 @@ Framing: `Authorization: Bearer ` (missing/duplicate/malformed → 401 without r
 - Listener→vhost mappings on the unchanged listener set
 - Rewrites, document roots, contexts, static locations
 - Reloadable request settings, cache policy gates, expires
-- Proxy processors and groups (health schedulers restart cleanly)
+- Proxy and FastCGI processors, and proxy groups (health schedulers restart cleanly)
 - GeoIP database and upstream client-cert files — inside a resource root
 
 #### Constrained trust (TCP transaction)
@@ -2404,7 +2424,7 @@ Framing: `Authorization: Bearer ` (missing/duplicate/malformed → 401 without r
 #### restart_required
 
 - Listener addresses, count, order, secure/plain roles; QUIC enablement; UDS topology
-- PHP topology and pools; non-proxy processors
+- PHP topology and pools (LSAPI processors)
 - Cache-store identity and boot-time cache caps/policy
 - User/group, namespace and isolation settings, per-vhost log resources
 - `useIpInProxyHeader` and the whole ` ` block
@@ -2529,18 +2549,18 @@ httpjet does not `dlopen` third-party trait objects: Rust promises no stable tra
 
 ==============================================================================
 PAGE: Performance (https://httpjet.net/docs/performance)
-SUMMARY: Measured throughput by regime: loopback three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.
+SUMMARY: Measured throughput by regime: three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.
 ==============================================================================
 
 # Performance
 
 httpjet is fast — and these docs are strict about *where* the time goes. Every figure names its regime, because a **loopback benchmark** (synthetic, on-box, PGO build) is not the same thing as **production telemetry** (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.
 
-        ~908 k rps   h2 static, c=50, dedicated-host loopback
+        ~908 k rps   h2 static, c=50, dedicated load-generator client (mean of 4 runs)
         44.8 k rps   PHP/LSAPI over HTTP/1.1, PGO loopback
-        101 ×   cache hit vs the same page through PHP
-        0.2 %   httpjet's share of production request latency
-        1.55 IPC   h2 hit path at saturation (hardware counters)
+        40 ×   cache hit vs the same page through PHP
+        0.2 %   httpjet's request phases, June 2026 production telemetry
+        1.55 IPC   h2 hit path at saturation, June 2026 (hardware counters)
         0.0002 flt   v0.1.5 h2 static minor page faults/req
         0 / 80   metric rows worse, 0.1.10 vs 0.1.5 (controlled A/B)
 
@@ -2550,17 +2570,17 @@ httpjet is fast — and these docs are strict about *where* the time goes. Every
            production telemetry · real CF-fronted traffic
            hardware counters · perf at saturation
 
-A loopback benchmark removes the network, real TLS handshakes and the CDN — it isolates the server's code path, which is exactly what you want to compare two servers and exactly what you must not generalize to end-user latency. Production telemetry measures what users feel, dominated by the backend and the edge. The same server shows ~908k req/s on loopback and ~0.2% of user-visible latency in production; those answer different questions.
+A loopback benchmark removes the network, real TLS handshakes and the CDN — it isolates the server's code path, which is exactly what you want to compare two servers and exactly what you must not generalize to end-user latency. Production telemetry measures what users feel, dominated by the backend and the edge. The same server shows ~908k req/s in a synthetic benchmark and ~0.2% of user-visible latency in June 2026 production telemetry; those answer different questions.
 
 ## Performance across builds — interactive presentation
 
-Every benchmark campaign from the initial Phase 1–7 baseline (`0.0.1`, June 2026) through the October 2026 zero-fault pooling release (`v0.1.5`) and the `0.1.10` bug/perf release is recorded below with its exact regime, commit, and CSV receipt in github.com/faratech/httpjet . Use the **All-Builds Curve vs LiteSpeed & nginx** below to see the full trajectory on one canvas, or step through the **13 build slides**, **Workload Trajectories**, and **Build-vs-Build Diff**.
+Every benchmark campaign from the initial Phase 1–7 baseline (`0.0.1`, June 2026) through the October 2026 zero-fault pooling release (`v0.1.5`) and the `0.1.10` bug/perf release is recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at github.com/faratech/httpjet . Use the **All-Builds Curve vs LiteSpeed & nginx** below to see every build with a recorded absolute measurement on one canvas (later releases were measured as relative A/Bs), or step through the **14 build slides**, **Workload Trajectories**, and **Build-vs-Build Diff**.
 
 ## Loopback throughput
 
-The primary dataset is the August 2026 **dedicated-host three-way** (httpjet vs OpenLiteSpeed vs nginx on a quiet box, all release/PGO-equivalent builds). The June PGO campaign against a commercial-LiteSpeed baseline remains the PHP-path reference.
+The primary dataset is the August 2026 **three-way** (httpjet vs OpenLiteSpeed vs nginx): the static matrix was driven from a dedicated load-generator client on 2026-08-27 (two interleaved pairs per cell; the server host was not otherwise idle), and the heavy-`.htaccess` rows are a loopback PGO run on 2026-08-28. The June PGO campaign against a commercial-LiteSpeed baseline remains the PHP-path reference.
 
-> [Benchmark Chart: h2-static — HTTP/2 static throughput by concurrency (dedicated-host loopback · 2026-08-27 · empty bodies · req/s)]
+> [Benchmark Chart: h2-static — HTTP/2 static throughput by concurrency (dedicated load-generator client · 2026-08-27 · empty bodies · mean of 2 interleaved pairs · req/s)]
 
 One h2 connection is not a ceiling (~58k req/s at c=1), and throughput keeps rising with concurrency instead of collapsing; the earlier "h2 collapses past c=50" shape belonged to the June build and its measurement conditions, not the transport. HTTP/1.1 empty bodies at c=1000: ~202k vs OpenLiteSpeed's ~183k.
 
@@ -2614,7 +2634,7 @@ A 2026-08-30 refresh under shared-box conditions (live production on the same ho
 > [Benchmark Chart: attribution — Where a production request spends its time (live sample · 2026-08-30 · mean request 9.99 ms)]
 
         ⎁   Measured
-Across millions of production requests, the `lsphp` render is **86.5–98.8% of request wall time**. httpjet's own CPU is about **0.2%** — roughly **138 µs per request**, ~38 µs per cache hit, and that includes TLS, HTTP/2, rewrite, cache lookup and access logging. The 2026-08-30 sample: mean request 9.99 ms, 8.96 ms of it LSAPI TTFB, rewrite 5.4 µs, cache lookup 3.2 µs; pool acquire p99.9  production telemetry · --telemetry-file + --php-slow-log
+Across millions of production requests, the `lsphp` render is **86.5–98.8% of request wall time**. In the June 2026 telemetry httpjet's own request phases were about **0.2%** — roughly **138 µs per request** (rewrite, cache lookup, compression); a synthetic cache hit costs ~38 µs of CPU including TLS, HTTP/2, rewrite, cache lookup and access logging. The 2026-08-30 sample: mean request 9.99 ms, 8.96 ms of it LSAPI TTFB, rewrite 5.4 µs, cache lookup 3.2 µs; pool acquire p99.9  production telemetry · --telemetry-file + --php-slow-log
 
 If httpjet is 0.2% of latency, halving its CPU shaves ~0.1% off a page — imperceptible. Turning a PHP render into a cache hit removes the other ~99%. That asymmetry is why the project stopped shaving the serving path and invested in the cache, PHP/opcache tuning and raising the cacheable fraction.
 
@@ -2624,7 +2644,7 @@ If httpjet is 0.2% of latency, halving its CPU shaves ~0.1% off a page — imper
 At saturation the h2 cache-hit path shows **IPC 1.55**, a **0.31% branch-miss rate** and **1.6 L1d misses per 100 instructions**: execution is efficient and the bottleneck is instructions retired per request, not locality. Futex traffic (~85% of syscall time) turned out to be idle parking and cross-thread waker churn — the box was ~50% idle at the apparent ceiling — not lock contention.
  perf stat / strace · off-CPU analysis
 
-Two structural moves followed: the global **mimalloc** allocator (fewer arena futexes across the per-core monoio workers plus the tokio side-runtime) and the **on-core fast path** with the finished-response memo, which removes pipeline work rather than speeding it up. The October 2026 campaign (`0.0.9`–`0.1.5`) extended this to the remaining hot paths: keeping static-missing 404s and non-cacheable PHP GETs off the fast-path double lookup (−14.5% CPU on cookied guest pages), memoizing per-file `.htaccess` access rule matches (`access_decision_for_request` 13% → 2.7% of process CPU), extending the certified-peer idle window via `--trusted-proxy-idle-secs 1800` (cutting full TLS handshakes per request by 28% on x86 and 78% on ARM), tuning per-vhost dictionary zstd levels via `--page-cache-dict-level` (cutting ARM dictionary encode from ~50% to 11% of tokio CPU), and pooling transient response/TLS buffers and h2/bridge task slots (`hj_core::recycle::BODY_BUFS`) so sparse size classes do not page-fault under `MIMALLOC_PURGE_DELAY=0`.
+Two structural moves followed: the global **mimalloc** allocator (fewer arena futexes across the per-core monoio workers plus the tokio side-runtime) and the **on-core fast path** with the finished-response memo, which removes pipeline work rather than speeding it up. The October 2026 campaign (`0.0.9`–`0.1.5`) extended this to the remaining hot paths: keeping static-missing 404s and non-cacheable PHP GETs off the fast-path double lookup (−14.5% CPU on cookied guest pages), memoizing per-file `.htaccess` access rule matches (`access_decision_for_request` 13% → 2.7% of process CPU), extending the certified-peer idle window via `--trusted-proxy-idle-secs 1800` (cutting full TLS handshakes per request by 30% on x86 and 78% on ARM), tuning per-vhost dictionary zstd levels via `--page-cache-dict-level` (cutting ARM dictionary encode from ~50% to 11% of tokio CPU), and pooling transient response/TLS buffers and h2/bridge task slots (`hj_core::recycle::BODY_BUFS`) so sparse size classes do not page-fault under `MIMALLOC_PURGE_DELAY=0`.
 
 ## File egress: sendfile and kTLS
 
@@ -2634,10 +2654,10 @@ Plain-TCP H1 file bodies leave through bounded nonblocking `sendfile(2)`; TLS 1.
 
 ## The codegen tier — PGO + mimalloc
 
-Production binaries combine profile-guided optimization, the mimalloc allocator and `-C target-cpu=native`. The checked-in `scripts/build-pgo.sh` is the classic three-step — instrument, drive a representative loopback workload (h2 cache hits dominant, plus h2/h1 static and PHP), merge and rebuild — with frame pointers kept so the pprof endpoint can symbolize the live binary. Its workload and CPU tuning belong to one deployment; build a neutral release artifact separately.
+Production binaries combine profile-guided optimization, the mimalloc allocator and `-C target-cpu=native`. The development tree's `scripts/build-pgo.sh` (not in the public source export) is the classic three-step — instrument, drive a representative loopback workload (h2 cache hits dominant, plus h2/h1 static and PHP), merge and rebuild — with frame pointers kept so the pprof endpoint can symbolize the live binary. Its workload and CPU tuning belong to one deployment; build a neutral release artifact separately.
 
         !   A non-PGO benchmark is not a benchmark
-Debug builds are ~5× slower and meaningless. Even a plain release build differs from PGO by enough (~10% from binary layout alone) to fake a regression: build both sides the same way and interleave runs. The bench harness (`scripts/bench-suite.sh`, `scripts/bench-report.py`) records CSVs under `scripts/bench-results/`.
+Debug builds are ~5× slower and meaningless. Even a plain release build differs from PGO by enough (~10% from binary layout alone) to fake a regression: build both sides the same way and interleave runs. The bench harness (`scripts/bench-suite.sh`, `scripts/bench-report.py`) records CSVs under `scripts/bench-results/` in the development tree; neither the harness nor the CSVs are in the public source export.
 
 ## Knobs that actually move production
 
@@ -2665,17 +2685,17 @@ Filter by build tag, commit, workload, regime, or CSV receipt file across all 14
 
 | `0.0.1` · Phase 1–7 2026-06-01 · `dcf4ca1e` | loopback A/B vs LSWS 6.3.5 | Light `.htaccess` H1: **135,448 RPS** vs LSWS 182,743 (`0.74×`); Heavy 477-line `.htaccess` H1: **95,840 RPS** vs LSWS 160,920 (`0.60×`); H2 1 KB `c=50`: **~128k RPS** vs LSWS 220.5k. Receipt: `RESULTS.md` Phase 7, `litespeed-*-run1.csv` |
 
-| `Tier A` · StatCache + DFA 2026-06-04 · `2e1db15` | loopback A/B vs LSWS 6.3.5 | 1s TTL on `.htaccess` `statx`, `FileCache` & `StatCache` (`-f`/`-d`) + `RegexSet` DFA prefilter: heavy `/robots.txt` ratio lifted **`0.46× → 0.63×`** (`0.70×` peak); 66 KB `og-image.png` reached **`0.90–0.99×`** parity. Receipt: `RESULTS.md` Tier A |
+| `Tier A` · StatCache + DFA 2026-05-31 · `66fc2088` | loopback A/B vs LSWS 6.3.5 | 1s TTL on `.htaccess` `statx`, `FileCache` & `StatCache` (`-f`/`-d`) + `RegexSet` DFA prefilter: heavy `/robots.txt` ratio lifted **`0.46× → 0.63×`** (`0.70×` peak); 66 KB `og-image.png` reached **`0.90–0.99×`** parity. Receipt: `RESULTS.md` Tier A |
 
-| `Batches 1–5` · Micro-Opts 2026-06-06 · `2d80a25` | same-session A/B shared host | Lazy header map, `Cow` CGI env keys, literal-prefix rule filter, `zstd > br > gzip` negotiation, OR-condition regex folding (28 evals → 1): PHP H1 `c=40` **31,013 → 31,300 RPS**; heavy H1 **78.6k vs 72.3k** (within noise, isolating codegen/allocator as the true bottleneck). Receipt: `RESULTS.md` Batches 1–5 |
+| `Batches 1–5` · Micro-Opts 2026-06-02 · `2d80a25` | same-session A/B shared host | Lazy header map, `Cow` CGI env keys, literal-prefix rule filter, `zstd > br > gzip` negotiation, OR-condition regex folding (28 evals → 1): PHP H1 `c=40` **31,013 → 31,300 RPS**; heavy H1 **78.6k vs 72.3k** (within noise, isolating codegen/allocator as the true bottleneck). Receipt: `RESULTS.md` Batches 1–5 |
 
-| `Batch 6` · Codegen PGO 2026-06-07 · `5091dfc` | isolated PID A/B PGO + mimalloc | `-C target-cpu=native` + global `mimalloc` + 3-step PGO: heavy `.htaccess` H1 **75.4k → 84.3k RPS (`+11.8%`)** matching LSWS (84.3k); light static H1 **88.3k → 93.0k RPS (`+5.2%`)**. Receipt: `RESULTS.md` Batch 6, `scripts/build-pgo.sh` |
+| `Batch 6` · Codegen PGO 2026-06-02 · `5091dfc` | isolated PID A/B PGO + mimalloc | `-C target-cpu=native` + global `mimalloc` + 3-step PGO: heavy `.htaccess` H1 **75.4k → 84.3k RPS (`+11.8%`)** matching LSWS (84.3k); light static H1 **88.3k → 93.0k RPS (`+5.2%`)**. Receipt: `RESULTS.md` Batch 6, `scripts/build-pgo.sh` |
 
-| `LSCache + H2 Fix` 2026-06-07 · `dc38d640` | loopback PGO HTTPS suite | Single-flight follower Notify fix lifted heavy `c=50` H1 **298 → 72,371 RPS** and H2 **2,939 → 165,939 RPS**. H2 1-conn 64-stream fan-out: **52.5k → 116k RPS (`2.2×`)**. 1s `open_beneath` memo: `openat` **20,000 → 0** (`+12%` static). H2 1 KB `c=50`: **250.8k** vs LSWS 220.5k; PHP H1 `c=40`: **44.8k** vs LSWS 38.5k. Origin page-cache HIT (152 KB): **19,912 RPS (`p50 2ms`)** vs PHP **196 RPS (`p50 93ms`, `101×`)**; tmpfs `jetcache` hit: **18,211 RPS**. Receipt: `httpjet-sweep-fixed.csv`, `httpjet-cache-run1.csv`, `httpjet-cache-jetfile.csv` |
+| `LSCache + H2 Fix` 2026-06-07 · `36078788` | loopback PGO HTTPS suite | Single-flight follower Notify fix lifted heavy `c=50` H1 **298 → 72,371 RPS** and H2 **2,939 → 165,939 RPS**. H2 1-conn 64-stream fan-out: **52.5k → 116k RPS (`2.2×`)**. 1s `open_beneath` memo: `openat` **20,000 → 0** (`+12%` static). H2 1 KB `c=50`: **250.8k** vs LSWS 220.5k; PHP H1 `c=40`: **44.8k** vs LSWS 38.5k. Origin page-cache HIT (152 KB): **19,215 RPS (`p50 2ms`)** vs PHP **480 RPS (`p50 34ms`, `40×`)**; tmpfs `jetcache` hit: **18,211 RPS**. Receipt: `httpjet-sweep-fixed.csv`, `httpjet-cache-run1.csv`, `httpjet-cache-jetfile.csv` |
 
-| `io_uring` · monoio 2026-06-21 · `30b7fda` | transport A/B uring vs epoll | Unconditional thread-per-core `monoio` `io_uring` transport for H1/H2 TCP+TLS and UDP H3 + vendored `monoio-rustls` vectored `writev`: H1 **`+19%`**, H2 **`+22%`**, H3 **`+14–20%`** over tokio/epoll + quinn. Receipt: `CLAUDE.md` / `RESULTS.md` 2026-06-21 |
+| `io_uring` · monoio 2026-06-21 · `c4930ff6` | transport A/B uring vs epoll | Unconditional thread-per-core `monoio` `io_uring` transport for H1/H2 TCP+TLS and UDP H3 + vendored `monoio-rustls` vectored `writev`: H1 **`+19%`**, H2 **`+22%`**, H3 **`+14–20%`** over tokio/epoll + quinn. Receipt: `CLAUDE.md` / `RESULTS.md` 2026-06-21 |
 
-| `v0.0.1` · 3-Way + Memo 2026-08-28 · `456711f5` | dedicated 3-way + prod telemetry | H2 static empty: `c=50` **907.7k** (HJ) vs 792.8k (OLS); `c=200` **937.0k** vs 687.2k; 1 KB `c=200` **803.9k** vs 790.5k. Fast-memo A/B (`c=100`): H1 **107k → 153k (`+43%`)**, H2 **137k → 248k (`+81%`)**. 806-line `.htaccess` PGO 3-way: H2 **298.0k** (HJ) vs 283.3k (OLS) vs 125.4k (nginx). Prod telemetry: mean **9.99 ms** (8.96 ms PHP = `89.7%`, HJ CPU **138 µs** = `0.2%`, **1.55 IPC**). Receipt: `versus5-dedicated-final-20260827.csv`, `compare-rewrite-memo-vary-pgo.csv` |
+| `v0.0.1` · 3-Way + Memo 2026-08-27..28 · `49c5e7c2` (pre-tag) | dedicated-client + loopback 3-way + prod telemetry | H2 static empty (mean of two interleaved pairs): `c=50` **891.1k** (HJ) vs 838.2k (OLS); `c=200` **851.8k** vs 736.3k; 1 KB `c=200` **802.9k** vs 788.4k. Fast-memo A/B (`c=100`): H1 **107k → 153k (`+43%`)**, H2 **137k → 248k (`+81%`)**. 806-line `.htaccess` PGO 3-way: H2 **298.0k** (HJ) vs 283.3k (OLS) vs 125.4k (nginx). Prod telemetry (2026-08-30): mean **9.99 ms** (8.96 ms PHP = `89.7%`; rewrite 5.4 µs + cache lookup 3.2 µs = `0.09%`). Receipt: `versus5-dedicated-final-20260827.csv`, `compare-rewrite-memo-vary-pgo.csv` |
 
 | `v0.0.2` · sendfile & kTLS 2026-09-23 · `f987d7cd` | loopback egress 1 MiB × 5,000 c=50 | Plaintext H1 `sendfile(2)`: **4,852.5 RPS** (`10.08 ms` mean); TLS 1.3 H1 rustls (`--ktls=off`): **2,999.7 RPS**; forced software kTLS on virtual GVE NIC: **2,944.9 RPS** (validating why `--ktls=auto` requires physical `tls-hw-tx-offload`). `--page-cache-dict-level windowsforum.com=6` halved encode CPU for `+4%` footprint. Receipt: `httpjet-sendfile-sendfile-release.csv`, `httpjet-ktls-sendfile-*-20260909.csv` |
 
@@ -2683,7 +2703,7 @@ Filter by build tag, commit, workload, regime, or CSV receipt file across all 14
 
 | `v0.0.9` · CPU Campaign 2026-10-18 · `d4a4e333` | PMU counters x86 + ARM64 | Idle ticker parking: idle CPU **`−54..63%`** (TLS wakes `32/s → 0`). Cookied front-controller early bridge: cookied guest **`−14.5%` CPU** (TLS **`−30%`**), PHP **`−12%`** (TLS **`−44%`**). Per-file `.htaccess` access-rule match memo (`#963`): `access_decision_for_request` **`13.0% → 2.7%`** CPU. ARM64 PMU instructions/req: PHP **`−18%`**, guest **`−11%`**, hit **`−8.5%`**. Live x86 prod CPU/req: **970 µs → 921 µs**. Receipt: `RESULTS.md` 2026-10-18 (`#958`–`#964`) |
 
-| `v0.0.10` · TLS Idle + Dict L3 2026-10-18 · `f73fcedf` | live prod metrics x86 + voidrune | `--trusted-proxy-idle-secs 1800` cut full TLS handshakes/req **`0.052 → 0.0365 (−28%)`** on x86 and **`0.77 → 0.169 (−78%)`** on ARM64; `--tls-session-tickets 0` cut handshake CPU **`−5%`**. `--page-cache-dict-level moontimenow.com=3,thisdayinhistory.ai=3` sped up ARM64 dict encode **`5.3×`** (`3.53 → 0.66 ms/page`), dropping dict CPU from **`~50% → 11%`** of tokio CPU. Receipt: `CLAUDE.md` `#486`, `#489`, `#967` |
+| `v0.0.10` · TLS Idle + Dict L3 2026-10-18 · `f73fcedf` | live prod metrics x86 + voidrune | `--trusted-proxy-idle-secs 1800` cut full TLS handshakes/req **`0.052 → 0.0365 (−30%)`** on x86 and **`0.77 → 0.169 (−78%)`** on ARM64; `--tls-session-tickets 0` cut handshake CPU **`−5%`**. `--page-cache-dict-level moontimenow.com=3,thisdayinhistory.ai=3` sped up ARM64 dict encode **`5.3×`** (`3.53 → 0.66 ms/page`), dropping dict CPU from **`~50% → 11%`** of tokio CPU. Receipt: `CLAUDE.md` `#486`, `#489`, `#967` |
 
 | `v0.1.2–0.1.3` · Task Pools 2026-10-24 · `2f259201` | perf stat PGO PURGE_DELAY=0 | `hj_core::recycle::Recycled ` for H2 stream & bridge futures, LSAPI read/BEGIN pools, and per-thread zstd/gzip scratch: minor page faults/req dropped **`0.80 → 0.0005`** on H2 1 KiB (`−22..32%` CPU), **`1.61 → 0.05`** on heavy `.htaccess` (`−19..25%` CPU), **`1.60 → 0.026`** on 64 KiB, and **`0.41 → 0.001`** on cache hits. `v0.1.3` (`0c10fdc4`) skipped quality-9 brotli on internal refresh under `--cf-send-zstd` (**`−8k` faults & `−10 ms`/page**). Receipt: PR `#1157`, commit `0c10fdc4` |
 
@@ -2769,7 +2789,7 @@ The last full runs: the whole workspace suite green at the 0.1.10 release (3,068
 
 - **Dependency advisories**: a daily job fails on any RustSec finding and on a newer compatible transport-critical crate (quinn, rustls, aws-lc-rs, tokio, httparse, io-uring, zstd, brotli, h2, hyper, http, mio, socket2, openssl, bcrypt, libc).
 
-- **Nightly/manual fuzz**: all eight parser targets with bounded time, input size, memory and artifact retention.
+- **Weekly/manual fuzz**: all eight parser targets with bounded time, input size, memory and artifact retention.
 
            **local reproduction**
 ```
@@ -2833,7 +2853,7 @@ target/release/httpjet --root /abs/copied-root check --strict
 sudo -u   target/release/httpjet --root /abs/copied-root check --strict
 ```
 
-Treat errors as blockers. Review every warning — ignored security elements (`lsrecaptcha`, `censorshipControl`), generic CGI contexts, wildcard maps, TLS over a Unix socket, unsupported auth forms, missing GeoIP data, unloaded vhosts, and settings that require a restart rather than a reload. *Parsed does not mean equivalent.* Compare the resulting listener/vhost map and effective limits with the source server, and run the check as the runtime identity too: readable-by-root is not proof the service user can read certificates or write logs, sockets and cache.
+Treat errors as blockers — shared or missing docroots, mapped vhosts whose config did not load, geo rules without their database. Review every warning — ignored security elements (`lsrecaptcha`, `censorshipControl`), generic CGI contexts, wildcard maps, TLS over a Unix socket, unsupported auth forms, vhosts without an exact domain, and settings that require a restart rather than a reload. *Parsed does not mean equivalent.* Compare the resulting listener/vhost map and effective limits with the source server, and run the check as the runtime identity too: readable-by-root is not proof the service user can read certificates or write logs, sockets and cache.
 
         !   Things LiteSpeed does that httpjet will not
 `RequestHeader` and `Header edit` are ignored; traditional DES and `$5$`/`$6$` `crypt()` htpasswd hashes verify false (bcrypt, APR1 `$apr1$`, MD5-crypt `$1$` and `{SHA}` are supported); `Require` forms other than `all granted`/`valid-user`/`user` deny; anti-abuse elements are inert; `cacheStorePath` is unused; `respBuffer` always streams; `instances>1` is a single upstream. Each is on the capability matrix . You can also paste any `.htaccess` file into the interactive `.htaccess` & `fast_memo` readiness inspector to preview directive support and `MemoClass` eligibility in the browser.

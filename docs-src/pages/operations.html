@@ -13,7 +13,9 @@ sudo install -m0755 target/release/httpjet /usr/local/httpjet/bin/httpjet
 sudo /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
 sudo -u httpjet /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
 
-<span class="t-c"># minimal loopback example unit (no TLS, no PHP, no cache)</span>
+<span class="t-c"># minimal loopback example unit (no TLS, no PHP, no cache); it runs /usr/bin/httpjet on /etc/httpjet/litespeed</span>
+sudo install -m0755 target/release/httpjet /usr/bin/httpjet
+sudo install -d /etc/httpjet &amp;&amp; sudo cp -a examples/litespeed /etc/httpjet/litespeed
 sudo install -m0644 packaging/systemd/httpjet-example.service /etc/systemd/system/
 sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now httpjet-example</code></pre></div>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Review before start</span><p>The example units bind loopback and use example document roots. Set listeners, domains, docroots, TLS material, writable paths and the service identity deliberately before enabling a public service. A permission-preparing <code>ExecStartPre</code> that runs as root and then drops to the unprivileged account is the reference shape.</p></div></div>
@@ -21,7 +23,7 @@ sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now httpjet-exam
 
     <section>
       <h2 id="systemd">The systemd model</h2>
-      <!--diagram:systemd-units|<strong>Five units.</strong> The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.-->
+      <!--diagram:systemd-units|<strong>Five core units</strong> (plus the optional edge firewall). The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.-->
       <div class="tablewrap"><table>
         <thead><tr><th>Unit</th><th>Role</th></tr></thead>
         <tbody>
@@ -106,5 +108,5 @@ bash scripts/oci-smoke.sh                                    <span class="t-c">#
 
     <section>
       <h2 id="release">Release and upgrade discipline</h2>
-      <p>A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through <code>scripts/update-deps.sh</code> and the full suite (the 0.1.x sweeps refreshed tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13 and zstd 0.14.3; a daily dependency-advisory job fails the build on any RustSec finding).</p>
+      <p>A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through <code>scripts/update-deps.sh</code> and the full suite (the 0.1.x sweeps refreshed tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3 and brotli 9.1 / brotli-decompressor 6.2; a daily dependency-advisory job fails the build on any RustSec finding).</p>
     </section>

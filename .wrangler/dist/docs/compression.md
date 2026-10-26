@@ -19,9 +19,9 @@
 
 | zstd | `zstd` | 3 (1–22) | `enableZstdCompress`, `enableDynZstdCompress`, `zstdCompressLevel` |
 
-| brotli | `brotli` | 5 (0–11) | `enableBrCompress`, `enableDynBrCompress`, `brCompressLevel` |
+| brotli | `brotli` | 5 (0–11; without `brCompressLevel`, a LiteSpeed `enableBrCompress` level 1–6 sets it, 0 disables) | `enableBrCompress`, `enableDynBrCompress`, `brCompressLevel` |
 
-| gzip | `flate2` | 6 | `enableGzipCompress`, `enableDynGzipCompress` |
+| gzip | `flate2` | 6 (1–9) | `enableGzipCompress`, `enableDynGzipCompress`, `gzipCompressLevel` |
 
 > [Diagram: compression-negotiation] Choosing an encoder. Bodies of 200 bytes or fewer are never compressed (OpenLiteSpeed parity), the compressible-type set matches LiteSpeed's compressibleTypes, already-encoded and 206 responses are skipped, and every encoded response carries Vary: Accept-Encoding.
 

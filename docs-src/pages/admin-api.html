@@ -20,10 +20,10 @@
 {
   "schema_version": 1,
   "generation": 3,                       <span class="t-c"># process-local, starts at 1; rejected candidates stay invisible</span>
-  "config_fingerprint": "sha256:…",      <span class="t-c"># of the normalized model's Debug form — comparable within one binary version only</span>
+  "config_fingerprint": "9f2c…",      <span class="t-c"># of the normalized model's Debug form — comparable within one binary version only</span>
   "listeners": [{"name":"https","tls":true,"unix":false}],   <span class="t-c"># configured names + flags, NOT bound addresses</span>
   "vhosts": ["example.test"],
-  "upstreams": [{"scope":"server","group":"application","peers":[{"ordinal":0,"healthy":true,"active":2,"selections":1290}]}],
+  "upstreams": [{"scope":"server","group":"application","peer":0,"healthy":true,"active":2,"selections":1290}],
   "page_cache": {"entries": 41210, "memory_bytes": 60817408, "hits": 1904411, "misses": 88123},   <span class="t-c"># or null when off</span>
   "truncated": false
 }</code></pre></div>
@@ -56,9 +56,9 @@
       <p><code>hj-config::parse_bundle</code> normalizes the bundle without ever reading the submitted <code>configFile</code> paths: 1 MiB aggregate, ≤128 vhosts, one root element per document, no DTD, ≤64 nesting levels, missing/extra/duplicate declarations fatal, diagnostics suppressed, errors carry no submitted data. The server root always comes from startup.</p>
       <h3 id="classification">What a transaction may change</h3>
       <div class="two">
-        <div><h4>Reloadable (application)</h4><ul><li>Listener→vhost mappings on the unchanged listener set</li><li>Rewrites, document roots, contexts, static locations</li><li>Reloadable request settings, cache policy gates, expires</li><li>Proxy processors and groups (health schedulers restart cleanly)</li><li>GeoIP database and upstream client-cert files — inside a resource root</li></ul></div>
+        <div><h4>Reloadable (application)</h4><ul><li>Listener→vhost mappings on the unchanged listener set</li><li>Rewrites, document roots, contexts, static locations</li><li>Reloadable request settings, cache policy gates, expires</li><li>Proxy and FastCGI processors, and proxy groups (health schedulers restart cleanly)</li><li>GeoIP database and upstream client-cert files — inside a resource root</li></ul></div>
         <div><h4>Constrained trust (TCP transaction)</h4><ul><li>Listener identity/routing, PROXY-protocol policy, TLS certificate/key/CA/CRL material — through prepared same-socket TCP successors</li><li>An existing <code>--http-uds</code> endpoint is handed off</li><li>An already-enabled QUIC endpoint adopts the new TLS/mTLS policy for future handshakes without rebinding UDP</li><li>UDS ext-processor addresses authorized against resource roots</li></ul></div>
-        <div><h4>restart_required</h4><ul><li>Listener addresses, count, order, secure/plain roles; QUIC enablement; UDS topology</li><li>PHP topology and pools; non-proxy processors</li><li>Cache-store identity and boot-time cache caps/policy</li><li>User/group, namespace and isolation settings, per-vhost log resources</li><li><code>useIpInProxyHeader</code> and the whole <code>&lt;security&gt;</code> block</li></ul></div>
+        <div><h4>restart_required</h4><ul><li>Listener addresses, count, order, secure/plain roles; QUIC enablement; UDS topology</li><li>PHP topology and pools (LSAPI processors)</li><li>Cache-store identity and boot-time cache caps/policy</li><li>User/group, namespace and isolation settings, per-vhost log resources</li><li><code>useIpInProxyHeader</code> and the whole <code>&lt;security&gt;</code> block</li></ul></div>
       </div>
       <p><strong>Resource policy.</strong> Every filesystem reference in a candidate (vhost roots, docroots, static contexts, GeoIP file, upstream client certs, TCP certificate/key/CA/CRL paths) must resolve inside one of the operator's <code>--admin-resource-root</code> directories: parent traversal, relative paths, missing resources and symlinks resolving outside the roots are rejected at submission time. This is authorization, not a sandbox — roots and their symlinks stay operator-controlled. Failures return bounded categories, never configuration values.</p>
       <p><strong>Cache namespaces.</strong> The first successful publication introduces a response-cache epoch; every later generation keys page-cache and memo entries by epoch + generation, so a late render from an old generation cannot overwrite a new entry and a previous document root's memoized response cannot replay. See <a href="page-cache.html#generations">Page cache → generations</a>.</p>

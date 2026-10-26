@@ -60,7 +60,7 @@ httpjet is a complete origin server on a memory-safe Rust core, built so that an
 - Loopback status + transactional config API , WAF sidecar , compile-time extensions
 
         i   Where it runs
-httpjet serves WindowsForum.com on an x86_64 origin and MoonTimeNow.com + ThisDayInHistory.ai on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version **0.1.5**, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See Capabilities & limits for the honest matrix.
+httpjet serves WindowsForum.com on an x86_64 origin and MoonTimeNow.com + ThisDayInHistory.ai on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version **0.1.10**, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See Capabilities & limits for the honest matrix.
 
 ## How the pieces fit
 
@@ -70,20 +70,20 @@ Every wire protocol lands in the same request pipeline. Click a node to jump to 
 
 ## By the numbers
 
-Headline figures from the checked-in benchmark record — every number names its regime (see Performance for methodology and the raw CSVs).
+Headline figures from the checked-in benchmark record — every number names its regime (see Performance for methodology and the receipt names).
 
-          ~908 k rps   h2 static, dedicated-host loopback — vs OpenLiteSpeed's ~793k (2026-08-27)
+          ~908 k rps   h2 static c=50, dedicated load-generator client, mean of 4 runs — interleaved with OpenLiteSpeed: ~891k vs ~838k (2026-08-27)
           44.8 k rps   PHP/LSAPI over h1, PGO loopback — vs LiteSpeed's ~38.5k (2026-06)
-          101 ×   cache hit vs full PHP render of the same page (19,912 vs 196 rps)
+          40 ×   cache hit vs full PHP render of the same page (19,215 vs 480 rps; p50 2 ms vs 34 ms)
           146 /146   h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs
-          0.2 %   httpjet's share of production request latency — ~138 µs/req; PHP owns the rest
+          0.2 %   httpjet's request phases in June 2026 production telemetry (~138 µs/req: rewrite, cache lookup, compression); PHP render was 86.5–98.8% of wall time
           3,000 +   test functions across 20 crates; full workspace suite green at v0.1.10 (3,068 tests)
 
 ## Project status
 
 | Aspect | State (2026-10-26) |
 
-| Version | **0.1.10** (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
+| Version | **0.1.10** (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
 
 | Configuration | LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. `check --strict` is the deploy gate. |
 

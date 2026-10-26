@@ -2,11 +2,11 @@
     <p class="lede">httpjet is fast — and these docs are strict about <em>where</em> the time goes. Every figure names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.</p>
 
     <div class="stats">
-      <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static, c=50, dedicated-host loopback</div></div>
+      <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static, c=50, dedicated load-generator client (mean of 4 runs)</div></div>
       <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI over HTTP/1.1, PGO loopback</div></div>
-      <div class="stat accent"><div class="v">101<span class="u">×</span></div><div class="l">cache hit vs the same page through PHP</div></div>
-      <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's share of production request latency</div></div>
-      <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation (hardware counters)</div></div>
+      <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs the same page through PHP</div></div>
+      <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's request phases, June 2026 production telemetry</div></div>
+      <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation, June 2026 (hardware counters)</div></div>
       <div class="stat accent"><div class="v">0.0002<span class="u">flt</span></div><div class="l">v0.1.5 h2 static minor page faults/req</div></div>
       <div class="stat accent"><div class="v">0<span class="u">/ 80</span></div><div class="l">metric rows worse, 0.1.10 vs 0.1.5 (controlled A/B)</div></div>
     </div>
@@ -18,12 +18,12 @@
         <span class="chip"><span class="dot"></span>production telemetry · real CF-fronted traffic</span>
         <span class="chip"><span class="dot"></span>hardware counters · perf at saturation</span>
       </div>
-      <p>A loopback benchmark removes the network, real TLS handshakes and the CDN — it isolates the server's code path, which is exactly what you want to compare two servers and exactly what you must not generalize to end-user latency. Production telemetry measures what users feel, dominated by the backend and the edge. The same server shows ~908k req/s on loopback and ~0.2% of user-visible latency in production; those answer different questions.</p>
+      <p>A loopback benchmark removes the network, real TLS handshakes and the CDN — it isolates the server's code path, which is exactly what you want to compare two servers and exactly what you must not generalize to end-user latency. Production telemetry measures what users feel, dominated by the backend and the edge. The same server shows ~908k req/s in a synthetic benchmark and ~0.2% of user-visible latency in June 2026 production telemetry; those answer different questions.</p>
     </section>
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) and the <code>0.1.10</code> bug/perf release is recorded below with its exact regime, commit, and CSV receipt in <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>. Use the <strong>All-Builds Curve vs LiteSpeed &amp; nginx</strong> below to see the full trajectory on one canvas, or step through the <strong>13 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
+      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) and the <code>0.1.10</code> bug/perf release is recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>. Use the <strong>All-Builds Curve vs LiteSpeed &amp; nginx</strong> below to see every build with a recorded absolute measurement on one canvas (later releases were measured as relative A/Bs), or step through the <strong>14 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
 
       <div class="bexp" id="all-builds-curve" aria-label="All builds performance curve vs LiteSpeed, OpenLiteSpeed, and nginx">
         <div class="bexp__curve"></div>
@@ -39,7 +39,7 @@
 
     <section>
       <h2 id="loopback">Loopback throughput</h2>
-      <p>The primary dataset is the August 2026 <strong>dedicated-host three-way</strong> (httpjet vs OpenLiteSpeed vs nginx on a quiet box, all release/PGO-equivalent builds). The June PGO campaign against a commercial-LiteSpeed baseline remains the PHP-path reference.</p>
+      <p>The primary dataset is the August 2026 <strong>three-way</strong> (httpjet vs OpenLiteSpeed vs nginx): the static matrix was driven from a dedicated load-generator client on 2026-08-27 (two interleaved pairs per cell; the server host was not otherwise idle), and the heavy-<code>.htaccess</code> rows are a loopback PGO run on 2026-08-28. The June PGO campaign against a commercial-LiteSpeed baseline remains the PHP-path reference.</p>
       <!--chart:h2-static-->
       <p>One h2 connection is not a ceiling (~58k req/s at c=1), and throughput keeps rising with concurrency instead of collapsing; the earlier "h2 collapses past c=50" shape belonged to the June build and its measurement conditions, not the transport. HTTP/1.1 empty bodies at c=1000: ~202k vs OpenLiteSpeed's ~183k.</p>
       <!--chart:heavy-rewrite-->
@@ -81,14 +81,14 @@
     <section>
       <h2 id="attribution">Where the time actually goes</h2>
       <!--chart:attribution-->
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Across millions of production requests, the <code>lsphp</code> render is <strong>86.5–98.8% of request wall time</strong>. httpjet's own CPU is about <strong>0.2%</strong> — roughly <strong>138 µs per request</strong>, ~38 µs per cache hit, and that includes TLS, HTTP/2, rewrite, cache lookup and access logging. The 2026-08-30 sample: mean request 9.99 ms, 8.96 ms of it LSAPI TTFB, rewrite 5.4 µs, cache lookup 3.2 µs; pool acquire p99.9 &lt; 1 ms.</p><span class="regime">production telemetry · --telemetry-file + --php-slow-log</span></div></div>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Across millions of production requests, the <code>lsphp</code> render is <strong>86.5–98.8% of request wall time</strong>. In the June 2026 telemetry httpjet's own request phases were about <strong>0.2%</strong> — roughly <strong>138 µs per request</strong> (rewrite, cache lookup, compression); a synthetic cache hit costs ~38 µs of CPU including TLS, HTTP/2, rewrite, cache lookup and access logging. The 2026-08-30 sample: mean request 9.99 ms, 8.96 ms of it LSAPI TTFB, rewrite 5.4 µs, cache lookup 3.2 µs; pool acquire p99.9 &lt; 1 ms.</p><span class="regime">production telemetry · --telemetry-file + --php-slow-log</span></div></div>
       <p>If httpjet is 0.2% of latency, halving its CPU shaves ~0.1% off a page — imperceptible. Turning a PHP render into a cache hit removes the other ~99%. That asymmetry is why the project stopped shaving the serving path and invested in the cache, PHP/opcache tuning and raising the cacheable fraction.</p>
     </section>
 
     <section>
       <h2 id="instruction-floor">At the instruction floor</h2>
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>At saturation the h2 cache-hit path shows <strong>IPC 1.55</strong>, a <strong>0.31% branch-miss rate</strong> and <strong>1.6 L1d misses per 100 instructions</strong>: execution is efficient and the bottleneck is instructions retired per request, not locality. Futex traffic (~85% of syscall time) turned out to be idle parking and cross-thread waker churn — the box was ~50% idle at the apparent ceiling — not lock contention.</p><span class="regime">perf stat / strace · off-CPU analysis</span></div></div>
-      <p>Two structural moves followed: the global <strong>mimalloc</strong> allocator (fewer arena futexes across the per-core monoio workers plus the tokio side-runtime) and the <strong>on-core fast path</strong> with the finished-response memo, which removes pipeline work rather than speeding it up. The October 2026 campaign (<code>0.0.9</code>–<code>0.1.5</code>) extended this to the remaining hot paths: keeping static-missing 404s and non-cacheable PHP GETs off the fast-path double lookup (−14.5% CPU on cookied guest pages), memoizing per-file <code>.htaccess</code> access rule matches (<code>access_decision_for_request</code> 13% → 2.7% of process CPU), extending the certified-peer idle window via <code>--trusted-proxy-idle-secs 1800</code> (cutting full TLS handshakes per request by 28% on x86 and 78% on ARM), tuning per-vhost dictionary zstd levels via <code>--page-cache-dict-level</code> (cutting ARM dictionary encode from ~50% to 11% of tokio CPU), and pooling transient response/TLS buffers and h2/bridge task slots (<code>hj_core::recycle::BODY_BUFS</code>) so sparse size classes do not page-fault under <code>MIMALLOC_PURGE_DELAY=0</code>.</p>
+      <p>Two structural moves followed: the global <strong>mimalloc</strong> allocator (fewer arena futexes across the per-core monoio workers plus the tokio side-runtime) and the <strong>on-core fast path</strong> with the finished-response memo, which removes pipeline work rather than speeding it up. The October 2026 campaign (<code>0.0.9</code>–<code>0.1.5</code>) extended this to the remaining hot paths: keeping static-missing 404s and non-cacheable PHP GETs off the fast-path double lookup (−14.5% CPU on cookied guest pages), memoizing per-file <code>.htaccess</code> access rule matches (<code>access_decision_for_request</code> 13% → 2.7% of process CPU), extending the certified-peer idle window via <code>--trusted-proxy-idle-secs 1800</code> (cutting full TLS handshakes per request by 30% on x86 and 78% on ARM), tuning per-vhost dictionary zstd levels via <code>--page-cache-dict-level</code> (cutting ARM dictionary encode from ~50% to 11% of tokio CPU), and pooling transient response/TLS buffers and h2/bridge task slots (<code>hj_core::recycle::BODY_BUFS</code>) so sparse size classes do not page-fault under <code>MIMALLOC_PURGE_DELAY=0</code>.</p>
     </section>
 
     <section>
@@ -99,8 +99,8 @@
 
     <section>
       <h2 id="codegen">The codegen tier — PGO + mimalloc</h2>
-      <p>Production binaries combine profile-guided optimization, the mimalloc allocator and <code>-C target-cpu=native</code>. The checked-in <code>scripts/build-pgo.sh</code> is the classic three-step — instrument, drive a representative loopback workload (h2 cache hits dominant, plus h2/h1 static and PHP), merge and rebuild — with frame pointers kept so the pprof endpoint can symbolize the live binary. Its workload and CPU tuning belong to one deployment; build a neutral release artifact separately.</p>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">A non-PGO benchmark is not a benchmark</span><p>Debug builds are ~5× slower and meaningless. Even a plain release build differs from PGO by enough (~10% from binary layout alone) to fake a regression: build both sides the same way and interleave runs. The bench harness (<code>scripts/bench-suite.sh</code>, <code>scripts/bench-report.py</code>) records CSVs under <code>scripts/bench-results/</code>.</p></div></div>
+      <p>Production binaries combine profile-guided optimization, the mimalloc allocator and <code>-C target-cpu=native</code>. The development tree's <code>scripts/build-pgo.sh</code> (not in the public source export) is the classic three-step — instrument, drive a representative loopback workload (h2 cache hits dominant, plus h2/h1 static and PHP), merge and rebuild — with frame pointers kept so the pprof endpoint can symbolize the live binary. Its workload and CPU tuning belong to one deployment; build a neutral release artifact separately.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">A non-PGO benchmark is not a benchmark</span><p>Debug builds are ~5× slower and meaningless. Even a plain release build differs from PGO by enough (~10% from binary layout alone) to fake a regression: build both sides the same way and interleave runs. The bench harness (<code>scripts/bench-suite.sh</code>, <code>scripts/bench-report.py</code>) records CSVs under <code>scripts/bench-results/</code> in the development tree; neither the harness nor the CSVs are in the public source export.</p></div></div>
     </section>
 
     <section>
@@ -140,34 +140,34 @@
               <td class="wrap">Light <code>.htaccess</code> H1: <strong>135,448 RPS</strong> vs LSWS 182,743 (<code>0.74×</code>); Heavy 477-line <code>.htaccess</code> H1: <strong>95,840 RPS</strong> vs LSWS 160,920 (<code>0.60×</code>); H2 1 KB <code>c=50</code>: <strong>~128k RPS</strong> vs LSWS 220.5k. <span class="mini">Receipt: <code>RESULTS.md</code> Phase 7, <code>litespeed-*-run1.csv</code></span></td>
             </tr>
             <tr data-group="foundation">
-              <th><code>Tier A</code> · StatCache + DFA<span class="mini">2026-06-04 · <code>2e1db15</code></span></th>
+              <th><code>Tier A</code> · StatCache + DFA<span class="mini">2026-05-31 · <code>66fc2088</code></span></th>
               <td class="def">loopback A/B<br><span class="mini">vs LSWS 6.3.5</span></td>
               <td class="wrap">1s TTL on <code>.htaccess</code> <code>statx</code>, <code>FileCache</code> &amp; <code>StatCache</code> (<code>-f</code>/<code>-d</code>) + <code>RegexSet</code> DFA prefilter: heavy <code>/robots.txt</code> ratio lifted <strong><code>0.46× → 0.63×</code></strong> (<code>0.70×</code> peak); 66 KB <code>og-image.png</code> reached <strong><code>0.90–0.99×</code></strong> parity. <span class="mini">Receipt: <code>RESULTS.md</code> Tier A</span></td>
             </tr>
             <tr data-group="foundation">
-              <th><code>Batches 1–5</code> · Micro-Opts<span class="mini">2026-06-06 · <code>2d80a25</code></span></th>
+              <th><code>Batches 1–5</code> · Micro-Opts<span class="mini">2026-06-02 · <code>2d80a25</code></span></th>
               <td class="def">same-session A/B<br><span class="mini">shared host</span></td>
               <td class="wrap">Lazy header map, <code>Cow</code> CGI env keys, literal-prefix rule filter, <code>zstd &gt; br &gt; gzip</code> negotiation, OR-condition regex folding (28 evals → 1): PHP H1 <code>c=40</code> <strong>31,013 → 31,300 RPS</strong>; heavy H1 <strong>78.6k vs 72.3k</strong> (within noise, isolating codegen/allocator as the true bottleneck). <span class="mini">Receipt: <code>RESULTS.md</code> Batches 1–5</span></td>
             </tr>
             <tr data-group="foundation">
-              <th><code>Batch 6</code> · Codegen PGO<span class="mini">2026-06-07 · <code>5091dfc</code></span></th>
+              <th><code>Batch 6</code> · Codegen PGO<span class="mini">2026-06-02 · <code>5091dfc</code></span></th>
               <td class="def">isolated PID A/B<br><span class="mini">PGO + mimalloc</span></td>
               <td class="wrap"><code>-C target-cpu=native</code> + global <code>mimalloc</code> + 3-step PGO: heavy <code>.htaccess</code> H1 <strong>75.4k → 84.3k RPS (<code>+11.8%</code>)</strong> matching LSWS (84.3k); light static H1 <strong>88.3k → 93.0k RPS (<code>+5.2%</code>)</strong>. <span class="mini">Receipt: <code>RESULTS.md</code> Batch 6, <code>scripts/build-pgo.sh</code></span></td>
             </tr>
             <tr data-group="cache">
-              <th><code>LSCache + H2 Fix</code><span class="mini">2026-06-07 · <code>dc38d640</code></span></th>
+              <th><code>LSCache + H2 Fix</code><span class="mini">2026-06-07 · <code>36078788</code></span></th>
               <td class="def">loopback PGO<br><span class="mini">HTTPS suite</span></td>
-              <td class="wrap">Single-flight follower Notify fix lifted heavy <code>c=50</code> H1 <strong>298 → 72,371 RPS</strong> and H2 <strong>2,939 → 165,939 RPS</strong>. H2 1-conn 64-stream fan-out: <strong>52.5k → 116k RPS (<code>2.2×</code>)</strong>. 1s <code>open_beneath</code> memo: <code>openat</code> <strong>20,000 → 0</strong> (<code>+12%</code> static). H2 1 KB <code>c=50</code>: <strong>250.8k</strong> vs LSWS 220.5k; PHP H1 <code>c=40</code>: <strong>44.8k</strong> vs LSWS 38.5k. Origin page-cache HIT (152 KB): <strong>19,912 RPS (<code>p50 2ms</code>)</strong> vs PHP <strong>196 RPS (<code>p50 93ms</code>, <code>101×</code>)</strong>; tmpfs <code>jetcache</code> hit: <strong>18,211 RPS</strong>. <span class="mini">Receipt: <code>httpjet-sweep-fixed.csv</code>, <code>httpjet-cache-run1.csv</code>, <code>httpjet-cache-jetfile.csv</code></span></td>
+              <td class="wrap">Single-flight follower Notify fix lifted heavy <code>c=50</code> H1 <strong>298 → 72,371 RPS</strong> and H2 <strong>2,939 → 165,939 RPS</strong>. H2 1-conn 64-stream fan-out: <strong>52.5k → 116k RPS (<code>2.2×</code>)</strong>. 1s <code>open_beneath</code> memo: <code>openat</code> <strong>20,000 → 0</strong> (<code>+12%</code> static). H2 1 KB <code>c=50</code>: <strong>250.8k</strong> vs LSWS 220.5k; PHP H1 <code>c=40</code>: <strong>44.8k</strong> vs LSWS 38.5k. Origin page-cache HIT (152 KB): <strong>19,215 RPS (<code>p50 2ms</code>)</strong> vs PHP <strong>480 RPS (<code>p50 34ms</code>, <code>40×</code>)</strong>; tmpfs <code>jetcache</code> hit: <strong>18,211 RPS</strong>. <span class="mini">Receipt: <code>httpjet-sweep-fixed.csv</code>, <code>httpjet-cache-run1.csv</code>, <code>httpjet-cache-jetfile.csv</code></span></td>
             </tr>
             <tr data-group="cache">
-              <th><code>io_uring</code> · monoio<span class="mini">2026-06-21 · <code>30b7fda</code></span></th>
+              <th><code>io_uring</code> · monoio<span class="mini">2026-06-21 · <code>c4930ff6</code></span></th>
               <td class="def">transport A/B<br><span class="mini">uring vs epoll</span></td>
               <td class="wrap">Unconditional thread-per-core <code>monoio</code> <code>io_uring</code> transport for H1/H2 TCP+TLS and UDP H3 + vendored <code>monoio-rustls</code> vectored <code>writev</code>: H1 <strong><code>+19%</code></strong>, H2 <strong><code>+22%</code></strong>, H3 <strong><code>+14–20%</code></strong> over tokio/epoll + quinn. <span class="mini">Receipt: <code>CLAUDE.md</code> / <code>RESULTS.md</code> 2026-06-21</span></td>
             </tr>
             <tr data-group="dedicated">
-              <th><code>v0.0.1</code> · 3-Way + Memo<span class="mini">2026-08-28 · <code>456711f5</code></span></th>
-              <td class="def">dedicated 3-way<br><span class="mini">+ prod telemetry</span></td>
-              <td class="wrap">H2 static empty: <code>c=50</code> <strong>907.7k</strong> (HJ) vs 792.8k (OLS); <code>c=200</code> <strong>937.0k</strong> vs 687.2k; 1 KB <code>c=200</code> <strong>803.9k</strong> vs 790.5k. Fast-memo A/B (<code>c=100</code>): H1 <strong>107k → 153k (<code>+43%</code>)</strong>, H2 <strong>137k → 248k (<code>+81%</code>)</strong>. 806-line <code>.htaccess</code> PGO 3-way: H2 <strong>298.0k</strong> (HJ) vs 283.3k (OLS) vs 125.4k (nginx). Prod telemetry: mean <strong>9.99 ms</strong> (8.96 ms PHP = <code>89.7%</code>, HJ CPU <strong>138 µs</strong> = <code>0.2%</code>, <strong>1.55 IPC</strong>). <span class="mini">Receipt: <code>versus5-dedicated-final-20260827.csv</code>, <code>compare-rewrite-memo-vary-pgo.csv</code></span></td>
+              <th><code>v0.0.1</code> · 3-Way + Memo<span class="mini">2026-08-27..28 · <code>49c5e7c2</code> (pre-tag)</span></th>
+              <td class="def">dedicated-client + loopback 3-way<br><span class="mini">+ prod telemetry</span></td>
+              <td class="wrap">H2 static empty (mean of two interleaved pairs): <code>c=50</code> <strong>891.1k</strong> (HJ) vs 838.2k (OLS); <code>c=200</code> <strong>851.8k</strong> vs 736.3k; 1 KB <code>c=200</code> <strong>802.9k</strong> vs 788.4k. Fast-memo A/B (<code>c=100</code>): H1 <strong>107k → 153k (<code>+43%</code>)</strong>, H2 <strong>137k → 248k (<code>+81%</code>)</strong>. 806-line <code>.htaccess</code> PGO 3-way: H2 <strong>298.0k</strong> (HJ) vs 283.3k (OLS) vs 125.4k (nginx). Prod telemetry (2026-08-30): mean <strong>9.99 ms</strong> (8.96 ms PHP = <code>89.7%</code>; rewrite 5.4 µs + cache lookup 3.2 µs = <code>0.09%</code>). <span class="mini">Receipt: <code>versus5-dedicated-final-20260827.csv</code>, <code>compare-rewrite-memo-vary-pgo.csv</code></span></td>
             </tr>
             <tr data-group="dedicated">
               <th><code>v0.0.2</code> · sendfile &amp; kTLS<span class="mini">2026-09-23 · <code>f987d7cd</code></span></th>
@@ -187,7 +187,7 @@
             <tr data-group="zerofault">
               <th><code>v0.0.10</code> · TLS Idle + Dict L3<span class="mini">2026-10-18 · <code>f73fcedf</code></span></th>
               <td class="def">live prod metrics<br><span class="mini">x86 + voidrune</span></td>
-              <td class="wrap"><code>--trusted-proxy-idle-secs 1800</code> cut full TLS handshakes/req <strong><code>0.052 → 0.0365 (−28%)</code></strong> on x86 and <strong><code>0.77 → 0.169 (−78%)</code></strong> on ARM64; <code>--tls-session-tickets 0</code> cut handshake CPU <strong><code>−5%</code></strong>. <code>--page-cache-dict-level moontimenow.com=3,thisdayinhistory.ai=3</code> sped up ARM64 dict encode <strong><code>5.3×</code></strong> (<code>3.53 → 0.66 ms/page</code>), dropping dict CPU from <strong><code>~50% → 11%</code></strong> of tokio CPU. <span class="mini">Receipt: <code>CLAUDE.md</code> <code>#486</code>, <code>#489</code>, <code>#967</code></span></td>
+              <td class="wrap"><code>--trusted-proxy-idle-secs 1800</code> cut full TLS handshakes/req <strong><code>0.052 → 0.0365 (−30%)</code></strong> on x86 and <strong><code>0.77 → 0.169 (−78%)</code></strong> on ARM64; <code>--tls-session-tickets 0</code> cut handshake CPU <strong><code>−5%</code></strong>. <code>--page-cache-dict-level moontimenow.com=3,thisdayinhistory.ai=3</code> sped up ARM64 dict encode <strong><code>5.3×</code></strong> (<code>3.53 → 0.66 ms/page</code>), dropping dict CPU from <strong><code>~50% → 11%</code></strong> of tokio CPU. <span class="mini">Receipt: <code>CLAUDE.md</code> <code>#486</code>, <code>#489</code>, <code>#967</code></span></td>
             </tr>
             <tr data-group="zerofault">
               <th><code>v0.1.2–0.1.3</code> · Task Pools<span class="mini">2026-10-24 · <code>2f259201</code></span></th>

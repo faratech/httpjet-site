@@ -23,7 +23,7 @@ How httpjet selects certificates, verifies clients, and resumes sessions — plu
 
 | per-vhost ` ` | The SNI identity for that vhost's domains — server *chain* material, never a client-verify root. Configure an ECDSA and an RSA pair for the same names to serve modern clients the smaller chain (ECDSA is chosen when the client offers ECDSA signature algorithms). |
 
-| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | Mutual TLS: 0 none · 1 optional · 2 required · 3 optional without CA check. The verifier is built from the **listener** CA only. Positive chain verdicts are memoized off the hot path. |
+| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | Mutual TLS: 0 none · 1 optional · 2 required · 3 optional, treated like 1 (a presented certificate is still validated against the listener CA). The verifier is built from the **listener** CA only. Positive chain verdicts are memoized off the hot path. |
 
 | `crlFile` httpjet | PEM CRL or bundle enforced by the webpki verifier. Absent = no revocation checking. Loaded at config build; rotating means a reload of the trust generation. |
 
@@ -35,7 +35,7 @@ How httpjet selects certificates, verifies clients, and resumes sessions — plu
 
 - **TLS 1.3 offers exactly `TLS_AES_128_GCM_SHA256`** (the RFC 8446 mandatory suite); TLS 1.2 keeps its full set. rustls negotiates by client order, and without this pin OpenSSL-family clients pick slower suites; the transcript moves to hardware SHA-NI.
 
-- **Resumption & certified-peer idle window** — single-use TLS 1.3 tickets, 0-RTT off, including on client-cert-verifying listeners. Cloudflare does not re-offer origin tickets, so `httpjet_tls_handshakes_resumed_total` stays low behind it. Ticket volume is tunable with `--tls-session-tickets` (rustls default 2); production mints **0** — each ticket was two extra handshake records plus a cached copy of CF's client-cert chain for a resumption that never comes. Instead, `--trusted-proxy-idle-secs` extends the idle window for connections that presented a verified client certificate (reducing full handshakes per request by 28% on x86 and 78% on ARM in production). Resumption is *disabled* whenever OCSP is enabled (status must be enforced per handshake).
+- **Resumption & certified-peer idle window** — 0-RTT is off everywhere. Listeners without client verification (`clientVerify` 0) issue single-use, stateful TLS 1.3 tickets — `--tls-session-tickets` sets how many per full handshake (rustls default 2; 0 also shrinks the session cache from 32,768 entries to 256 TLS 1.2 session IDs). Listeners with `clientVerify` 1–3 issue no tickets and keep no session cache, so every connection is a full handshake that re-runs the client-certificate verifier (an abbreviated handshake would restore an old identity without re-verifying it); `httpjet_tls_handshakes_resumed_total` stays 0 there. Instead, `--trusted-proxy-idle-secs` extends the idle window for connections that presented a verified client certificate (reducing full handshakes by 28% per second, about 30% per request, on x86 and by 78% per request on ARM in production). Resumption is *disabled* whenever OCSP is enabled (status must be enforced per handshake).
 
 - **mTLS trust boundary** — on a listener with `clientVerify=2`, a plaintext request for an mTLS-protected vhost is refused from the request head unless it arrives from loopback; `--no-mtls` relaxes the requirement for local testing only.
 

@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261026b'
+VERSION = '20261026c'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 ROOT = '/web/httpjet'
@@ -72,7 +72,7 @@ NAV = [
     ('observability', 'Observability', 'observability', 'Prometheus metrics, the cache-entries report, access and error logs in text or JSON, syslog, request ids, telemetry, the PHP slow log, OpenTelemetry, and profiling.'),
     ('admin-api', 'Admin API &amp; reload', 'admin API and reload', 'SIGHUP reload semantics, the read-only status API, the transactional configuration API, revisions, and the restart-required boundary.'),
     ('extensions', 'Extending httpjet', 'extending httpjet', 'Compile-time extension hooks, the bounded WAF sidecar contract, and why there is no dynamic plugin ABI.'),
-    ('performance', 'Performance', 'performance', 'Measured throughput by regime: loopback three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.'),
+    ('performance', 'Performance', 'performance', 'Measured throughput by regime: three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.'),
     ('conformance', 'Conformance &amp; testing', 'conformance and testing', 'h2spec 146/146, RFC coverage, LiteSpeed parity, the test layers, CI interoperability jobs, fuzzing, and the deploy gates.'),
     ('migration', 'Migrating from LiteSpeed', 'migrating from LiteSpeed', 'A validation-first migration path from LiteSpeed or OpenLiteSpeed: inventory, check --strict, isolated candidate, behavioral proof, caching, cutover and rollback.'),
   ]),
@@ -107,10 +107,10 @@ def diagram(m):
 # Horizontal grouped bar charts as inline SVG. {name: (title, subtitle, unit, series, rows, foot)}
 # rows = [(label, [v0, v1, ...])]; None = no bar (annotated).
 CHARTS = {
- 'h2-static': ('HTTP/2 static throughput by concurrency', 'dedicated-host loopback · 2026-08-27 · empty bodies · req/s', 'k rps',
+ 'h2-static': ('HTTP/2 static throughput by concurrency', 'dedicated load-generator client · 2026-08-27 · empty bodies · mean of 2 interleaved pairs · req/s', 'k rps',
    ['httpjet', 'OpenLiteSpeed', 'nginx'],
-   [('c=1 (1 KB)', [58, 50, None]), ('c=50', [908, 793, None]), ('c=200', [937, 687, None]), ('c=1000', [860, 878, None])],
-   'nginx could not complete the low-concurrency h2 cells in this harness (blank). Source: bench-results/versus5-dedicated-final-20260827.csv'),
+   [('c=1 (1 KB)', [59, 50, None]), ('c=50', [891, 838, None]), ('c=200', [852, 736, None]), ('c=1000', [872, 882, 118])],
+   'nginx failed the c=1 to c=200 h2 cells in this harness (blank); its c=1000 value comes from separate interleaved pairs. Source: bench-results/versus5-dedicated-final-20260827.csv'),
  'heavy-rewrite': ('Heavy .htaccess static (806-line chain, /robots.txt)', 'PGO three-way · 2026-08-28 · c=100 · req/s', 'k rps',
    ['httpjet', 'OpenLiteSpeed', 'nginx'],
    [('HTTP/1.1', [168.7, 169.1, 145.6]), ('HTTP/2', [298.0, 283.3, 125.4])],
@@ -125,12 +125,12 @@ CHARTS = {
    'Same hardware, same lsphp binary; LiteSpeed needed higher concurrency to reach its best.'),
  'cache-vs-php': ('One forum page: cache hit vs full PHP render', 'HTTPS loopback · PGO · 152 KB page · req/s', 'rps',
    ['requests / s'],
-   [('page-cache HIT (p50 2 ms)', [19912]), ('full DB-backed PHP render (p50 93 ms)', [196])],
-   '≈101× the throughput, ≈46× lower latency. The cache removes the backend from the request entirely.'),
+   [('page-cache HIT (p50 2 ms)', [19215]), ('full DB-backed PHP render (p50 34 ms)', [480])],
+   '≈40× the throughput, ≈17× lower p50 latency. The cache removes the backend from the request entirely. Source: bench-results/httpjet-cache-run1.csv'),
  'attribution': ('Where a production request spends its time', 'live sample · 2026-08-30 · mean request 9.99 ms', 'ms',
    ['milliseconds'],
    [('LSAPI TTFB inside PHP', [8.96]), ('everything else (TLS, h2, rewrite 5.4 µs, cache lookup 3.2 µs, log)', [1.03])],
-   'httpjet-side CPU is ~0.2% of user-visible latency; the levers are PHP speed and the cache hit ratio.'),
+   'The rewrite and cache-lookup phases are 0.09% of this mean; the levers are PHP speed and the cache hit ratio.'),
  'sendfile': ('File egress receipts (1 MiB bodies, c=50)', 'loopback · 2026-09-09 · req/s', 'rps',
    ['req/s'],
    [('plaintext H1 sendfile', [4852.5]), ('TLS 1.3 H1, kTLS off (rustls)', [2999.7]), ('TLS 1.3 H1, kTLS forced on (software, virtual NIC)', [2944.9])],
@@ -253,7 +253,7 @@ def head(slug, title_suffix, desc, nav_title, docs_min_css, lastmod):
                     "name": "How fast is httpjet compared to LiteSpeed, OpenLiteSpeed, and nginx?",
                     "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": "In dedicated-host loopback benchmarks, httpjet reaches ~908k–965k req/s on HTTP/2 static workloads (vs OpenLiteSpeed ~793k–878k req/s), 298k–316k req/s on an 806-line .htaccess chain over HTTP/2 (vs OpenLiteSpeed 283.3k and nginx 125.4k), 44.8k–48.6k req/s on PHP over LSAPI (vs LiteSpeed 6.3.5 38.5k–41.2k), and 19,912 req/s on a 152 KB XenForo origin page-cache hit (101x faster than an uncached PHP render)."
+                        "text": "In synthetic benchmarks, httpjet measured ~908k req/s on HTTP/2 static empty bodies at c=50 (mean of four runs from a dedicated load-generator client; ~891k vs OpenLiteSpeed ~838k in two interleaved pairs), 298k req/s on an 806-line .htaccess chain over HTTP/2 in a loopback PGO three-way (vs OpenLiteSpeed 283.3k and nginx 125.4k), 44.8k req/s on PHP over LSAPI over HTTP/1.1 (vs LiteSpeed 6.3.5 38.5k at the same concurrency and 41.2k at its best), and ~19.2k req/s on a 152 KB XenForo origin page-cache hit (about 40x an uncached PHP render)."
                     }
                 }
             ]
@@ -430,7 +430,7 @@ def pager(i):
         out += f'<a class="next" href="{href}"{" style=\"margin-left:auto\"" if not prev else ""}><div class="dir">Next →</div><div class="ttl">{nxt[1]}</div></a>'
     return out + '</nav>'
 
-FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-24 (v0.1.5); performance results updated 2026-10-26 (v0.1.10).<br>'
+FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-10-26 (v0.1.10).<br>'
         'Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>')
 
 SLUGS = None
@@ -594,11 +594,11 @@ def main():
         '',
         '## Key Facts & Benchmarks',
         '',
-        '- **HTTP/2 Static Throughput (loopback, c=50 / c=200):** ~908k–937k req/s vs OpenLiteSpeed ~793k req/s',
+        '- **HTTP/2 Static Throughput (empty bodies, c=50, dedicated load-generator client, 2026-08-27):** ~908k req/s (mean of 4 runs); interleaved with OpenLiteSpeed ~891k vs ~838k req/s (mean of 2 pairs)',
         '- **Heavy 806-line `.htaccess` Static (c=100, PGO):** 298k req/s HTTP/2, 168.7k req/s HTTP/1.1 (vs nginx 125.4k / 145.6k)',
-        '- **Origin Page Cache Hit vs Full PHP Render:** 19,912 req/s (p50 2 ms) vs 196 req/s (p50 93 ms) — 101× speedup',
+        '- **Origin Page Cache Hit vs Full PHP Render:** 19,215 req/s (p50 2 ms) vs 480 req/s (p50 34 ms) — about 40× (loopback, 152 KB page)',
         '- **PHP over LSAPI (HTTP/1.1, c=40, PGO):** 44.8k req/s vs LiteSpeed 6.3.5 38.5k req/s (41.2k at c=60)',
-        '- **Production Latency Attribution:** httpjet CPU is ~0.2% of request wall time (~138 µs/req, ~38 µs/cache hit); PHP renders account for 86.5–98.8%',
+        '- **Production Latency Attribution:** June 2026 telemetry: httpjet request phases ~0.2% of wall time (~138 µs/req) and PHP renders 86.5–98.8%; 2026-08-30 sample: mean 9.99 ms, LSAPI TTFB 8.96 ms, rewrite + cache lookup 0.09%',
         '- **Release 0.1.10 vs 0.1.5 (controlled loopback A/B, relative change, not production throughput):** 0 of 80 metric rows worse; page-cache miss-to-store CPU per request −61% (throughput +16%), warmer burst CPU −38%, open-loop mix p99 −29%, uncached PHP +6% throughput / −6% CPU, RSS −8% to −10%; static-file CPU +1–2% (within noise)',
         '- **Full Documentation Corpus (single file):** [https://httpjet.net/llms-full.txt](https://httpjet.net/llms-full.txt)',
         '- **Source Repository:** [https://github.com/faratech/httpjet](https://github.com/faratech/httpjet)',

@@ -29,7 +29,7 @@ Static files have a separate, default-on per-worker finished-response memo (1 s 
 
 ## Opt-in by the app
 
-The cache never guesses. A response is stored only when the application says so. Per-vhost ` ` (and the six LSWS gates on a context's `cachePolicy`), the `.htaccess` `CacheLookup` directive, and the `[E=no-cache]` env all gate lookups; the response header gates storage.
+The cache never guesses. A response is stored only when the application says so. Per-vhost ` ` (and the public and private pairs of a context's six-flag LSWS `cachePolicy`: `respectCacheable` and `enablePostCache` are parsed but not enforced), the `.htaccess` `CacheLookup` directive, and the `[E=no-cache]` env all gate lookups; the response header gates storage.
 
            **app → httpjet** · the cache protocol headers
 ```
@@ -111,7 +111,7 @@ By default the cache is in-RAM only and flushes on restart. `--page-cache-store-
 
 - **Durable purges.** Purges unlink eagerly and retain a purge-all stamp, so old data cannot be resurrected on restart.
 
-- **Dictionaries compress at store.** The birth copy is identity; a bounded background task then dict-recompresses it in place against the vhost's own zstd dictionary (~3.5–9× smaller) at store time — never inline on a response, and never triggered by a first hit. An admission filter rejects one-hit public content before it reaches this work, and incompressible Content-Types are never encoded. Judge by `httpjet_pagecache_dict_recompress_{total,skipped_total{reason}}`; the served bytes stay standard zstd/br/gzip either way.
+- **Dictionaries compress at store.** The birth copy is identity; a bounded background task then dict-recompresses it in place against the vhost's own zstd dictionary (~3.5–9× smaller) at store time — never inline on a response, and never triggered by a first hit. An admission filter rejects one-hit public content before it reaches this work, and incompressible Content-Types are never encoded. Judge by `httpjet_pagecache_dict_recompress_{total,skipped_total{reason}}`; the served bytes stay standard zstd/br/gzip either way. Vhosts listed in `--page-cache-egress-at-rest-vhosts` skip this job and keep plain zstd at rest (0.1.6).
 
 budget calculator — how many pages fit?
 
@@ -121,7 +121,7 @@ budget calculator — how many pages fit?
            typical page (KB, identity)
            dictionary ratio ×
 
-Rules of thumb only (≈6 KB of metadata per entry, ratio 3.5–9× measured on forum HTML). tmpfs *is* RAM — size the disk cap against the box's headroom. Production runs disk-mem 6 GiB, hot-mem 384 MiB.
+Rules of thumb only (≈6 KB of metadata per entry, ratio 3.5–9× measured on forum HTML). tmpfs *is* RAM — size the disk cap against the box's headroom. Production runs disk-mem 2 GiB on the x86 origin and 5.5 GiB on the ARM origin, hot-mem 384 MiB on both.
 
 | Flag | Default | Bounds |
 
@@ -131,7 +131,7 @@ Rules of thumb only (≈6 KB of metadata per entry, ratio 3.5–9× measured on 
 
 | `--page-cache-hot-mem` | 192 MiB | In-RAM hot bodies in front of the files: zero-syscall serves; cold hits pay one ~µs tmpfs read + decode. |
 
-| `--page-cache-store-path` | *none* | Enables the file tier. Requires the integrity key; deploy scripts gate it behind `ALLOW_PAGE_CACHE_FILE_TIER=1`. |
+| `--page-cache-store-path` | *none* | Enables the file tier. Containers are tagged with `--page-cache-integrity-key` (created on first use if absent; without `--page-cache-integrity-required` an unusable key leaves containers untagged instead of refusing to start); deploy scripts gate the tier behind `ALLOW_PAGE_CACHE_FILE_TIER=1`. |
 
 | `--page-cache-dict-vhost` / `--page-cache-dict` / `--page-cache-dict-level` | — | Per-vhost zstd dictionaries (train one per site with `scripts/train-pagecache-dict.sh`) / global fallback / per-vhost internal zstd level (1–19, default 12). Rotation needs a restart; old-generation entries become safe misses (each body records its `dict_gen`). |
 
@@ -140,6 +140,8 @@ Rules of thumb only (≈6 KB of metadata per entry, ratio 3.5–9× measured on 
 | `--page-cache-opt-in-status` / `--page-cache-303-prefixes` | *empty* | Opt-in caching of 303/404/410 — only on an explicit `X-LiteSpeed-Cache-Control: public`, TTL capped 300 s, no stale windows; a 303 only under a listed prefix. Default: only 200/301 are cached. |
 
 | `--page-cache-stream-fill-vhosts` | *empty* | Vhosts whose cacheable public 200 misses without a Content-Length stream to the client frame by frame and store when the backend finishes (~ms earlier first byte on progressive template output). Errors/short bodies/over-cap serve but never store. |
+
+| `--page-cache-egress-at-rest-vhosts` | *empty* | Vhosts whose buffered misses keep a dictionary-less zstd body and skip the background dictionary re-encode. A zstd miss stores the encode made for its own response (one encode instead of two). Any other miss stores identity and encodes it plain in the background. A hot entry later gains its L9 variant. The stored copy is larger than a dictionary-compressed one. With `--xf-capsule-dedicated-store`, capsule renders keep the dictionary path. |
 
         !   Dictionaries can retain content
 Train only on public, logged-out pages of one vhost; a dictionary trained on another site's boilerplate does little, and one trained on private pages can leak fragments. Served bytes are never dictionary-encoded — a missing compatible dictionary is a miss, never undecodable output.
@@ -182,7 +184,7 @@ The first successful API publication introduces a response-cache *epoch* derived
 
 ## Microcaching today, and what is missing
 
-Short TTLs already work: a backend that sends `X-LiteSpeed-Cache-Control: public,max-age=2` gets every guard above and a two-second hit window (`scripts/microcache_policy_example.sh` proves miss→hit→expiry→fresh render, distinct-query isolation and `no-store` respect on an isolated instance). What does not exist yet is a **first-class route-level policy**: named profiles with deterministic precedence, route TTL floors/ceilings, per-profile eligibility, bypass matchers, declarative key dimensions, profile budgets, and bounded collapse/refresh controls. The proposed ` ` contract is specified in the source tree (`docs/microcache-policy.md`) and the parser intentionally rejects it until implemented.
+Short TTLs already work: a backend that sends `X-LiteSpeed-Cache-Control: public,max-age=2` gets every guard above and a two-second hit window (`scripts/microcache_policy_example.sh` proves miss→hit→expiry→fresh render, distinct-query isolation and `no-store` respect on an isolated instance). What does not exist yet is a **first-class route-level policy**: named profiles with deterministic precedence, route TTL floors/ceilings, per-profile eligibility, bypass matchers, declarative key dimensions, profile budgets, and bounded collapse/refresh controls. The proposed ` ` contract is specified in the source tree (`docs/microcache-policy.md`) and the current parser does not implement it yet (like any unknown element, it is ignored).
 
 ## Observing the cache
 
@@ -214,7 +216,7 @@ These scripts must pass before `--page-cache` ships anywhere; they run against a
 
 - **`cache_persist_test.sh`** With a file tier: waits on `/__hj_cache_ready` and asserts the boot scan restored entries. It restarts the service — run once (five restarts a minute trip systemd's start limit).
 
-- **`cache_sie_test.sh` · `cache_capsule_purge_test.sh`** Stale-if-error (kills its own lsphp mid-test) and the capsule purge invariant.
+- **`cache_sie_test.sh` · `cache_capsule_purge_test.sh`** Stale-if-error (freezes its own lsphp tree mid-test, the production outage shape) and the capsule purge invariant.
 
         !   A cache bug outlives a rollback
 A wrong response cached at the CDN edge stays there for its edge TTL. If bad content shipped: confirm the origin is correct on loopback, then purge the CDN zone — a binary rollback does not remove objects already stored upstream.

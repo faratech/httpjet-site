@@ -15,7 +15,7 @@ httpjet is configured by a **LiteSpeed-compatible XML tree** selected with `--ro
 
 With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) applies LiteSpeed value semantics faithfully:
 
-- Variables `$SERVER_ROOT`, `$HOSTNAME`, `$VH_ROOT`, `$VH_NAME` substitute in `$VAR` and `${VAR}` forms.
+- Variables `$SERVER_ROOT`, `$HOSTNAME`, `$VH_ROOT`, `$VH_NAME` (plus `$DOC_ROOT` and `$VH_DOMAIN` once the vhost resolves them) substitute in `$VAR` and `${VAR}` forms.
 
 - Sizes accept `K`/`M`/`G`/`B` suffixes; times are bare seconds.
 
@@ -23,7 +23,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 - Booleans are `1`, `2` or `true` (case-insensitive); `followSymbolLink`/`allowSymbolLink` treat `2` (owner-restricted) as fail-closed never-follow.
 
-- Unknown elements are ignored so real trees load; `check --strict` reports the ones that would silently do nothing.
+- Unknown elements are ignored so real trees load; `check` warns on the ones that would silently do nothing, and security-relevant ones httpjet cannot enforce (a partial `allowOverride` mask, vhost `clientVerify`, `rewrite` maps, `phpIniOverride`, `enableHotlinkCtrl`, `forceStrictOwnership`) refuse the load.
 
            **layout** · a server root
 ```
@@ -65,9 +65,9 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | `bandwidthLimit` httpjet | `0` | Per-connection egress throttle, bytes/s (0 = unlimited). H2 paces per connection; H3 unpaced. |
 
-| `maxCachedFileSize` / `totalInMemCacheSize` | `4M` / `4G` | Small-file in-memory promotion threshold and budget (`CacheCaps`). |
+| `maxCachedFileSize` / `totalInMemCacheSize` | `4M` / `4G` | Small-file in-memory promotion threshold and budget (`CacheCaps`); the budget is clamped to 1 GiB. |
 
-| `maxMMapFileSize` / `totalMMapCacheSize` | `256K` / `2G` | Parsed for compatibility; the mmap file cache was removed. |
+| `maxMMapFileSize` / `totalMMapCacheSize` | `256K` / `2G` | The mmap tier is gone, but both still size the static-file RAM store: the per-file cap is the larger of `maxCachedFileSize` and `maxMMapFileSize`, and without `--page-cache` the store budget is `totalInMemCacheSize` (clamped to 1 GiB) + `totalMMapCacheSize` (clamped to 2 GiB). |
 
 | `fileETag` | `28` | ETag bitmask (INODE|MTIME|SIZE → `"size-mtime-inode;;;"`); 0 = no ETag. |
 
@@ -101,7 +101,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | Directive | Default | Meaning |
 
-| `name`, `address` | `*:80` | `ip:port` / `host:port`. httpjet also `unix:/path` or `uds:/path` for an HTTP-over-Unix-socket listener (TLS over UDS is rejected). Listener names are the stable identity across reloads. |
+| `name`, `address` | `*:80` | `ip:port` / `host:port`. httpjet also `unix:/path` or `uds:/path` for an HTTP-over-Unix-socket listener (TLS over UDS is unsupported: `check` warns and the TLS half does not serve). Listener names are the stable identity across reloads. |
 
 | `secure`, `keyFile`, `certFile`, `certChain` | off | TLS material; `certChain=1` appends `CACertFile` to the served chain. |
 
@@ -113,7 +113,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | `proxyProtocol` httpjet | `0` | PROXY v2/v1 required on *this* listener; fail-closed; never on a public bind. |
 
-| `vhostMapList/vhostMap` `vhost`, `domain` | — | Host→vhost; domains lowercased; exact matches take precedence over longest-match leading (`*.example.com`) or suffix (`example.*`) wildcards, then the bare `*` catch-all. |
+| `vhostMapList/vhostMap` `vhost`, `domain` | — | Host→vhost; domains lowercased; a configured `:port` is ignored and a leading `www.` is stripped for the lookup key. Resolution is exact match, then the nearest configured parent domain (`a.example.com` → `example.com`, treated as a non-canonical foreign host), then the bare `*` catch-all. Glob patterns such as `*.example.com` or `example.*` are not supported: `check` warns and they never match. |
 
            **httpd_config.xml** · a TLS listener with h3
 ```
@@ -157,7 +157,7 @@ An ` ` (server-level ` ` or per-vhost) is a reverse-proxy upstream (`proxy`), an
 
 | `path`, `backlog`, `instances`, `autoStart`, `runOnStartUp` | — / `100` / `1` / `0` / `0` | LSAPI worker binary and supervision (`instances>1` warns: one fixed upstream). |
 
-| *`phpConfig` additionally:* `phpHandler` (`command`, `suffixes`), `memSoftLimit`/`memHardLimit`, `maxProcessTime` (0 = unlimited; `--php-max-process-time-ms` overrides), `procSoftLimit`/`procHardLimit`, `extMaxIdleTime`, `backlog` default 1024, `detachedMode`. |
+| *`phpConfig` additionally:* `phpHandler` (`command`, `suffixes`), `memSoftLimit`/`memHardLimit`, `maxProcessTime` (0 = unlimited; `--php-max-process-time-ms` overrides), `procSoftLimit`/`procHardLimit`, `extMaxIdleTime`, `backlog` default 1024, `pcKeepAliveTimeout` default 30 s (not 60), `detachedMode`. |
 
 ## Virtual hosts
 
@@ -169,7 +169,7 @@ Declarations live in `httpd_config.xml` (`name`, `vhRoot`, `configFile`, `allowS
 
 | ` ` `enable`, `autoLoadHtaccess`, `base`, `rules` | Inline rules run before the `.htaccess` chain. |
 
-| ` ` `allowOverride`, `accessFileName` | `allowOverride 0` kills the whole chain; the access file name defaults to `.htaccess`. |
+| ` ` `allowOverride`, `accessFileName` | Only `allowOverride` `0` (no `.htaccess`) or `31` (all categories) loads per vhost; a partial category mask refuses the load (the server-level block accepts only 31). The access file name defaults to `.htaccess`. |
 
 | ` ` `keyFile`, `certFile`, `certChain`, `CACertFile` | The SNI identity for this vhost's domains (chain material, not a client-verify root). |
 
@@ -179,7 +179,7 @@ Declarations live in `httpd_config.xml` (`name`, `vhRoot`, `configFile`, `allowS
 
 | ` ` `uri`, `address` | WebSocket relay maps (plain TCP HTTP/1 upstreams). |
 
-| ` ` `accessLog`/`errorLog` with `useServer=0`, `fileName`, `rollingSize`, `keepDays`, `logHeaders` httpjet | Per-vhost log files (default roll 50 MB, keep 30 days; `logHeaders` 7 = combined). Log paths are boot-owned. |
+| ` ` `accessLog`/`errorLog` with `useServer=0`, `fileName`, `rollingSize`, `keepDays`, `logHeaders` httpjet | Per-vhost log files (default roll 50 MB, keep 30 days; `logHeaders` default 3 = combined, 7 = combined + Host). Log paths are boot-owned. |
 
 | `setUIDMode` (0/1/2), `chrootMode` (0/1/2), `chrootPath`, `suexecUser`/`suexecGroup`, ` ` | Per-vhost PHP isolation (needs the server ` ` gate). Out-of-range modes are hard errors. → |
 
@@ -193,11 +193,11 @@ Contexts map URI prefixes to terminals (`static`, `proxy`, `redirect`, `php`/`ls
 
 | `type`, `uri`, `location`, `handler`, `enabled` | — | Kind, prefix, on-disk location (static), processor name (proxy/lsapi). |
 
-| `extraHeaders` | — | Additional response headers for the context. |
+| `extraHeaders` | — | Additional response headers for the context: `Name: value` lines only (header operations refuse the load); `NONE` sets none and stops inheritance. Not allowed on `proxy` contexts (load error). |
 
 | `addDefaultCharset` / `addDefaultCharsetCustomized` | off | Charset appended to text types. |
 
-| `cachePolicy/*` | on | `checkPublicCache`, `checkPrivateCache`, `respectCacheable`, `enableCache`, `enablePrivateCache`, `enablePostCache` — the six LSWS gates, enforced on both cache tiers. |
+| `cachePolicy/*` | on (`enablePostCache` off) | `checkPublicCache`, `checkPrivateCache`, `respectCacheable`, `enableCache`, `enablePrivateCache`, `enablePostCache` — the six LSWS gates, enforced on both cache tiers. |
 
 | `maxReqBodySize` httpjet | inherit | Per-context body cap (413) on every terminal. |
 
@@ -225,7 +225,7 @@ Contexts map URI prefixes to terminals (`static`, `proxy`, `redirect`, `php`/`ls
            **check**
 ```
 httpjet --root /abs/root check            # summary: listeners, vhost map, fast-memo verdicts, warnings
-httpjet --root /abs/root check --strict   # + topology lint, missing docroots, vhost-map-fingerprint; non-zero on findings
+httpjet --root /abs/root check --strict   # same lint output; exits non-zero on lint errors (warnings never fail)
 ```
 
 Run the check under the intended service identity as well as as root: readable-by-root is not proof the runtime user can read certificates or write logs and sockets. The same normalization runs for the write API 's in-memory bundle (`parse_bundle`), which additionally refuses DTDs, more than 64 nesting levels, more than 128 vhosts, and 1 MiB of XML. A config file read from disk is capped at 16 MiB per file (`ConfigError::TooLarge`, 2026-10-06) — a bound on all readers, `check` included.

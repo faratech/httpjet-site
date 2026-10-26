@@ -47,7 +47,7 @@
           <li><a href="admin-api.html">Loopback status + transactional config API</a>, <a href="extensions.html#waf">WAF sidecar</a>, compile-time extensions</li>
         </ul></div>
       </div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Where it runs</span><p>httpjet serves <a href="https://windowsforum.com">WindowsForum.com</a> on an x86_64 origin and <a href="https://moontimenow.com">MoonTimeNow.com</a> + <a href="https://thisdayinhistory.ai">ThisDayInHistory.ai</a> on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version <strong>0.1.5</strong>, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See <a href="capabilities.html">Capabilities &amp; limits</a> for the honest matrix.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Where it runs</span><p>httpjet serves <a href="https://windowsforum.com">WindowsForum.com</a> on an x86_64 origin and <a href="https://moontimenow.com">MoonTimeNow.com</a> + <a href="https://thisdayinhistory.ai">ThisDayInHistory.ai</a> on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version <strong>0.1.10</strong>, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See <a href="capabilities.html">Capabilities &amp; limits</a> for the honest matrix.</p></div></div>
     </section>
 
     <section>
@@ -58,13 +58,13 @@
 
     <section>
       <h2 id="numbers">By the numbers</h2>
-      <p>Headline figures from the checked-in benchmark record — every number names its regime (see <a href="performance.html">Performance</a> for methodology and the raw CSVs).</p>
+      <p>Headline figures from the checked-in benchmark record — every number names its regime (see <a href="performance.html">Performance</a> for methodology and the receipt names).</p>
       <div class="stats">
-        <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static, dedicated-host loopback — vs OpenLiteSpeed's ~793k (2026-08-27)</div></div>
+        <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static c=50, dedicated load-generator client, mean of 4 runs — interleaved with OpenLiteSpeed: ~891k vs ~838k (2026-08-27)</div></div>
         <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI over h1, PGO loopback — vs LiteSpeed's ~38.5k (2026-06)</div></div>
-        <div class="stat accent"><div class="v">101<span class="u">×</span></div><div class="l">cache hit vs full PHP render of the same page (19,912 vs 196 rps)</div></div>
+        <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs full PHP render of the same page (19,215 vs 480 rps; p50 2 ms vs 34 ms)</div></div>
         <div class="stat"><div class="v">146<span class="u">/146</span></div><div class="l">h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs</div></div>
-        <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's share of production request latency — ~138 µs/req; PHP owns the rest</div></div>
+        <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's request phases in June 2026 production telemetry (~138 µs/req: rewrite, cache lookup, compression); PHP render was 86.5–98.8% of wall time</div></div>
         <div class="stat accent"><div class="v">3,000<span class="u">+</span></div><div class="l">test functions across 20 crates; full workspace suite green at v0.1.10 (3,068 tests)</div></div>
       </div>
     </section>
@@ -75,7 +75,7 @@
         <table>
           <thead><tr><th>Aspect</th><th>State (2026-10-26)</th></tr></thead>
           <tbody>
-            <tr><td>Version</td><td><strong>0.1.10</strong> (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3).</td></tr>
+            <tr><td>Version</td><td><strong>0.1.10</strong> (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3).</td></tr>
             <tr><td>Configuration</td><td>LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. <code>check --strict</code> is the deploy gate.</td></tr>
             <tr><td>Transport</td><td>Pure io_uring (monoio) for H1/H2/H3 — the <em>only</em> transport; there is no epoll fallback and no Windows/macOS port.</td></tr>
             <tr><td>PHP</td><td>Native LSAPI; the operator supplies <code>lsphp</code>. Production runs the persistent external pool with zero-downtime generation reloads.</td></tr>

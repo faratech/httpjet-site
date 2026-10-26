@@ -21,7 +21,7 @@ The rewrite stage runs the vhost's inline ` ` rules first, then the `.htaccess` 
 
 ## Per-directory loading
 
-An `HtaccessCache` loads each directory's file (name from `accessFileName`, default `.htaccess`; bare file names only — `/` and `..` are rejected) with **mtime invalidation**, so an edit takes effect on the next request without a reload. The parsed form holds the directive list, compiled regexes, scoping blocks, a per-file memo of which access rules match, the auth realm map and the memo-eligibility verdict. The chain from docroot to the request's directory is bounded at **64** levels; past that a deny-all sentinel applies. Since 2026-09-16 an **unreadable or non-UTF-8 `.htaccess` also fails closed** to that sentinel rather than being skipped.
+An `HtaccessCache` loads each directory's file (name from `accessFileName`, default `.htaccess`; bare file names only — `/` and `..` are rejected) with **mtime invalidation** (each file is re-`stat`ed at most once a second), so an edit takes effect within about a second, without a reload. The parsed form holds the directive list, compiled regexes, scoping blocks, a per-file memo of which access rules match, the auth realm map and the memo-eligibility verdict. The chain from docroot to the request's directory is bounded at **64** levels; past that a deny-all sentinel applies. Since 2026-09-16 an **unreadable `.htaccess` (or one that fails to parse or exceeds 16 MiB) also fails closed** to that sentinel rather than being skipped. A non-UTF-8 byte is decoded lossily, so a legacy-encoded comment cannot downgrade a protected directory to "no rules".
 
 Vhost-level switches: ` 0` disables the whole chain (even with `autoLoadHtaccess`), while `autoLoadHtaccess` alone loads files without enabling general overrides. Candidate configuration generations own their own htaccess, rewrite-outcome and UA caches, so a reload never reintroduces stale results.
 
@@ -49,6 +49,8 @@ A flagged rule runs through a `CompiledRegex` that prefers `regex_automata::meta
 | Lookahead `(?=…)` / `(?!…)`, lookbehind | `fancy-regex` | Not expressible as a finite automaton. |
 
 | In-pattern backreference `\1` | `fancy-regex` | Requires backtracking. |
+
+| Pure lookahead conjunction `^(?=.*A)(?=.*B)…` | `regex_automata::meta` per part | Each lookahead runs as one linear search; `fancy-regex` is kept only for captures (0.1.10: a cookie `SetEnvIf` fell from 29 to 1 µs). |
 
 A regex that errors at match time **fails closed toward the rule's polarity**: a deny that cannot evaluate counts as matched; an allow that cannot evaluate is withheld (hardened 2026-09-06 alongside the spoofing checks).
 
@@ -127,7 +129,7 @@ htpasswd hashes: **bcrypt** (`$2y$`/`$2b$`/`$2a$`, `htpasswd -B`, cost capped at
 
 | RewriteEngine · RewriteBase | supported | Toggle and base-path resolution. |
 
-| RewriteCond · RewriteRule | supported | Flags: `L END R R=code F G P PT E= N NC QSA QSD NE C S=n`, `OR` on conditions; `-f -d -l -s -x` file tests. Variables: `REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME`, `%{HTTP:Name}`, `%{ENV:NAME}`, `%{LA-U:…}`/`%{LA-F:…}`. `%{TIME*}` and map lookups yield the empty string. Unknown flags are ignored, as Apache does. |
+| RewriteCond · RewriteRule | supported | Flags: `L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F`, `OR` on conditions; `-f/-F -d -e -l/-L/-h -s -x` file tests (`-U` always matches). Variables: `REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME`, `%{HTTP:Name}`, `%{ENV:NAME}`, `%{LA-U:…}`/`%{LA-F:…}`. `%{TIME*}` yields the empty string. `RewriteMap`, `${map:key}` lookups and the forced type/handler flags `T=`/`H=` are refused at parse time, so an `.htaccess` carrying one fails closed. Other unrecognized flags (e.g. `DPI`, `CO=`) are ignored. |
 
 | SetEnvIf · SetEnvIfNoCase | supported | Lazy header access; server-computed CGI names are protected. |
 
@@ -137,11 +139,11 @@ htpasswd hashes: **bcrypt** (`$2y$`/`$2b$`/`$2a$`, `htpasswd -B`, cost capped at
 
 | AuthType · AuthName · AuthUserFile | supported | Basic only; bcrypt, APR1 (`$apr1$`), MD5-crypt (`$1$`) and `{SHA}` hashes. |
 
-| Header set / add / append / merge / unset / setifempty | supported | `always`/`onsuccess`, case-insensitive `env=`/`env=!` guards, `%{NAME}e` interpolation, ` `/` `/` ` scopes (merged in Apache order: directory-level across the chain, then ` ` against the resolved target file, then ` `). `merge` deduplicates trimmed comma-separated values. Applied in `finalize`, before cache storage and compression. CR/LF rejected. |
+| Header set / add / append / merge / unset | supported | `always`/`onsuccess`, case-insensitive `env=`/`env=!` guards, `%{NAME}e` interpolation, ` `/` `/` ` scopes (merged in Apache order: directory-level across the chain, then ` ` against the resolved target file, then ` `). `merge` deduplicates trimmed comma-separated values. Applied in `finalize`, before cache storage and compression. CR/LF rejected. |
 
 | Header echo | partial | Parses without error; emits nothing. |
 
-| Header edit / edit* / note · RequestHeader * | ignored | Line ignored. See the header-directive compatibility inventory in the source tree (`docs/header-directive-compatibility.md`) for the exact boundary and the executable fixtures. |
+| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. See the header-directive compatibility inventory in the source tree (`docs/header-directive-compatibility.md`) for the exact boundary and the executable fixtures. |
 
 | Header condition expr= / value expr= | partial | Only a conjunction of `%{REQUEST_URI} =~ / !~` is evaluated; other expressions are not. Value expressions are not implemented. |
 

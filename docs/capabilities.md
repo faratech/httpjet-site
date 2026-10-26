@@ -34,7 +34,7 @@ What the current source tree does, what it does only behind a build feature, wha
 
 | kTLS / sendfile | partial | Plain-TCP H1 file bodies use `sendfile(2)` always; a `--features ktls` build adds TLS 1.3 H1 sendfile only when `--ktls=auto` finds a physical NIC with active `tls-hw-tx-offload`. H2/H3/UDS/TLS 1.2 keep userspace paths. → |
 
-| Virtual hosts | supported | Listener + exact Host/SNI maps, OLS wildcard domain patterns (`*.example.test` and `example.*` with exact > longest-match precedence), and a bare `*` fallback. |
+| Virtual hosts | supported | Listener + exact Host/SNI maps, nearest-configured-parent-domain fallback (an unmapped `a.example.test` reaches the vhost that maps `example.test`), and a bare `*` fallback. Glob patterns such as `*.example.test` or `example.*` are not matched: `check` warns and those hosts fall to `*`. |
 
 | Static content | supported | Conditional requests, LiteSpeed ETags, ranges, in-memory small-file promotion, precompressed `.br`/`.gz` siblings, traversal-safe opens. → |
 
@@ -50,13 +50,13 @@ What the current source tree does, what it does only behind a build feature, wha
 
 | CGI execution, uWSGI | unsupported | Design contracts exist; nothing is routable. A `cgi` handler without an explicit FastCGI processor fails closed (never serves source). → |
 
-| Rewrites & `.htaccess` | partial | Common rewrite, access, auth, header (`set`/`append`/`add`/`merge`/`unset`/`setifempty`), expiry (`ExpiresActive`/`ExpiresDefault`/`ExpiresByType`), cache and env directives. `Header edit` and `RequestHeader` are ignored. Run `check --strict`. → |
+| Rewrites & `.htaccess` | partial | Common rewrite, access, auth, header (`set`/`append`/`add`/`merge`/`unset`), expiry (`ExpiresActive`/`ExpiresDefault`/`ExpiresByType`), cache and env directives. `Header edit`, `Header setifempty`, `Header echo` and `RequestHeader` are ignored. Run `check --strict`. → |
 
 | Compression | supported | Dynamic gzip/brotli/zstd + precompressed siblings. Gzip *request* decoding on by default; brotli/zstd request decoding opt-in and bounded. → |
 
 | Origin page cache | supported opt-in | Public/private tiers, vary (including per-URL cookie vary), purge tags, stale policies, single flight, admission, RAM/file tiers, dictionaries, restart scan, generation-scoped keys. A first-class route-level *microcache policy* is specified, not implemented. → |
 
-| Access controls | supported | Peer ACLs, trusted-proxy client IP, GeoIP/ASN CIDR rules, per-IP rate limit, body limits, Basic auth (bcrypt, APR1 `$apr1$`, MD5-crypt `$1$` and `{SHA}` htpasswd in constant time; bcrypt cost capped at 14, files confined to the docroot). → |
+| Access controls | supported | Peer ACLs, trusted-proxy client IP, GeoIP/ASN CIDR rules, per-IP rate limit, body limits, Basic auth (bcrypt, APR1 `$apr1$`, MD5-crypt `$1$` and `{SHA}` htpasswd in constant time; bcrypt cost capped at 14, files confined to the docroot or an operator-listed `--auth-user-file-roots` directory). → |
 
 | WAF | external opt-in | Bounded request-inspection sidecar over Unix socket (peer-UID verified) or loopback TCP, fail-closed by default. No embedded ModSecurity/CRS engine. → |
 
@@ -134,7 +134,7 @@ Request limits come from the LiteSpeed ` ` block and per-context overrides; insp
 
 | sub_filter buffering | 4 MiB default (`subFilterMaxBody`); beyond it the stream passes through raw |
 
-| WAF sidecar | Body ≤ 1 MiB inspected (`--waf-body-max`), total timeout ≤ 30 s, concurrency ≤ 4096, 4 KiB response head, 64 MiB process-wide serialization budget |
+| WAF sidecar | Body inspected up to `--waf-body-max` (default 64 KiB, cap 1 MiB), total timeout default 100 ms (cap 30 s), concurrency default 128 (cap 4096), 4 KiB response head, 64 MiB process-wide serialization budget |
 
 | Admin APIs | Read: 4 KiB/32 header fields, 4 connections, 5 s deadlines, 1 MiB response. Write: 8 KiB/32 fields, 1 MiB body, ≤128 vhosts, ≤64 XML nesting, 4 connections, one candidate build, 5 s lock / 10 s wait |
 

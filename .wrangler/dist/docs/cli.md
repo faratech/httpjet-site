@@ -9,13 +9,13 @@
 
 # CLI reference
 
-One binary, four subcommands. `--root` is the only global option. Persistent policy lives in the XML; **everything on the command line is an operational override** — addresses, workers, PHP wiring, cache budgets, feature opt-ins. This page is generated from `httpjet serve --help` of v0.1.5 plus the feature-gated flags.
+One binary, four subcommands. `--root` is the only global option. Persistent policy lives in the XML; **everything on the command line is an operational override** — addresses, workers, PHP wiring, cache budgets, feature opt-ins. This page is generated from `httpjet serve --help` of v0.1.10 plus the feature-gated flags.
 
 ## Subcommands
 
            **httpjet** [--root DIR] <subcommand>
 ```
-httpjet --root /abs/root check [--strict]     # parse + summary; --strict lints topology and exits non-zero on findings (deploy gate)
+httpjet --root /abs/root check [--strict]     # parse + summary + lint; --strict exits non-zero on lint errors (deploy gate)
 httpjet --root /abs/root serve [flags…]       # bind the configured listeners and serve
 httpjet --root /abs/root lsphp [flags…]       # run a standalone persistent lsphp pool (the PHP half of a zero-downtime deploy)
 httpjet lsphp-reload [flags…]                 # ask a running pool to replace its worker generation without closing the listener
@@ -26,7 +26,7 @@ httpjet --version                             # httpjet 0.1.10
 
 | `--root ` (global) | `/usr/local/lsws` | Server root containing `conf/httpd_config.xml`. Use an absolute path. |
 
-| `check --strict` | off | Hard-error on shared docroots, missing docroots, vhosts without an exact `vhostMap` domain; warn on apex-without-www, TLS over UDS, PROXY protocol on public binds, geo lists without a db, inert LiteSpeed elements, generic CGI contexts, unsupported auth forms; print `vhost-map-fingerprint` and fast-memo verdicts. |
+| `check --strict` | off | Hard-error on shared docroots, missing docroots, mapped vhosts whose config did not load, and an unloadable first TLS listener; warn (never fail) on vhosts without an exact `vhostMap` domain, apex-without-www, wildcard map patterns, TLS over UDS, PROXY protocol on public binds, inert LiteSpeed elements, generic CGI contexts, unsupported auth forms. Geo rules without a db fail `check` even without `--strict`. Plain `check` prints the same lint lines, `vhost-map-fingerprint` and fast-memo verdicts; `--strict` only makes errors exit non-zero. |
 
 | `lsphp --php-socket` | `/tmp/php8-httpjet.sock` | Socket lsphp listens on — the path `serve --lsphp-external` dials. A systemd-activated fd at the same path is adopted. |
 
@@ -62,7 +62,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --http-uds   | — | Additionally serve plain HTTP on this unix domain socket (H1 + h2c prior knowledge, one accept core). Peers have no address: ACLs and logs see fabricated loopback and the access log renders `unix:` — the socket file's mode/owner is the real access boundary. A socket-activated fd at the same path (socket unit) is adopted for zero-downtime restarts |
 
-| --ktls [ ] | auto | Kernel-TLS on the io_uring TLS path: after the rustls handshake, upgrade the socket to kTLS so H1/H2 serve plaintext over the raw fd (kernel encrypt/decrypt), removing the userspace AEAD copy on large-body egress. Runs only on the io_uring TLS path (the default transport). `auto` (default) requires a `--features ktls` build, a physical default-route NIC, and active `tls-hw-tx-offload`; otherwise it logs one reason and stays on rustls. `on` forces kTLS for isolated benchmarking and fails when the feature is absent; `off` never enables it. A bare `--ktls` remains an alias for `--ktls=on`. TLS 1.3 only (1.2 falls back to userspace); peer KeyUpdate is handled (RX rekey + reply). STAGED — validate on an alt port before production Print help Values: `auto, on, off`. |
+| --ktls [ ] | auto | Kernel-TLS on the io_uring TLS path: after the rustls handshake, upgrade the socket to kTLS so H1/H2 serve plaintext over the raw fd (kernel encrypt/decrypt), removing the userspace AEAD copy on large-body egress. Runs only on the io_uring TLS path (the default transport). `auto` (default) requires a `--features ktls` build, a physical default-route NIC, and active `tls-hw-tx-offload`; otherwise it logs one reason and stays on rustls. `on` forces kTLS for isolated benchmarking and fails when the feature is absent; `off` never enables it. A bare `--ktls` remains an alias for `--ktls=on`. TLS 1.3 only (1.2 falls back to userspace); peer KeyUpdate is handled (RX rekey + reply). STAGED — validate on an alt port before production. Values: `auto, on, off`. |
 
 | Security & limits |
 
@@ -124,6 +124,8 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --page-cache-stream-fill-vhosts   | (empty) | Comma-separated vhost names whose cacheable page-cache misses WITHOUT a Content-Length (progressive template output) are sent to the client as the backend writes them and stored once the backend finishes, instead of being buffered whole first. Only identity-encoded public 200s; a body that errors, is cut short or grows past the object cap is served but never stored. Empty = off |
 
+| --page-cache-egress-at-rest-vhosts   | (empty) | Comma-separated vhost names whose stored misses keep a dictionary-less zstd body (plain zstd) instead of being re-encoded against the vhost dictionary in the background. A miss answered with zstd (a CDN peer under `--cf-send-zstd`) stores the encode made for its own response, one encode instead of two; any other miss stores the identity and encodes it plain in the background. A zstd hit is served the stored bytes until the entry is hot enough for its L9 variant. The stored copy is larger than a dictionary-compressed one. Buffered misses only (not --page-cache-stream-fill-vhosts); with --xf-capsule dedicated storage, capsule renders keep the dictionary path. Empty = off |
+
 | --page-cache-admit-threshold   | 2 | (W-TinyLFU) Base admission bar: minimum frequency a cacheable response must show before it is STORED. One request counts as ONE sighting — the on-core fast path probes uncounted and records only a hit it serves. 2 = store on the 2nd sighting (miss-miss-hit; rejects the long-tail of one-hit-wonders — the default). 1 = store on the 1st sighting (miss-hit; cache everything — now cheap with --page-cache-dict, with the store's byte LRU protecting the hot set). Size-weighting adds +1 per 256 KiB on top. Watch httpjet_cache_hit_ratio_real to tune |
 
 | --page-cache-vary-cookies   | xf_style_variation,xf_style_id,xf_language_id | Comma-separated public-vary cookie names: a cacheable public response may declare `X-LiteSpeed-Vary: cookie=NAME,...` and the entry is keyed by these cookies' values (shared, non-sensitive prefs). Default matches the XenForo style/language set |
@@ -172,6 +174,8 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --no-fast-memo | off | Disable the finished-response memo on the on-core static fast path (default ON; per-thread, 1 s TTL, byte-identity-gated — see `pipeline::fast_memo`). Env `HJ_FAST_MEMO=0` is equivalent |
 
+| --fast-early-bridge   | off | Bridge a cookieless request to the full pipeline before the on-core prefix when nothing on-core can serve it: the page cache cannot answer the path and the static branch would decline. `off` (default) is today's path; `shadow` only counts what `on` would do (`httpjet_fast_early_predicted_total`, `httpjet_fast_early_forfeit_total`). Env `HJ_FAST_EARLY_BRIDGE` is equivalent and takes precedence. Values: `off, shadow, on`. |
+
 | --cf-send-zstd | off | Compress responses to a trusted-proxy (Cloudflare) peer as zstd, ignoring the forwarded Accept-Encoding. CF asks the origin for br/gzip but decodes an origin `Content-Encoding: zstd` and re-encodes per browser at its edge — so this hands CF the cheapest-to-produce form (zstd ≪ brotli to compress) without changing what browsers receive. Officially unsupported CF↔origin; opt-in, default off. Never applies to untrusted (direct) clients. Off ⇒ byte-identical to today |
 
 | --rewrite-outcome-ttl-ms   | 1000 | TTL in milliseconds for the rewrite-outcome cache (memoized rewrite decisions for `path_cacheable` chains, keyed by vhost/scheme/ method/host/path/query + any keyable header vars). 0 disables the cache entirely. The default (1000 ms) matches the historical hard-coded TTL — it bounds `-f`/`-d` filesystem staleness exactly like the StatCache and lets `.htaccess` edits take effect within ~1 s |
@@ -192,13 +196,15 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --telemetry-flush-secs   | 30 | Snapshot flush interval in seconds (only used when --telemetry-file is set). Fixed RAM; ~1 MB/day on disk at the default |
 
-| --php-slow-log   | (empty) | Per-request PHP render log: a TSV line for every LSAPI request whose render TTFB exceeds --php-slow-threshold-ms, plus a 1-in-128 sample of ALL PHP requests as the population baseline — the per-URL / user-class attribution behind the lsapi_ttfb histogram. Rolls at 64 MiB, gzip archives, 30-day prune. Empty = disabled. e.g. logs/php-slow.tsv |
+| --php-slow-log   | (empty) | Per-request PHP render log: a TSV line for every LSAPI request whose render TTFB exceeds --php-slow-threshold-ms, plus a 1-in-128 sample of ALL PHP requests as the population baseline — the per-URL / user-class attribution behind the lsapi_ttfb histogram. Rolls at 64 MiB, gzip archives, 7-day prune. Empty = disabled. e.g. logs/php-slow.tsv |
 
 | --php-slow-threshold-ms   | 50 | "Slow" threshold in milliseconds for --php-slow-log |
 
 | --request-id-header | off | Echo the per-request correlation id (also in the access/error/php-slow logs) as an `X-Request-Id` response header, so a client/CDN can join a response to the server-side logs. Off by default |
 
 | --profile-token   | (empty) | Bearer secret required for profiling and sensitive metrics diagnostics. Empty disables those routes; ordinary metrics scraping stays available. Visible in /proc/*/cmdline; prefer `--profile-token-file` |
+
+| --profile-token-file   | — | File holding the --profile-token secret (single-link regular file owned by root or the serving user, no group/other permissions). Conflicts with `--profile-token`. |
 
 | Admin API |
 
@@ -261,7 +267,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 | --xf-capsule-dedicated-store | off | Also store every capsule-capable page under a DEDICATED (admission-exempt) key. Off by default since 2026-10-04: members are served from the shell-capable PUBLIC entry, which keeps one copy per page and lets the admission gate govern every store |
 
         !   Removed flags
-`--cache-peer` / `--cache-peer-fill*` (cross-node cache peers) and `--cache-purge-secret-file` are gone; the purge endpoint is loopback-gated. `--io-uring` / `--io-uring-h3` never existed as opt-ins — the io_uring transport is unconditional.
+`--cache-peer` / `--cache-peer-fill*` (cross-node cache peers) and `--cache-purge-secret-file` are gone; the purge endpoint is loopback-gated. `--io-uring` / `--io-uring-h3` were removed when the io_uring transport became unconditional (the tokio/epoll adapters were deleted with them).
 
 ## Environment variables
 
@@ -275,7 +281,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | `HTTPJET_LOG_DIR` | unset | Redirect every opened log file (unified and per-vhost) into this directory so isolated test or PGO runs never touch production log paths. |
 
-| `HTTPJET_URING_NO_IOWAIT` | unset | `1` sets `IORING_FEAT_NO_IOWAIT` on supported kernels so network-wait time on io_uring rings is not accounted as system iowait. |
+| `HTTPJET_URING_NO_IOWAIT` | unset | `1` passes `IORING_ENTER_NO_IOWAIT` on blocking ring waits when the kernel advertises `IORING_FEAT_NO_IOWAIT`, so network-wait time on io_uring rings is not accounted as system iowait. |
 
 | `HTTPJET_SYSLOG_TARGET` | unset | Mirror every rendered access line to syslog: `udp://host:514`, bare `host:port`, or a unix-dgram path such as `/run/systemd/journal/syslog`. Sent from the writer task; failures counted, never fatal. |
 
@@ -284,6 +290,10 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 | `CF_SEND_ZSTD` | unset | `1` ≡ `--cf-send-zstd`. |
 
 | `HJ_FAST_MEMO` | `1` | `0` ≡ `--no-fast-memo`. |
+
+| `HJ_FAST_EARLY_BRIDGE` | unset | `off` · `shadow` · `on` ≡ `--fast-early-bridge`; takes precedence over the flag when set. |
+
+| `HJ_LSAPI_FULL_HEADER_ENV` | unset | `1` also sends every request header's `HTTP_*` copy in the LSAPI env table (kill switch for the 0.1.8 dedupe; lsphp's `$_SERVER` is unchanged either way). Read once. |
 
 | `HTTPJET_OTEL` · `HTTPJET_OTEL_METRICS` | unset | `1` enables OTLP tracing / metrics (`--features otel`; startup fails if the feature is absent). |
 
@@ -301,8 +311,12 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 - **SIGHUP**: Reload configuration and certificates through the publication coordinator; a bad config keeps the current generation (see Admin API & reload ).
 
-- **SIGTERM / SIGINT**: Graceful shutdown: stop accepting, GOAWAY h2, drain within the unit's `TimeoutStopSec`, close the admin coordinator, flush logs and telemetry, bounded OTel shutdown.
+- **SIGUSR1**: Reopen the unified and per-vhost access/error logs and the PHP slow log (logrotate).
+
+- **SIGUSR2**: Toggle httpjet's own log level to `debug` and back to the boot `RUST_LOG` filter.
+
+- **SIGTERM / SIGINT**: Graceful shutdown: stop accepting, GOAWAY h2, drain in-flight connections for up to 15 s (inside the reference unit's `TimeoutStopSec=20`), close the admin coordinator, flush logs and telemetry, bounded OTel shutdown.
 
 - **Argument validation**: Public admin binds, missing companion options (`--admin-token-file`, `--admin-resource-root`, ACME requirements), malformed `--page-cache-shared-paths` or `--page-cache-vary-default` / `--page-cache-dict-level` pairs, an unopenable generation file, or a rejected WAF configuration fail startup before any socket is bound; `--page-cache-integrity-required` additionally refuses to start the file tier when the integrity key cannot be installed.
 
-- **Socket activation**: Inherited fds are adopted by address/path; their count must match `--workers` for TCP listeners.
+- **Socket activation**: Inherited fds are classified by port (TCP for the HTTP/HTTPS listeners, UDP for QUIC) or exact path (Unix socket); one io_uring core serves each inherited TCP fd, so the socket unit's fd count, not `--workers`, sets the core count.

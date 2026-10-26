@@ -80,7 +80,7 @@ The last full runs: the whole workspace suite green at the 0.1.10 release (3,068
 
 - **Dependency advisories**: a daily job fails on any RustSec finding and on a newer compatible transport-critical crate (quinn, rustls, aws-lc-rs, tokio, httparse, io-uring, zstd, brotli, h2, hyper, http, mio, socket2, openssl, bcrypt, libc).
 
-- **Nightly/manual fuzz**: all eight parser targets with bounded time, input size, memory and artifact retention.
+- **Weekly/manual fuzz**: all eight parser targets with bounded time, input size, memory and artifact retention.
 
            **local reproduction**
 ```

@@ -35,10 +35,10 @@ $ curl -s http://127.0.0.1:9091/v1/status | jq .
 {
   "schema_version": 1,
   "generation": 3,                       # process-local, starts at 1; rejected candidates stay invisible
-  "config_fingerprint": "sha256:…",      # of the normalized model's Debug form — comparable within one binary version only
+  "config_fingerprint": "9f2c…",      # of the normalized model's Debug form — comparable within one binary version only
   "listeners": [{"name":"https","tls":true,"unix":false}],   # configured names + flags, NOT bound addresses
   "vhosts": ["example.test"],
-  "upstreams": [{"scope":"server","group":"application","peers":[{"ordinal":0,"healthy":true,"active":2,"selections":1290}]}],
+  "upstreams": [{"scope":"server","group":"application","peer":0,"healthy":true,"active":2,"selections":1290}],
   "page_cache": {"entries": 41210, "memory_bytes": 60817408, "hits": 1904411, "misses": 88123},   # or null when off
   "truncated": false
 }
@@ -91,7 +91,7 @@ Framing: `Authorization: Bearer ` (missing/duplicate/malformed → 401 without r
 - Listener→vhost mappings on the unchanged listener set
 - Rewrites, document roots, contexts, static locations
 - Reloadable request settings, cache policy gates, expires
-- Proxy processors and groups (health schedulers restart cleanly)
+- Proxy and FastCGI processors, and proxy groups (health schedulers restart cleanly)
 - GeoIP database and upstream client-cert files — inside a resource root
 
 #### Constrained trust (TCP transaction)
@@ -104,7 +104,7 @@ Framing: `Authorization: Bearer ` (missing/duplicate/malformed → 401 without r
 #### restart_required
 
 - Listener addresses, count, order, secure/plain roles; QUIC enablement; UDS topology
-- PHP topology and pools; non-proxy processors
+- PHP topology and pools (LSAPI processors)
 - Cache-store identity and boot-time cache caps/policy
 - User/group, namespace and isolation settings, per-vhost log resources
 - `useIpInProxyHeader` and the whole ` ` block

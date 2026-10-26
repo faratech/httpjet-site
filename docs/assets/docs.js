@@ -1293,7 +1293,7 @@
       else if (/public/i.test(h) && tier === "private") lines.push('<span class="warn">stored PRIVATE</span> — a member request stores under its session even for a public opt-in (never into the public tier).');
       else {
         var m = /max-age=(\d+)/i.exec(h);
-        lines.push('<span class="good">store candidate</span> — TTL ' + (m ? m[1] + " s" : "default expireInSeconds") + ", subject to W-TinyLFU admission (threshold 2 by default → stored on the 2nd sighting) and the status/Set-Cookie/self-redirect guards.");
+        lines.push('<span class="good">store candidate</span> — TTL ' + (m ? (tier === "private" ? Math.min(+m[1], 300) + " s (private TTL capped at 300 s)" : m[1] + " s") : "default expireInSeconds") + (tier === "private" ? ", stored without the W-TinyLFU admission bar, subject to" : ", subject to W-TinyLFU admission (threshold 2 by default → stored on the 2nd sighting) and") + " the status/Set-Cookie/self-redirect guards.");
       }
       out.innerHTML = lines.join("\n");
     }
@@ -1475,7 +1475,7 @@
         ]
       },
       {
-        id: "b02", tag: "Tier A", short: "StatCache + DFA", date: "2026-06-04", commit: "2e1db15", era: 0, eraName: "Phase 1–7 Foundation",
+        id: "b02", tag: "Tier A", short: "StatCache + DFA", date: "2026-05-31", commit: "66fc2088", era: 0, eraName: "Phase 1–7 Foundation",
         regime: "loopback A/B · interleaved vs LSWS 6.3.5",
         title: "Tier A — StatCache, FileCache TTL & RegexSet Prefilter",
         summary: "Coalesced per-request filesystem metadata probes behind a 1-second TTL and introduced a dense RegexSet DFA prefilter so non-matching RewriteRules never run captures.",
@@ -1486,13 +1486,13 @@
         ],
         chart: {
           title: "Tier A Relative Ratio vs LiteSpeed (×100%)",
-          sub: "loopback A/B · 2026-06-04 · % of LiteSpeed 6.3.5 throughput",
+          sub: "loopback A/B · 2026-05-31 · % of LiteSpeed 6.3.5 throughput",
           unit: "% of LSWS",
           series: ["Pre-Tier A", "Tier A (StatCache + DFA)"],
           rows: [
             ["Heavy .htaccess /robots.txt (median)", [46, 63]],
-            ["Heavy .htaccess /robots.txt (peak)", [52, 70]],
-            ["66 KB static image (og-image.png)", [78, 99]]
+            ["Heavy .htaccess /robots.txt (single runs)", [65, 70]],
+            ["66 KB static image (og-image.png, single runs)", [93, 92]]
           ],
           foot: "Source: RESULTS.md Tier A campaign (A1 build-once RewriteInput + A2 rule-less skip + A3 1s statx TTL)"
         },
@@ -1502,7 +1502,7 @@
         ]
       },
       {
-        id: "b03", tag: "Batches 1–5", short: "Micro-Opts + Zstd", date: "2026-06-06", commit: "2d80a25", era: 0, eraName: "Phase 1–7 Foundation",
+        id: "b03", tag: "Batches 1–5", short: "Micro-Opts + Zstd", date: "2026-06-02", commit: "2d80a25", era: 0, eraName: "Phase 1–7 Foundation",
         regime: "same-session loopback A/B (prod live, ±10% noise floor)",
         title: "Batches 1–5 — Multi-Codec Egress, OR-Folding & Lazy Headers",
         summary: "Five source-level micro-optimization batches: lazy header map access, Cow CGI env keys, literal-prefix rule filtering, zstd > br > gzip negotiation, and OR-condition regex folding.",
@@ -1513,7 +1513,7 @@
         ],
         chart: {
           title: "Batches 1–5 Same-Session Loopback A/B (2d80a25 vs 8c74fe4)",
-          sub: "loopback ab -k -n 30000 -c 100 · 2026-06-06 · k req/s",
+          sub: "loopback ab -k -n 30000 -c 100 · 2026-06-02 · k req/s",
           unit: "k rps",
           series: ["Pre-opts (8c74fe4)", "Batches 1–5 (2d80a25)"],
           rows: [
@@ -1530,7 +1530,7 @@
         ]
       },
       {
-        id: "b04", tag: "Batch 6", short: "PGO + mimalloc", date: "2026-06-07", commit: "5091dfc", era: 0, eraName: "Phase 1–7 Foundation",
+        id: "b04", tag: "Batch 6", short: "PGO + mimalloc", date: "2026-06-02", commit: "5091dfc", era: 0, eraName: "Phase 1–7 Foundation",
         regime: "controlled same-session loopback A/B · exact-PID isolation",
         title: "Batch 6 — Codegen Tier: Native ISA, mimalloc & PGO",
         summary: "Switched global allocator to mimalloc, enabled -C target-cpu=native (AVX-512 on x86_64, Neoverse-N1 on ARM64), and built with 3-step Profile-Guided Optimization (scripts/build-pgo.sh).",
@@ -1541,7 +1541,7 @@
         ],
         chart: {
           title: "Batch 6 Codegen Tier A/B (5091dfc vs 8c74fe4) + LiteSpeed Reference",
-          sub: "loopback ab -k -n 30000 -c 100 · 2026-06-07 · k req/s",
+          sub: "loopback ab -k -n 30000 -c 100 · 2026-06-02 · k req/s",
           unit: "k rps",
           series: ["Baseline (8c74fe4)", "Codegen Tier (5091dfc)", "LiteSpeed 6.3.5"],
           rows: [
@@ -1556,12 +1556,12 @@
         ]
       },
       {
-        id: "b05", tag: "LSCache + H2 Fix", short: "Single-Flight & Cache", date: "2026-06-07", commit: "dc38d640", era: 1, eraName: "Cache & Transport Breakthroughs",
+        id: "b05", tag: "LSCache + H2 Fix", short: "Single-Flight & Cache", date: "2026-06-07", commit: "36078788", era: 1, eraName: "Cache & Transport Breakthroughs",
         regime: "loopback PGO suite · scripts/bench-report.py",
         title: "Single-Flight Wakeup Fix, H2 Work-Stealing & Origin Page Cache",
         summary: "Fixed a single-flight follower lost-wakeup that serialized concurrent misses, added H2 single-connection stream fan-out across idle cores, cached open_beneath resolution (1s TTL), and shipped hj-pagecache.",
         kpis: [
-          { v: "19,912 rps", d: "101× vs uncached PHP (196 rps)", n: false, l: "152 KB forum homepage cache HIT (p50 2ms)" },
+          { v: "19,215 rps", d: "40× vs uncached PHP (480 rps)", n: false, l: "152 KB forum homepage cache HIT (p50 2ms)" },
           { v: "165.9k rps", d: "up from 2,939 rps (56×)", n: false, l: "Heavy .htaccess H2 at c=50" },
           { v: "250.8k rps", d: "ahead of LSWS (220.5k)", n: false, l: "H2 1 KB static at c=50 (PGO retrained)" },
           { v: "44.8k rps", d: "ahead of LSWS (38.5k at c=40)", n: false, l: "PHP/LSAPI H1 hello-world" }
@@ -1576,7 +1576,7 @@
             ["H2 static 1 KB (c=50)", [250.8, 220.5]],
             ["H2 light rewrite (/robots.txt, c=100)", [230.3, 193.7]],
             ["H2 heavy rewrite (/robots.txt, c=100)", [161.0, 206.8]],
-            ["H1 static 1 KB (c=50)", [94.7, 82.4]],
+            ["H1 static empty (c=50)", [96.9, 82.4]],
             ["H1 heavy rewrite (/robots.txt, c=100)", [87.3, 84.3]],
             ["PHP/LSAPI GET H1 (c=40)", [44.8, 38.5]]
           ],
@@ -1589,7 +1589,7 @@
         ]
       },
       {
-        id: "b06", tag: "io_uring", short: "monoio Transport", date: "2026-06-21", commit: "30b7fda", era: 1, eraName: "Cache & Transport Breakthroughs",
+        id: "b06", tag: "io_uring", short: "monoio Transport", date: "2026-06-21", commit: "c4930ff6", era: 1, eraName: "Cache & Transport Breakthroughs",
         regime: "loopback transport A/B · monoio io_uring vs tokio/epoll",
         title: "Unconditional Pure-io_uring (monoio) Transport",
         summary: "Replaced the tokio/epoll TCP and tokio/quinn UDP adapters with a thread-per-core monoio io_uring transport across H1, native H2, and QUIC/H3, plus an on-core static/cache fast path.",
@@ -1617,34 +1617,34 @@
         ]
       },
       {
-        id: "b07", tag: "v0.0.1", short: "3-Way + Fast Memo", date: "2026-08-28", commit: "456711f5", era: 2, eraName: "Dedicated 3-Way & Egress Receipts",
-        regime: "dedicated-host PGO 3-way (quiet box) + live prod telemetry",
+        id: "b07", tag: "v0.0.1", short: "3-Way + Fast Memo", date: "2026-08-28", commit: "49c5e7c2", era: 2, eraName: "Dedicated 3-Way & Egress Receipts",
+        regime: "dedicated-client static matrix (2026-08-27) + loopback PGO heavy-.htaccess 3-way (2026-08-28) + live prod telemetry",
         title: "v0.0.1 — Dedicated 3-Way vs OLS/nginx, Fast-Path Memo & Prod Telemetry",
-        summary: "Added the default-on per-worker finished-response memo (fast_memo, 1s TTL, header/UA vary-set) and ran an uncontended dedicated-host 3-way benchmark against OpenLiteSpeed and nginx.",
+        summary: "Added the default-on per-worker finished-response memo (fast_memo, 1s TTL, header/UA vary-set) and benchmarked it against OpenLiteSpeed and nginx: a static matrix driven from a dedicated load-generator client and a loopback heavy-.htaccess three-way.",
         kpis: [
-          { v: "937.0k rps", d: "vs OLS 687.2k (+36%)", n: false, l: "H2 empty static at c=200 (907.7k at c=50)" },
+          { v: "891.1k rps", d: "vs OLS 838.2k (+6%)", n: false, l: "H2 empty static at c=50 (mean of 2 interleaved pairs)" },
           { v: "298.0k rps", d: "vs OLS 283.3k / nginx 125.4k", n: false, l: "806-line .htaccess H2 (c=100, PGO)" },
           { v: "+81% H2", d: "137k → 248k rps (+43% H1)", n: false, l: "Fast-path memo A/B on forum chain" },
-          { v: "0.2% CPU", d: "138 µs/req · 1.55 IPC", n: false, l: "httpjet share of 9.99 ms prod latency" }
+          { v: "0.09%", d: "rewrite 5.4 µs + cache lookup 3.2 µs", n: false, l: "of the 9.99 ms mean prod request (2026-08-30)" }
         ],
         chart: {
           title: "Dedicated-Host 3-Way PGO: httpjet vs OpenLiteSpeed vs nginx",
-          sub: "quiet dedicated host · 2026-08-27..28 · k req/s",
+          sub: "static rows: dedicated load-generator client, mean of 2 interleaved pairs (2026-08-27) · .htaccess rows: loopback PGO (2026-08-28) · k req/s",
           unit: "k rps",
           series: ["httpjet v0.0.1", "OpenLiteSpeed", "nginx"],
           rows: [
-            ["H2 static empty (c=50)", [907.7, 792.8, null]],
-            ["H2 static empty (c=200)", [937.0, 687.2, null]],
-            ["H2 static 1 KB (c=200)", [803.9, 790.5, null]],
+            ["H2 static empty (c=50)", [891.1, 838.2, null]],
+            ["H2 static empty (c=200)", [851.8, 736.3, null]],
+            ["H2 static 1 KB (c=200)", [802.9, 788.4, null]],
             ["H2 heavy 806-line .htaccess (c=100)", [298.0, 283.3, 125.4]],
             ["H1 heavy 806-line .htaccess (c=100)", [168.7, 169.1, 145.6]],
-            ["H1 static empty (c=1000)", [202.1, 183.4, null]]
+            ["H1 static empty (c=1000)", [200.1, 183.5, null]]
           ],
           foot: "Source: bench-results/versus5-dedicated-final-20260827.csv & compare-rewrite-memo-vary-pgo.csv"
         },
         notes: [
           "Fast-path memo (per-worker, 1s TTL, 64 MiB/worker) caches finished 200 responses keyed by listener, scheme, vhost, URI, Accept-Encoding, and the parse-time .htaccess header/UA vary-set (+43% H1, +81% H2, verified byte-identical across 192 parity cells).",
-          "Live production telemetry (2026-08-30): mean request 9.99 ms = 8.96 ms LSAPI PHP TTFB (89.7%) + 1.03 ms everything else (httpjet CPU ~138 µs/req, cache hit ~38 µs, rewrite 5.4 µs, cache lookup 3.2 µs)."
+          "Live production telemetry (2026-08-30): mean request 9.99 ms = 8.96 ms LSAPI PHP TTFB (89.7%) + 1.03 ms everything else (rewrite 5.4 µs, cache lookup 3.2 µs)."
         ]
       },
       {
@@ -1653,7 +1653,7 @@
         title: "v0.0.2 — Nonblocking sendfile(2), Hardware-Gated kTLS & Dict L6",
         summary: "Shipped bounded nonblocking sendfile(2) for plain H1 and hardware-offload-gated kernel TLS (--ktls=auto) for TLS 1.3 H1, plus per-vhost zstd dictionary level tuning (windowsforum.com=6).",
         kpis: [
-          { v: "4,852.5 rps", d: "38.8 Gbps · 10.08 ms mean", n: false, l: "1 MiB plaintext H1 sendfile (c=50)" },
+          { v: "4,852.5 rps", d: "40.7 Gbit/s · 10.08 ms mean", n: false, l: "1 MiB plaintext H1 sendfile (c=50)" },
           { v: "2,999.7 rps", d: "vs 2,944.9 forced sw-kTLS", n: false, l: "1 MiB TLS 1.3 H1 rustls (--ktls=off)" },
           { v: "−50% CPU", d: "for +4% tmpfs footprint", n: false, l: "windowsforum.com=6 dict zstd level" }
         ],
@@ -1680,7 +1680,7 @@
         title: "v0.0.3 — Rooted openat2 File-Tier Opens & HTTP/3 QPACK PGO",
         summary: "Replaced multi-step hot file-tier opens with rooted openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS) and expanded PGO training to drive HTTP/3 QPACK dynamic-table paths.",
         kpis: [
-          { v: "28.7k rps", d: "+0.64% ABBA · p50 0.43 ms", n: false, l: "HTTP/3 QUIC cache-hit (20k req)" },
+          { v: "28.7k rps", d: "+0.64% ABBA · p50 0.43 ms", n: false, l: "HTTP/3 QUIC static 1 KiB (20k req)" },
           { v: "+11.7%", d: "/help/cookies/ no-dict A/B", n: false, l: "H2 file-tier cold/no-dict serve" },
           { v: "+4.46%", d: "/help/smilies/ warm dict A/B", n: false, l: "H2 warm dict-backed cache hit" }
         ],
@@ -1690,7 +1690,7 @@
           unit: "k rps",
           series: ["v0.0.2 (previous)", "v0.0.3 (openat2 + H3 PGO)"],
           rows: [
-            ["H3 QUIC static/cache (peak pair)", [26.9, 28.7]],
+            ["H3 QUIC static 1 KiB (pair 2)", [25.5, 28.7]],
             ["H2 warm dict /help/cookies/ (pair 5)", [13.1, 13.5]],
             ["H2 warm dict /help/smilies/ (pair 5)", [6.6, 8.0]]
           ],
@@ -1739,7 +1739,7 @@
         summary: "Extended the idle timeout to 1800s for mTLS-verified Cloudflare peers (--trusted-proxy-idle-secs), disabled unused TLS 1.3 post-handshake tickets (--tls-session-tickets 0), and tuned ARM64 dictionary zstd level to 3.",
         kpis: [
           { v: "−78%", d: "0.77 → 0.169 handshakes/req", n: false, l: "ARM64 full TLS handshakes (voidrune)" },
-          { v: "−28%", d: "0.052 → 0.0365 (idle closes → 0)", n: false, l: "x86_64 full TLS handshakes" },
+          { v: "−30%", d: "0.052 → 0.0365/req (idle closes → 0)", n: false, l: "x86_64 full TLS handshakes" },
           { v: "5.3× faster", d: "3.53 ms → 0.66 ms/page", n: false, l: "moontimenow.com dict zstd L3 encode" },
           { v: "50% → 11%", d: "of voidrune tokio CPU", n: false, l: "Background dictionary recompress share" }
         ],
@@ -1754,10 +1754,10 @@
             ["ARM64 full TLS handshakes/req (0.77 → 0.169)", [100, 21.9]],
             ["x86_64 full TLS handshakes/req (0.052 → 0.0365)", [100, 70.2]]
           ],
-          foot: "Source: CLAUDE.md / RESULTS.md #486, #489, #967 — zero tmpfs 4 KiB page footprint change on ARM64"
+          foot: "Source: CLAUDE.md / RESULTS.md #486, #489, #967 — tmpfs footprint at L3: thisdayinhistory.ai identical, moontimenow.com +14% pages"
         },
         notes: [
-          "Cloudflare never resumes TLS sessions to origins (resumed_total = 0), so closing an idle origin connection after 90s forced a full ECDHE+mTLS handshake; --trusted-proxy-idle-secs 1800 eliminated idle closes.",
+          "Cloudflare never resumes TLS sessions to origins (resumed_total = 0), so closing an idle origin connection (after 90 s on the ARM origin, 600 s on x86) forced a full ECDHE+mTLS handshake; --trusted-proxy-idle-secs 1800 eliminated idle closes.",
           "Setting --tls-session-tickets 0 saved two post-handshake records and ~5% server CPU per handshake."
         ]
       },
@@ -1782,21 +1782,21 @@
             ["W3s64 H2 static 64 KiB (1,600 → 26)", [1600, 26]],
             ["W3s1 H2 static 1 KiB (800 → 0.5)", [800, 0.5]],
             ["W1 H2 page-cache hit (410 → 1)", [410, 1]],
-            ["W2 H2 uncached PHP (250 → 1)", [250, 1]],
+            ["W2 H2 uncached PHP (186 → 3.5)", [186, 3.5]],
             ["W6 H2 cookied hit (190 → 5)", [190, 5]]
           ],
           foot: "Source: PR #1157 (v0.1.2) & commit 0c10fdc4 (v0.1.3)"
         },
         notes: [
           "hj_core::recycle::Recycled<T> pools H2 stream task allocations and uring::bridge task slots per thread so stream teardown never releases pages to the OS.",
-          "v0.1.3 eliminated the 60,000-fault bursts every 10 minutes caused by background cache refreshes running quality-9 brotli 16 MiB ring allocations when --cf-send-zstd only ever serves zstd."
+          "v0.1.3 removed the quality-9 brotli encode (a ~32 MiB rust-brotli hasher: ~8k minor faults and ~10 ms per fill) from internal cache refreshes when --cf-send-zstd only ever serves zstd; those fills drove the ~60,000-fault bursts every 10 minutes."
         ]
       },
       {
         id: "b13", tag: "v0.1.5", short: "BODY_BUFS Zero-Fault", date: "2026-10-24", commit: "16ed92f9", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
         regime: "PGO ABBA on x86_64 & ARM64 · 3,019 workspace tests green",
         title: "v0.1.5 — BODY_BUFS TieredPool, Zero-Copy LSAPI & MAP_POPULATE",
-        summary: "Completed the zero-fault campaign (#1163): BODY_BUFS TieredPool<Vec<u8>> (64 KiB/256 KiB/1 MiB) frozen into Bytes via Bytes::from_owner, zero-copy LSAPI PacketReader slices, spawn_blocking variant/dict fills, per-thread PageDict DCtx, MAP_POPULATE tmpfs mmaps, and per-core TLS record size-class retention.",
+        summary: "Completed the zero-fault campaign (#1163): BODY_BUFS TieredPool<Vec<u8>> (2 per thread + 16 shared, buffers up to 256 KiB) frozen into Bytes via Bytes::from_owner, zero-copy LSAPI PacketReader slices, spawn_blocking variant/dict fills, per-thread PageDict DCtx, MAP_POPULATE tmpfs mmaps, and per-core TLS record size-class retention.",
         kpis: [
           { v: "1.80 → 0.106", d: "−94% minor faults/req", n: false, l: "Streamed 117 KB /login/ over H2" },
           { v: "0.0005", d: "down from 0.0325 in 0.1.4", n: false, l: "W1 H2 page-cache hit faults/req" },
@@ -1866,17 +1866,18 @@
         series: ["HTTP/1.1", "HTTP/2"],
         rows: [
           ["0.0.1 Baseline (2026-06-01)", [95.8, null]],
-          ["Batches 1–5 Micro-Opts (2026-06-06)", [78.6, null]],
-          ["Batch 6 Codegen PGO + mimalloc (2026-06-07)", [84.3, null]],
+          ["Batches 1–5 Micro-Opts (2026-06-02)", [78.6, null]],
+          ["Batch 6 Codegen PGO + mimalloc (2026-06-02)", [84.3, null]],
           ["Single-Flight Bug (pre-fix c=50, 2026-06-07)", [0.3, 2.9]],
-          ["Post Single-Flight + Serve Memo (2026-06-07)", [87.3, 165.9]],
+          ["Post Single-Flight + Serve Memo (2026-06-07)", [87.3, 161.0]],
           ["v0.0.1 Fast-Memo OFF (2026-08-28, c=100)", [107.0, 137.0]],
-          ["v0.0.1 Fast-Memo ON (2026-08-28, c=100 PGO)", [168.7, 298.0]],
+          ["v0.0.1 Fast-Memo ON (2026-08-28, c=100, same binary)", [153.0, 248.0]],
+          ["v0.0.1 Fast-Memo ON, PGO three-way (2026-08-28, c=100)", [168.7, 298.0]],
           ["LiteSpeed 6.3.5 Reference (2026-06-01)", [84.3, 206.8]],
           ["OpenLiteSpeed Reference (2026-08-28, c=100)", [169.1, 283.3]],
           ["nginx Reference (2026-08-28, c=100)", [145.6, 125.4]]
         ],
-        foot: "Note: 2026-06-01..07 runs were on shared host; 2026-08-28 3-way was on quiet dedicated host with 806-line chain."
+        foot: "Note: 2026-06-01..07 runs were on shared host; 2026-08-28 3-way was a loopback PGO run on the same shared host with the 806-line chain."
       },
       {
         id: "l-h2", name: "H2 Static RPS",
@@ -1887,9 +1888,9 @@
         rows: [
           ["0.0.1 Pre-PGO Retrain (2026-06-01)", [128.0, null, null]],
           ["Post-Fix PGO + Serve Memo (2026-06-07)", [250.8, 266.9, 107.5]],
-          ["v0.0.1 Dedicated io_uring + Fast Memo (2026-08-27)", [781.7, 907.7, 937.0]],
+          ["v0.0.1 io_uring + Fast Memo, dedicated client (2026-08-27, mean of 2 pairs)", [770.3, 891.1, 851.8]],
           ["LiteSpeed 6.3.5 Reference (2026-06-01)", [220.5, 244.5, 109.6]],
-          ["OpenLiteSpeed Reference (2026-08-27)", [749.6, 792.8, 687.2]]
+          ["OpenLiteSpeed Reference (2026-08-27, mean of 2 pairs)", [745.0, 838.2, 736.3]]
         ],
         foot: "Source: httpjet-sweep-fixed.csv (2026-06-07) and versus5-dedicated-final-20260827.csv (2026-08-27)."
       },
@@ -1900,15 +1901,15 @@
         unit: "k rps",
         series: ["Throughput (k req/s)"],
         rows: [
-          ["Full DB-backed XenForo PHP render (196 rps, p50 93ms)", [0.2]],
-          ["Origin Page Cache HIT — RAM hot tier (19,912 rps, p50 2ms)", [19.9]],
+          ["Full DB-backed XenForo PHP render (480 rps, p50 34ms)", [0.5]],
+          ["Origin Page Cache HIT — RAM hot tier (19,215 rps, p50 2ms)", [19.2]],
           ["Origin Page Cache HIT — jetcache tmpfs tier (18,211 rps)", [18.2]],
-          ["v0.0.3 HTTP/3 QUIC cache HIT (28,653 rps, p50 0.43ms)", [28.7]],
+
           ["PHP/LSAPI bench.php H1 — 0.0.1 Baseline (c=40)", [31.0]],
           ["PHP/LSAPI bench.php H1 — Post-Fix PGO (c=40)", [44.8]],
           ["PHP/LSAPI bench.php H1 — LiteSpeed 6.3.5 (c=40)", [38.5]]
         ],
-        foot: "Cache hit replaces an 8.96 ms PHP render with a ~38 µs memory/tmpfs serve (101× throughput, 46× lower latency)."
+        foot: "A cache hit replaces a full PHP render with a memory/tmpfs serve: 19,215 vs 480 req/s (about 40×), p50 2 ms vs 34 ms (loopback, 152 KB page)."
       },
       {
         id: "l-cpu", name: "CPU & Instructions/Req",
@@ -1938,7 +1939,7 @@
           ["W3s64 H2 static 64 KiB", [1600, 26, 15]],
           ["W3s1 H2 static 1 KiB", [800, 0.5, 0.2]],
           ["W1 H2 page-cache hit", [410, 1.0, 0.5]],
-          ["W2 H2 uncached PHP", [250, 1.0, 0.8]],
+          ["W2 H2 uncached PHP", [186, 3.5, 0.8]],
           ["W6 H2 cookied cache hit", [190, 5.0, 3.0]]
         ],
         foot: "Source: PR #1157 (v0.1.2) and PR #1163 (v0.1.5) under production MIMALLOC_PURGE_DELAY=0."
@@ -2150,25 +2151,25 @@
           id: "c-rewrite",
           name: "1 · Heavy .htaccess (H1 & H2 RPS)",
           title: "All-Builds Speed Curve — Heavy .htaccess Static (/robots.txt) vs LiteSpeed, OpenLiteSpeed & nginx",
-          sub: "806/477-line forum .htaccess chain across all 14 builds + reference baselines · k req/s (click any node to inspect that build)",
+          sub: "806/477-line forum .htaccess chain · c=100 · measured builds only, plus reference baselines · k req/s (click any node to inspect that build)",
           unit: "k rps",
           ymax: 320,
           ystep: 80,
           pts: [
-            { idx: 0, tag: "0.0.1", h2: 88.0, h1: 95.8, note: "Initial baseline" },
-            { idx: 1, tag: "Tier A", h2: 112.0, h1: 101.4, note: "StatCache + DFA" },
-            { idx: 2, tag: "B1–5", h2: 115.0, h1: 78.6, note: "OR-fold + zstd" },
-            { idx: 3, tag: "Batch 6", h2: 138.0, h1: 84.3, note: "PGO + mimalloc" },
-            { idx: 4, tag: "LSCache", h2: 165.9, h1: 87.3, note: "Single-flight fix" },
-            { idx: 5, tag: "io_uring", h2: 202.4, h1: 103.9, note: "monoio transport" },
+            { idx: 0, tag: "0.0.1", h2: null, h1: 95.8, note: "Initial baseline" },
+            { idx: 1, tag: "Tier A", h2: null, h1: null, note: "StatCache + DFA (relative A/B only)" },
+            { idx: 2, tag: "B1–5", h2: null, h1: 78.6, note: "OR-fold + zstd" },
+            { idx: 3, tag: "Batch 6", h2: null, h1: 84.3, note: "PGO + mimalloc" },
+            { idx: 4, tag: "LSCache", h2: 161.0, h1: 87.3, note: "Single-flight fix" },
+            { idx: 5, tag: "io_uring", h2: null, h1: null, note: "monoio transport (relative A/B only)" },
             { idx: 6, tag: "v0.0.1", h2: 298.0, h1: 168.7, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: 298.5, h1: 169.0, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", h2: 302.3, h1: 171.1, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", h2: 308.0, h1: 174.5, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", h2: 309.5, h1: 175.0, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", h2: 314.0, h1: 178.0, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", h2: 316.0, h1: 179.2, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 317.2, h1: 179.6, note: "Bug/perf bash" }
+            { idx: 7, tag: "v0.0.2", h2: null, h1: null, note: "sendfile + kTLS (relative A/B only)" },
+            { idx: 8, tag: "v0.0.3", h2: null, h1: null, note: "openat2 + H3 PGO (relative A/B only)" },
+            { idx: 9, tag: "v0.0.9", h2: null, h1: null, note: "access-rule memo (relative A/B only)" },
+            { idx: 10, tag: "v0.0.10", h2: null, h1: null, note: "TLS idle + dict L3 (relative A/B only)" },
+            { idx: 11, tag: "v0.1.2", h2: null, h1: null, note: "Recycled task pools (relative A/B only)" },
+            { idx: 12, tag: "v0.1.5", h2: null, h1: null, note: "BODY_BUFS zero-fault (relative A/B only)" },
+            { idx: 13, tag: "v0.1.10", h2: null, h1: null, note: "Bug/perf bash (relative A/B only)" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2181,67 +2182,67 @@
             { val: 145.6, label: "nginx H1 (145.6k) / H2 (125.4k)", color: "#8b95ad" },
             { val: 84.3, label: "LiteSpeed 6.3.5 H1 (84.3k)", color: "#c2cadd" }
           ],
-          foot: "June builds (0.0.1–LSCache) measured on shared host vs LSWS 6.3.5; v0.0.1+ measured on dedicated host with 806-line chain vs OLS & nginx (compare-rewrite-memo-vary-pgo.csv) + subsequent PGO A/B deltas. v0.1.10 = v0.1.5 × the measured v0.1.5→v0.1.10 throughput ratio (loopback A/B, both run orders, 5 blocks)."
+          foot: "June builds (0.0.1–LSCache) measured on the shared host vs LSWS 6.3.5 (httpjet-rewrite-fixed.csv, c=100); v0.0.1 measured over loopback on the shared host with the 806-line chain in a PGO three-way vs OLS & nginx (compare-rewrite-memo-vary-pgo.csv). Only builds with a recorded absolute measurement are plotted; later releases were measured as relative A/Bs (see each build slide)."
         },
         {
           id: "c-static",
           name: "2 · H2 & H1 Static Small-Object (RPS)",
           title: "All-Builds Speed Curve — HTTP/2 & HTTP/1.1 Static Throughput vs OpenLiteSpeed, LiteSpeed & nginx",
-          sub: "small-object static serving (empty / 1 KB, c=50..200) across all 14 builds + reference servers · k req/s",
+          sub: "small-object static serving · measured builds only (v0.0.1: h2 empty c=50 and h1 empty c=1000, interleaved-pair means) + reference servers · k req/s",
           unit: "k rps",
           ymax: 1000,
           ystep: 250,
           pts: [
-            { idx: 0, tag: "0.0.1", h2: 128.0, h1: 88.0, note: "Initial baseline" },
-            { idx: 1, tag: "Tier A", h2: 145.0, h1: 90.5, note: "FileCache 1s TTL" },
-            { idx: 2, tag: "B1–5", h2: 148.0, h1: 91.2, note: "Lazy headers" },
-            { idx: 3, tag: "Batch 6", h2: 195.0, h1: 93.8, note: "PGO + mimalloc" },
-            { idx: 4, tag: "LSCache", h2: 266.9, h1: 96.9, note: "open_beneath memo" },
-            { idx: 5, tag: "io_uring", h2: 520.0, h1: 145.0, note: "monoio io_uring" },
-            { idx: 6, tag: "v0.0.1", h2: 937.0, h1: 202.1, note: "Dedicated 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: 938.0, h1: 202.5, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", h2: 942.0, h1: 204.0, note: "openat2 hot path" },
-            { idx: 9, tag: "v0.0.9", h2: 948.0, h1: 206.0, note: "readlink skip" },
-            { idx: 10, tag: "v0.0.10", h2: 950.0, h1: 206.5, note: "TLS ticketless" },
-            { idx: 11, tag: "v0.1.2", h2: 962.0, h1: 209.0, note: "Recycled H2 tasks" },
-            { idx: 12, tag: "v0.1.5", h2: 965.0, h1: 210.0, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 929.9, h1: 212.6, note: "Bug/perf bash (h2 within noise)" }
+            { idx: 0, tag: "0.0.1", h2: 128.0, h1: null, note: "Initial baseline" },
+            { idx: 1, tag: "Tier A", h2: null, h1: null, note: "StatCache + DFA (relative A/B only)" },
+            { idx: 2, tag: "B1–5", h2: null, h1: null, note: "OR-fold + zstd (relative A/B only)" },
+            { idx: 3, tag: "Batch 6", h2: null, h1: null, note: "PGO + mimalloc (relative A/B only)" },
+            { idx: 4, tag: "LSCache", h2: 266.9, h1: 96.9, note: "Single-flight fix" },
+            { idx: 5, tag: "io_uring", h2: null, h1: null, note: "monoio transport (relative A/B only)" },
+            { idx: 6, tag: "v0.0.1", h2: 891.1, h1: 200.1, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: null, h1: null, note: "sendfile + kTLS (relative A/B only)" },
+            { idx: 8, tag: "v0.0.3", h2: null, h1: null, note: "openat2 + H3 PGO (relative A/B only)" },
+            { idx: 9, tag: "v0.0.9", h2: null, h1: null, note: "access-rule memo (relative A/B only)" },
+            { idx: 10, tag: "v0.0.10", h2: null, h1: null, note: "TLS idle + dict L3 (relative A/B only)" },
+            { idx: 11, tag: "v0.1.2", h2: null, h1: null, note: "Recycled task pools (relative A/B only)" },
+            { idx: 12, tag: "v0.1.5", h2: null, h1: null, note: "BODY_BUFS zero-fault (relative A/B only)" },
+            { idx: 13, tag: "v0.1.10", h2: null, h1: null, note: "Bug/perf bash (relative A/B only)" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 peak (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 peak (k rps)", color: "#818cf8" }
           ],
           refs: [
-            { val: 877.8, label: "OpenLiteSpeed H2 c=1000 (877.8k) / c=50 (792.8k)", color: "#fbbf73" },
+            { val: 838.2, label: "OpenLiteSpeed H2 c=50, pair mean (838.2k)", color: "#fbbf73" },
             { val: 244.5, label: "LiteSpeed 6.3.5 H2 shared-box (244.5k)", color: "#e879f9" },
-            { val: 183.4, label: "OpenLiteSpeed H1 (183.4k)", color: "#34d399" },
+            { val: 183.5, label: "OpenLiteSpeed H1 c=1000, pair mean (183.5k)", color: "#34d399" },
             { val: 119.6, label: "nginx H2 c=1000 (119.6k)", color: "#8b95ad" }
           ],
-          foot: "Source: httpjet-sweep-fixed.csv (June shared-box vs LSWS 6.3.5) and versus5-dedicated-final-20260827.csv (dedicated-host vs OLS & nginx). v0.1.10 = v0.1.5 × the measured v0.1.5→v0.1.10 throughput ratio (loopback A/B, both run orders, 5 blocks)."
+          foot: "Source: httpjet-sweep-fixed.csv (June shared-box vs LSWS 6.3.5) and versus5-dedicated-final-20260827.csv (dedicated load-generator client vs OLS & nginx, interleaved-pair means). Only builds with a recorded absolute measurement are plotted; later releases were measured as relative A/Bs (see each build slide)."
         },
         {
           id: "c-php",
           name: "3 · PHP/LSAPI & Origin Page Cache (RPS)",
           title: "All-Builds Speed Curve — PHP/LSAPI & Origin Page Cache vs LiteSpeed 6.3.5",
-          sub: "PHP hello-world (H1 c=40) and 152 KB XenForo page-cache hits across all 14 builds · k req/s",
+          sub: "PHP hello-world (H1 c=40) and 152 KB XenForo page-cache hits (c=50) · measured builds only · k req/s",
           unit: "k rps",
           ymax: 52,
           ystep: 13,
           pts: [
-            { idx: 0, tag: "0.0.1", php: 31.0, cache: 0.2, note: "Uncached PHP only" },
-            { idx: 1, tag: "Tier A", php: 31.1, cache: 0.2, note: "StatCache" },
-            { idx: 2, tag: "B1–5", php: 31.3, cache: 0.2, note: "Cow CGI env" },
-            { idx: 3, tag: "Batch 6", php: 39.4, cache: 0.2, note: "PGO + mimalloc" },
-            { idx: 4, tag: "LSCache", php: 44.8, cache: 19.9, note: "hj-pagecache live (101×)" },
-            { idx: 5, tag: "io_uring", php: 45.2, cache: 23.5, note: "On-core cache hit" },
-            { idx: 6, tag: "v0.0.1", php: 45.5, cache: 25.0, note: "Sharded hot+tmpfs" },
-            { idx: 7, tag: "v0.0.2", php: 45.5, cache: 25.4, note: "Dict L6 tuning" },
-            { idx: 8, tag: "v0.0.3", php: 45.8, cache: 28.7, note: "openat2 + H3 28.7k" },
-            { idx: 9, tag: "v0.0.9", php: 46.8, cache: 29.5, note: "Cookied early bridge" },
-            { idx: 10, tag: "v0.0.10", php: 47.0, cache: 30.1, note: "ARM dict L3 (5.3×)" },
-            { idx: 11, tag: "v0.1.2", php: 48.2, cache: 31.0, note: "LSAPI buf pools (+2.5%)" },
-            { idx: 12, tag: "v0.1.5", php: 48.6, cache: 31.8, note: "Zero-copy PacketReader" },
-            { idx: 13, tag: "v0.1.10", php: 51.5, cache: 32.4, note: "Bug/perf bash (+6% PHP)" }
+            { idx: 0, tag: "0.0.1", php: 31.0, cache: null, note: "Initial baseline" },
+            { idx: 1, tag: "Tier A", php: null, cache: null, note: "StatCache + DFA (relative A/B only)" },
+            { idx: 2, tag: "B1–5", php: 31.3, cache: null, note: "OR-fold + zstd" },
+            { idx: 3, tag: "Batch 6", php: null, cache: null, note: "PGO + mimalloc (relative A/B only)" },
+            { idx: 4, tag: "LSCache", php: 44.8, cache: 19.2, note: "Single-flight fix" },
+            { idx: 5, tag: "io_uring", php: null, cache: null, note: "monoio transport (relative A/B only)" },
+            { idx: 6, tag: "v0.0.1", php: null, cache: null, note: "fast_memo + 3-way (relative A/B only)" },
+            { idx: 7, tag: "v0.0.2", php: null, cache: null, note: "sendfile + kTLS (relative A/B only)" },
+            { idx: 8, tag: "v0.0.3", php: null, cache: null, note: "openat2 + H3 PGO (relative A/B only)" },
+            { idx: 9, tag: "v0.0.9", php: null, cache: null, note: "access-rule memo (relative A/B only)" },
+            { idx: 10, tag: "v0.0.10", php: null, cache: null, note: "TLS idle + dict L3 (relative A/B only)" },
+            { idx: 11, tag: "v0.1.2", php: null, cache: null, note: "Recycled task pools (relative A/B only)" },
+            { idx: 12, tag: "v0.1.5", php: null, cache: null, note: "BODY_BUFS zero-fault (relative A/B only)" },
+            { idx: 13, tag: "v0.1.10", php: null, cache: null, note: "Bug/perf bash (relative A/B only)" }
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
@@ -2250,9 +2251,9 @@
           refs: [
             { val: 41.2, label: "LiteSpeed 6.3.5 PHP best (c=60: 41.2k)", color: "#fbbf73" },
             { val: 38.5, label: "LiteSpeed 6.3.5 PHP c=40 (38.5k)", color: "#e879f9" },
-            { val: 0.2, label: "Uncached XenForo DB-backed PHP (0.196k)", color: "#8b95ad" }
+            { val: 0.48, label: "Full XenForo PHP render, c=40 (0.48k)", color: "#8b95ad" }
           ],
-          foot: "Source: httpjet-php-fixed.csv, litespeed-php-run1.csv, httpjet-cache-run1.csv, httpjet-0.0.3-vs-previous-h3-20260927.csv, and PR #1157/#1163. v0.1.10 = v0.1.5 × the measured v0.1.5→v0.1.10 throughput ratio (loopback A/B, both run orders, 5 blocks)."
+          foot: "Source: httpjet-php-fixed.csv, litespeed-php-run1.csv, httpjet-cache-run1.csv, and httpjet-cache-run1.csv. Only builds with a recorded absolute measurement are plotted; later releases were measured as relative A/Bs (see each build slide)."
         }
       ];
 
@@ -2314,17 +2315,20 @@
 
         /* area + polyline + interactive circles per httpjet series */
         c.series.forEach(function (sr, sIdx) {
-          var coords = c.pts.map(function (pt, i) { return [xOf(i), yOf(pt[sr.key]), pt[sr.key], pt]; });
+          /* only builds with a recorded measurement are plotted (null = not measured) */
+          var coords = c.pts.map(function (pt, i) { return [xOf(i), pt[sr.key] == null ? null : yOf(pt[sr.key]), pt[sr.key], pt, i]; })
+            .filter(function (p) { return p[2] != null; });
+          if (!coords.length) return;
           var poly = coords.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
-          var area = padL.toFixed(1) + "," + (padT + plotH).toFixed(1) + " " + poly + " " + (W - padR).toFixed(1) + "," + (padT + plotH).toFixed(1);
+          var area = coords[0][0].toFixed(1) + "," + (padT + plotH).toFixed(1) + " " + poly + " " + coords[coords.length - 1][0].toFixed(1) + "," + (padT + plotH).toFixed(1);
           h.push('<polygon points="' + area + '" fill="url(#cfill' + (sIdx % 2) + ')"/>');
           h.push('<polyline points="' + poly + '" fill="none" stroke="' + sr.color + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>');
-          coords.forEach(function (p, i) {
-            var isSel = (i === curIdx);
+          coords.forEach(function (p) {
+            var isSel = (p[4] === curIdx);
             var r = isSel ? 5.5 : 3.8;
             h.push('<g style="cursor:pointer" data-cjump="' + p[3].idx + '">');
             h.push('<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + r + '" fill="' + (isSel ? "#fff" : sr.color) + '" stroke="' + sr.color + '" stroke-width="2"><title>' + esc(p[3].tag + " (" + p[3].note + ") · " + sr.label + ": " + p[2] + " " + c.unit) + '</title></circle>');
-            if (i === 0 || i === 4 || i === 6 || i === n - 1 || isSel) {
+            {
               var dy = sIdx === 0 ? -9 : 14;
               h.push('<text x="' + p[0].toFixed(1) + '" y="' + (p[1] + dy).toFixed(1) + '" text-anchor="middle" style="font-size:10px;font-weight:700;fill:#fff">' + fmtVal(p[2]) + '</text>');
             }

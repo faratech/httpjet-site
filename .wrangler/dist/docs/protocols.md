@@ -39,7 +39,7 @@ Unlike OpenLiteSpeed's server-level trusted-peer ACL, httpjet binds PROXY trust 
 
 ### HTTP over Unix sockets
 
-A listener whose address is `unix:/path/sock` (or `uds:`), or the `--http-uds` flag, serves plain HTTP over a Unix-domain socket: H1 and h2c prior knowledge, one accept core (SO_REUSEPORT does not exist for AF_UNIX), socket mode 0600 group-writable, socket-activated fds adopted by path. A stale socket file is unlinked only after a `connect(2)` proves it dead, and cleanup is bound to the owned directory and socket identity. Peers have no address: ACLs, the per-IP throttle and `REMOTE_ADDR` see a fabricated loopback value and the access log renders `unix:`. TLS over UDS is unsupported and linted.
+A listener whose address is `unix:/path/sock` (or `uds:`), or the `--http-uds` flag, serves plain HTTP over a Unix-domain socket: H1 and h2c prior knowledge, one accept core (SO_REUSEPORT does not exist for AF_UNIX), socket mode 0660 (owner and group read/write), socket-activated fds adopted by path. A stale socket file is unlinked only after a `connect(2)` proves it dead, and cleanup is bound to the owned directory and socket identity. Peers have no address: ACLs, the per-IP throttle and `REMOTE_ADDR` see a fabricated loopback value and the access log renders `unix:`. TLS over UDS is unsupported and linted.
 
 ## HTTP/1.1 & h2c detection
 
@@ -73,7 +73,7 @@ Beyond framing, the H1 path implements the newer semantics end to end:
 
 - **Bandwidth pacing** — a per-connection token bucket (burst 2× rate) paces `Body::Full` as 64 KiB slices and streams per chunk when `bandwidthLimit` is set; a matched context overrides the server-wide rate.
 
-- **Explicit `CONNECT` rejection** (405) and stalled-sendfile backoff with a 60 s zero-progress bound.
+- **Explicit `CONNECT` rejection** (405) and a minimum send-progress rate on every response write, sendfile included: under 16 KiB delivered per `connTimeout` window ends the response.
 
 ## Native HTTP/2
 
@@ -87,7 +87,7 @@ Beyond framing, the H1 path implements the newer semantics end to end:
 
 - **One vectored write per wake**; large bodies are zero-copy from page-cache `Bytes`. The vendored `monoio-rustls` fork adds a real `writev`, flushes all queued TLS records in one socket write, and pools per-record buffers per core so records do not page-fault.
 
-- **Inbound RFC 9113 validation** with graceful GOAWAY drain; `CONTINUATION` without an open header block and stream-id reuse are connection errors; over-cap decoded header blocks become a **stream error** (`RST_STREAM(REFUSED_STREAM)`, decoding the block with emission suppressed so the HPACK dynamic table stays in sync on pooled CDN connections); the time-refilled rapid-reset budget (`httpjet_h2_rapid_reset_drops_total`), HTTP/2 Bomb pattern (CVE-2026-49975) and no-forward-progress cases are bounded.
+- **Inbound RFC 9113 validation** with graceful GOAWAY drain; `CONTINUATION` without an open header block and stream-id reuse are connection errors; an over-cap decoded header block gets a complete, bodiless **431** response (an over-cap body gets 413), followed by `RST_STREAM(NO_ERROR)` while the client is still sending. The block is still decoded with emission suppressed, so the HPACK dynamic table stays in sync on pooled CDN connections. `RST_STREAM(REFUSED_STREAM)` is kept for streams refused by the concurrency or pending-header budget; the time-refilled rapid-reset budget (200 resets, refilled 10/s; past it the connection is closed with GOAWAY(ENHANCE_YOUR_CALM), counted in `httpjet_h2_rapid_reset_goaways_total`), HTTP/2 Bomb pattern (CVE-2026-49975) and no-forward-progress cases are bounded.
 
 - **Egress pacing** is per connection at the OutQueue flush with the server-wide rate (a per-response override is ill-defined under multiplexing). HTTP/3 is not paced.
 
@@ -97,7 +97,7 @@ The native stack passes **146 of 146** h2spec 2.6.0 cases over TLS (three consec
 
 ## HPACK
 
-Header compression is RFC 7541 HPACK, implemented as the `hpack` submodule of `hj-h2` (once a standalone crate, folded in so the codec and the connection state evolve together). It is **zero-allocation** — fields are decoded and encoded by slicing frame bytes in place — and pure safe Rust with `#![forbid(unsafe_op_in_unsafe_fn)]`. Both the decoder and the round-trip are fuzz targets ( Conformance ).
+Header compression is RFC 7541 HPACK, implemented as the `hpack` submodule of `hj-h2` (once a standalone crate, folded in so the codec and the connection state evolve together). It is **zero-allocation** — fields are decoded and encoded by slicing frame bytes in place — and pure safe Rust with `#![forbid(unsafe_op_in_unsafe_fn)]`. The Huffman decoder resolves every code of up to 11 bits from a 4 KiB root table that stays cache-resident between requests, with three 32-entry sub-tables for 12–16-bit codes (0.1.7; the 256 KiB flat table it replaced was evicted at production rates, and cold decode of a Cloudflare-shaped header set fell from 16.6 to 4.6 µs). The encoder packs Huffman output a word at a time and remembers the last eight long literals (257+ bytes) per thread (0.1.10; 4.73 → 1.34 µs per header block). Both the decoder and the round-trip are fuzz targets ( Conformance ).
 
 ## HTTP/3 & QUIC
 
@@ -112,7 +112,7 @@ The same numeric HTTPS port must be reachable over TCP (h1/h2) *and* UDP (h3). P
 
 ## File egress: sendfile & kTLS
 
-An uncached `Body::File` keeps its pinned inode and byte range across the tokio→monoio bridge. On **plain TCP HTTP/1** it is sent with bounded nonblocking `sendfile(2)`; unsupported descriptor/filesystem combinations resume at the exact offset with positional io_uring reads, and short files or client aborts close the connection rather than completing an incorrect `Content-Length`. A stalled sendfile backs off exponentially and gives up after 60 s of zero progress.
+An uncached `Body::File` keeps its pinned inode and byte range across the tokio→monoio bridge. On **plain TCP HTTP/1** it is sent with bounded nonblocking `sendfile(2)`; unsupported descriptor/filesystem combinations resume at the exact offset with positional io_uring reads, and short files or client aborts close the connection rather than completing an incorrect `Content-Length`. A stalled sendfile backs off exponentially (100 µs doubling to 12.8 ms). It is cut off by the same minimum send-progress rule as any slow H1 reader: under 16 KiB delivered per `connTimeout` window.
 
 A `--features ktls` build extends this to **TLS 1.3 H1**: after the rustls handshake the socket is upgraded to kernel TLS, so the same sendfile writer feeds ciphertext without a userspace AEAD copy. A peer KeyUpdate queued during a transfer is applied before the next response writes, fencing TX rekey from sendfile. Policy is `--ktls=auto|on|off`: `auto` (default in feature builds) resolves the IPv4 default-route interface, reads its driver and features via ethtool ioctls, refuses known virtual NICs, and enables kTLS only when `tls-hw-tx-offload` is active — otherwise it logs one reason and stays on rustls. TLS 1.2, H2, H3 and UDS keep their userspace paths.
 
@@ -122,4 +122,4 @@ Plaintext sendfile: 5,000 × 1 MiB at c=50 → **4,852 req/s**, 10.08 ms mean, z
 
 ## TLS in one paragraph
 
-`hj-tls` builds **one** `rustls::ServerConfig` for TCP and QUIC with aws-lc-rs as the crypto provider. SNI maps directly to configured chains (no cert-name-match, like OLS), with dual ECDSA+RSA chains per name; client verification is optional mTLS against the *listener* CA with CRL enforcement; TLS 1.3 offers exactly `TLS_AES_128_GCM_SHA256`; resumption uses single-use tickets with 0-RTT off. Certificates, ACME and OCSP have their own page: TLS, ACME & OCSP .
+`hj-tls` builds **one** `rustls::ServerConfig` for TCP and QUIC with aws-lc-rs as the crypto provider. SNI maps directly to configured chains (no cert-name-match, like OLS), with dual ECDSA+RSA chains per name; client verification is optional mTLS against the *listener* CA with CRL enforcement; TLS 1.3 offers exactly `TLS_AES_128_GCM_SHA256`; resumption (only on listeners without client verification; a client-certificate listener always runs a full handshake) uses single-use stateful tickets (`--tls-session-tickets`, default 2 per handshake) with 0-RTT off. Certificates, ACME and OCSP have their own page: TLS, ACME & OCSP .

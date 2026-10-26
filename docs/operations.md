@@ -26,7 +26,9 @@ sudo install -m0755 target/release/httpjet /usr/local/httpjet/bin/httpjet
 sudo /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
 sudo -u httpjet /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
 
-# minimal loopback example unit (no TLS, no PHP, no cache)
+# minimal loopback example unit (no TLS, no PHP, no cache); it runs /usr/bin/httpjet on /etc/httpjet/litespeed
+sudo install -m0755 target/release/httpjet /usr/bin/httpjet
+sudo install -d /etc/httpjet && sudo cp -a examples/litespeed /etc/httpjet/litespeed
 sudo install -m0644 packaging/systemd/httpjet-example.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now httpjet-example
 ```
@@ -36,7 +38,7 @@ The example units bind loopback and use example document roots. Set listeners, d
 
 ## The systemd model
 
-> [Diagram: systemd-units] Five units. The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.
+> [Diagram: systemd-units] Five core units (plus the optional edge firewall). The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.
 
 | Unit | Role |
 
@@ -143,4 +145,4 @@ A seccomp denial is a startup/test failure — do not work around it with `--pri
 
 ## Release and upgrade discipline
 
-A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through `scripts/update-deps.sh` and the full suite (the 0.1.x sweeps refreshed tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.10, fancy-regex 0.20, parking_lot 0.13 and zstd 0.14.3; a daily dependency-advisory job fails the build on any RustSec finding).
+A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through `scripts/update-deps.sh` and the full suite (the 0.1.x sweeps refreshed tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3 and brotli 9.1 / brotli-decompressor 6.2; a daily dependency-advisory job fails the build on any RustSec finding).

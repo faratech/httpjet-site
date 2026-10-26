@@ -11,5 +11,5 @@ flowchart TB
   E --> F("file tier on?")
   F -- no --> G["in-RAM body (charged to --page-cache-mem)"]:::ok
   F -- yes --> H["HJPC file at birth (identity form, tmpfs)<br/>metadata-only charge to RAM index; footprint to --page-cache-disk-mem"]:::ok
-  H -- "after first real hit" --> I["background dict recompress in place<br/>(per-vhost zstd dictionary, 3.5–9× smaller)"]:::ok
+  H -- "at store time (bounded background pool)" --> I["background dict recompress in place<br/>(per-vhost zstd dictionary, 3.5–9× smaller)"]:::ok
   click D "page-cache.html#admission"
