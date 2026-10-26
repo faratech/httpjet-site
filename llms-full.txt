@@ -2574,7 +2574,7 @@ A loopback benchmark removes the network, real TLS handshakes and the CDN — it
 
 ## Performance across builds — interactive presentation
 
-Every benchmark campaign from the initial Phase 1–7 baseline (`0.0.1`, June 2026) through the October 2026 zero-fault pooling release (`v0.1.5`) and the `0.1.10` bug/perf release is recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at github.com/faratech/httpjet . Use the **All-Builds Curve vs LiteSpeed & nginx** below to see every build with a recorded absolute measurement on one canvas (later releases were measured as relative A/Bs), or step through the **14 build slides**, **Workload Trajectories**, and **Build-vs-Build Diff**.
+Every benchmark campaign from the initial Phase 1–7 baseline (`0.0.1`, June 2026) through the October 2026 zero-fault pooling release (`v0.1.5`) and the `0.1.10` bug/perf release is recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at github.com/faratech/httpjet . Use the **Release Speed Curve** below to compare every release from v0.0.1 to v0.1.10, each PGO-built from its tag and measured side by side on 2026-10-26 under identical conditions (raw results: release-sweep-2026-10-26.tsv ), or step through the **14 build slides**, **Workload Trajectories**, and **Build-vs-Build Diff**.
 
 ## Loopback throughput
 

@@ -2142,7 +2142,7 @@
       setTimeout(renderExplorer, 0);
     }
 
-    /* ---------- unified all-builds performance curve vs LiteSpeed, OLS & nginx ---------- */
+    /* ---------- release speed curve: every release measured under identical conditions ---------- */
     var curveBox = doc.getElementById("all-builds-curve");
     var curveMount = curveBox ? curveBox.querySelector(".bexp__curve") : null;
     if (curveMount) {
@@ -2150,110 +2150,77 @@
         {
           id: "c-rewrite",
           name: "1 · Heavy .htaccess (H1 & H2 RPS)",
-          title: "All-Builds Speed Curve — Heavy .htaccess Static (/robots.txt) vs LiteSpeed, OpenLiteSpeed & nginx",
-          sub: "806/477-line forum .htaccess chain · c=100 · measured builds only, plus reference baselines · k req/s (click any node to inspect that build)",
+          title: "Release Speed Curve — Heavy .htaccess Static (/robots.txt, 806-line forum chain)",
+          sub: "/robots.txt through the full forum .htaccess chain · h2 c=32 m=10, h1 c=100 · k req/s (click any node to inspect that build)",
           unit: "k rps",
-          ymax: 320,
-          ystep: 80,
+          ymax: 600,
+          ystep: 200,
           pts: [
-            { idx: 0, tag: "0.0.1", h2: null, h1: 95.8, note: "Initial baseline" },
-            { idx: 1, tag: "Tier A", h2: null, h1: null, note: "StatCache + DFA (relative A/B only)" },
-            { idx: 2, tag: "B1–5", h2: null, h1: 78.6, note: "OR-fold + zstd" },
-            { idx: 3, tag: "Batch 6", h2: null, h1: 84.3, note: "PGO + mimalloc" },
-            { idx: 4, tag: "LSCache", h2: 161.0, h1: 87.3, note: "Single-flight fix" },
-            { idx: 5, tag: "io_uring", h2: null, h1: null, note: "monoio transport (relative A/B only)" },
-            { idx: 6, tag: "v0.0.1", h2: 298.0, h1: 168.7, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: null, h1: null, note: "sendfile + kTLS (relative A/B only)" },
-            { idx: 8, tag: "v0.0.3", h2: null, h1: null, note: "openat2 + H3 PGO (relative A/B only)" },
-            { idx: 9, tag: "v0.0.9", h2: null, h1: null, note: "access-rule memo (relative A/B only)" },
-            { idx: 10, tag: "v0.0.10", h2: null, h1: null, note: "TLS idle + dict L3 (relative A/B only)" },
-            { idx: 11, tag: "v0.1.2", h2: null, h1: null, note: "Recycled task pools (relative A/B only)" },
-            { idx: 12, tag: "v0.1.5", h2: null, h1: null, note: "BODY_BUFS zero-fault (relative A/B only)" },
-            { idx: 13, tag: "v0.1.10", h2: null, h1: null, note: "Bug/perf bash (relative A/B only)" }
+            { idx: 6, tag: "v0.0.1", h2: 314.7, h1: 216.2, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 336.9, h1: 231.2, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 311.2, h1: 189.7, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", h2: 357.0, h1: 212.4, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", h2: 354.4, h1: 236.4, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", h2: 464.6, h1: 201.8, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", h2: 461.3, h1: 232.5, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 481.6, h1: 233.6, note: "Bug/perf bash" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
-          refs: [
-            { val: 283.3, label: "OpenLiteSpeed H2 (283.3k)", color: "#fbbf73" },
-            { val: 206.8, label: "LiteSpeed 6.3.5 H2 (206.8k)", color: "#e879f9" },
-            { val: 169.1, label: "OpenLiteSpeed H1 (169.1k)", color: "#34d399" },
-            { val: 145.6, label: "nginx H1 (145.6k) / H2 (125.4k)", color: "#8b95ad" },
-            { val: 84.3, label: "LiteSpeed 6.3.5 H1 (84.3k)", color: "#c2cadd" }
-          ],
-          foot: "June builds (0.0.1–LSCache) measured on the shared host vs LSWS 6.3.5 (httpjet-rewrite-fixed.csv, c=100); v0.0.1 measured over loopback on the shared host with the 806-line chain in a PGO three-way vs OLS & nginx (compare-rewrite-memo-vary-pgo.csv). Only builds with a recorded absolute measurement are plotted; later releases were measured as relative A/Bs (see each build slide)."
+          refs: [],
+          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides."
         },
         {
           id: "c-static",
           name: "2 · H2 & H1 Static Small-Object (RPS)",
-          title: "All-Builds Speed Curve — HTTP/2 & HTTP/1.1 Static Throughput vs OpenLiteSpeed, LiteSpeed & nginx",
-          sub: "small-object static serving · measured builds only (v0.0.1: h2 empty c=50 and h1 empty c=1000, interleaved-pair means) + reference servers · k req/s",
+          title: "Release Speed Curve — HTTP/2 & HTTP/1.1 Static 1 KiB",
+          sub: "1 KiB static file · h2 c=32 m=10, h1 c=100 · k req/s",
           unit: "k rps",
-          ymax: 1000,
-          ystep: 250,
+          ymax: 800,
+          ystep: 200,
           pts: [
-            { idx: 0, tag: "0.0.1", h2: 128.0, h1: null, note: "Initial baseline" },
-            { idx: 1, tag: "Tier A", h2: null, h1: null, note: "StatCache + DFA (relative A/B only)" },
-            { idx: 2, tag: "B1–5", h2: null, h1: null, note: "OR-fold + zstd (relative A/B only)" },
-            { idx: 3, tag: "Batch 6", h2: null, h1: null, note: "PGO + mimalloc (relative A/B only)" },
-            { idx: 4, tag: "LSCache", h2: 266.9, h1: 96.9, note: "Single-flight fix" },
-            { idx: 5, tag: "io_uring", h2: null, h1: null, note: "monoio transport (relative A/B only)" },
-            { idx: 6, tag: "v0.0.1", h2: 891.1, h1: 200.1, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: null, h1: null, note: "sendfile + kTLS (relative A/B only)" },
-            { idx: 8, tag: "v0.0.3", h2: null, h1: null, note: "openat2 + H3 PGO (relative A/B only)" },
-            { idx: 9, tag: "v0.0.9", h2: null, h1: null, note: "access-rule memo (relative A/B only)" },
-            { idx: 10, tag: "v0.0.10", h2: null, h1: null, note: "TLS idle + dict L3 (relative A/B only)" },
-            { idx: 11, tag: "v0.1.2", h2: null, h1: null, note: "Recycled task pools (relative A/B only)" },
-            { idx: 12, tag: "v0.1.5", h2: null, h1: null, note: "BODY_BUFS zero-fault (relative A/B only)" },
-            { idx: 13, tag: "v0.1.10", h2: null, h1: null, note: "Bug/perf bash (relative A/B only)" }
+            { idx: 6, tag: "v0.0.1", h2: 464.5, h1: 269.7, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 517.8, h1: 250.7, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 381.1, h1: 255.7, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", h2: 395.5, h1: 236.9, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", h2: 426.0, h1: 255.0, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", h2: 605.7, h1: 225.3, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", h2: 593.4, h1: 258.1, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 585.5, h1: 256.8, note: "Bug/perf bash" }
           ],
           series: [
-            { key: "h2", label: "httpjet HTTP/2 peak (k rps)", color: "#22d3ee" },
-            { key: "h1", label: "httpjet HTTP/1.1 peak (k rps)", color: "#818cf8" }
+            { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
+            { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
-          refs: [
-            { val: 838.2, label: "OpenLiteSpeed H2 c=50, pair mean (838.2k)", color: "#fbbf73" },
-            { val: 244.5, label: "LiteSpeed 6.3.5 H2 shared-box (244.5k)", color: "#e879f9" },
-            { val: 183.5, label: "OpenLiteSpeed H1 c=1000, pair mean (183.5k)", color: "#34d399" },
-            { val: 119.6, label: "nginx H2 c=1000 (119.6k)", color: "#8b95ad" }
-          ],
-          foot: "Source: httpjet-sweep-fixed.csv (June shared-box vs LSWS 6.3.5) and versus5-dedicated-final-20260827.csv (dedicated load-generator client vs OLS & nginx, interleaved-pair means). Only builds with a recorded absolute measurement are plotted; later releases were measured as relative A/Bs (see each build slide)."
+          refs: [],
+          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides."
         },
         {
           id: "c-php",
           name: "3 · PHP/LSAPI & Origin Page Cache (RPS)",
-          title: "All-Builds Speed Curve — PHP/LSAPI & Origin Page Cache vs LiteSpeed 6.3.5",
-          sub: "PHP hello-world (H1 c=40) and 152 KB XenForo page-cache hits (c=50) · measured builds only · k req/s",
+          title: "Release Speed Curve — PHP over LSAPI & Origin Page-Cache Hits",
+          sub: "PHP fixture over LSAPI (h1 c=40) and XenForo page-cache hits (/help/cookies/, h2 c=32 m=32) · k req/s",
           unit: "k rps",
-          ymax: 52,
-          ystep: 13,
+          ymax: 150,
+          ystep: 50,
           pts: [
-            { idx: 0, tag: "0.0.1", php: 31.0, cache: null, note: "Initial baseline" },
-            { idx: 1, tag: "Tier A", php: null, cache: null, note: "StatCache + DFA (relative A/B only)" },
-            { idx: 2, tag: "B1–5", php: 31.3, cache: null, note: "OR-fold + zstd" },
-            { idx: 3, tag: "Batch 6", php: null, cache: null, note: "PGO + mimalloc (relative A/B only)" },
-            { idx: 4, tag: "LSCache", php: 44.8, cache: 19.2, note: "Single-flight fix" },
-            { idx: 5, tag: "io_uring", php: null, cache: null, note: "monoio transport (relative A/B only)" },
-            { idx: 6, tag: "v0.0.1", php: null, cache: null, note: "fast_memo + 3-way (relative A/B only)" },
-            { idx: 7, tag: "v0.0.2", php: null, cache: null, note: "sendfile + kTLS (relative A/B only)" },
-            { idx: 8, tag: "v0.0.3", php: null, cache: null, note: "openat2 + H3 PGO (relative A/B only)" },
-            { idx: 9, tag: "v0.0.9", php: null, cache: null, note: "access-rule memo (relative A/B only)" },
-            { idx: 10, tag: "v0.0.10", php: null, cache: null, note: "TLS idle + dict L3 (relative A/B only)" },
-            { idx: 11, tag: "v0.1.2", php: null, cache: null, note: "Recycled task pools (relative A/B only)" },
-            { idx: 12, tag: "v0.1.5", php: null, cache: null, note: "BODY_BUFS zero-fault (relative A/B only)" },
-            { idx: 13, tag: "v0.1.10", php: null, cache: null, note: "Bug/perf bash (relative A/B only)" }
+            { idx: 6, tag: "v0.0.1", php: 26.3, cache: 70.9, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", php: 26.7, cache: 77.9, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", php: 23.8, cache: 67.6, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", php: 28.8, cache: 85.8, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", php: 28.9, cache: 83.4, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", php: 34.6, cache: 94.1, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", php: 30.9, cache: 94.6, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", php: 33.2, cache: 98.2, note: "Bug/perf bash" }
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
-            { key: "cache", label: "httpjet Origin Page Cache Hit (k rps)", color: "#34d399" }
+            { key: "cache", label: "httpjet page-cache hit H2 (k rps)", color: "#818cf8" }
           ],
-          refs: [
-            { val: 41.2, label: "LiteSpeed 6.3.5 PHP best (c=60: 41.2k)", color: "#fbbf73" },
-            { val: 38.5, label: "LiteSpeed 6.3.5 PHP c=40 (38.5k)", color: "#e879f9" },
-            { val: 0.48, label: "Full XenForo PHP render, c=40 (0.48k)", color: "#8b95ad" }
-          ],
-          foot: "Source: httpjet-php-fixed.csv, litespeed-php-run1.csv, httpjet-cache-run1.csv, and httpjet-cache-run1.csv. Only builds with a recorded absolute measurement are plotted; later releases were measured as relative A/Bs (see each build slide)."
+          refs: [],
+          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides."
         }
       ];
 
@@ -2304,7 +2271,7 @@
         /* vertical build guide ticks + x labels */
         c.pts.forEach(function (pt, i) {
           var px = xOf(i);
-          var isSel = (i === curIdx);
+          var isSel = (pt.idx === curIdx);
           if (isSel) {
             h.push('<line x1="' + px.toFixed(1) + '" y1="' + padT + '" x2="' + px.toFixed(1) + '" y2="' + (padT + plotH) + '" stroke="#22d3ee" stroke-width="1.2" opacity="0.45"/>');
           }
@@ -2324,7 +2291,7 @@
           h.push('<polygon points="' + area + '" fill="url(#cfill' + (sIdx % 2) + ')"/>');
           h.push('<polyline points="' + poly + '" fill="none" stroke="' + sr.color + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>');
           coords.forEach(function (p) {
-            var isSel = (p[4] === curIdx);
+            var isSel = (p[3].idx === curIdx);
             var r = isSel ? 5.5 : 3.8;
             h.push('<g style="cursor:pointer" data-cjump="' + p[3].idx + '">');
             h.push('<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + r + '" fill="' + (isSel ? "#fff" : sr.color) + '" stroke="' + sr.color + '" stroke-width="2"><title>' + esc(p[3].tag + " (" + p[3].note + ") · " + sr.label + ": " + p[2] + " " + c.unit) + '</title></circle>');

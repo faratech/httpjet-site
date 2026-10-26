@@ -1,0 +1,145 @@
+round	version	workload	rps	p50_ms	p99_ms	n	dropped
+1	v0.0.1	W1	70928.90	13.510	28.790	709289	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+1	v0.0.1	W3s1	464460.00	0.540	2.796	4644600	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+1	v0.0.1	W3h1	269677.00	0.302	2.094	2696770	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+1	v0.0.1	W3rh1	233208.30	0.347	2.105	2332083	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+1	v0.0.1	W3rh2	318758.00	0.751	2.947	3187580	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+1	v0.0.1	PHP1	26328.60	1.416	3.537	263286	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+1	v0.0.2	W1	78427.50	10.806	25.056	784275	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.2	W3s1	517794.00	0.500	2.069	5177940	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.2	W3h1	250738.70	0.304	2.705	2507387	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.2	W3rh1	224767.90	0.348	2.157	2247679	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.2	W3rh2	319840.00	0.900	2.610	3198400	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.2	PHP1	27157.00	1.390	3.114	271570	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.3	W1	58066.90	14.606	40.094	580669	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.3	W3s1	339210.00	0.640	3.548	3392100	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.3	W3h1	199410.00	0.303	3.360	1994100	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.3	W3rh1	86668.40	0.507	5.953	866684	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.3	W3rh2	201332.00	0.856	6.944	2013320	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.3	PHP1	9028.00	3.919	12.129	90280	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+1	v0.0.9	W1	85411.10	11.769	20.181	854111	--page-cache-egress-at-rest-vhosts
+1	v0.0.9	W3s1	435486.00	0.630	2.302	4354860	--page-cache-egress-at-rest-vhosts
+1	v0.0.9	W3h1	246311.50	0.297	2.594	2463115	--page-cache-egress-at-rest-vhosts
+1	v0.0.9	W3rh1	238346.90	0.339	1.913	2383469	--page-cache-egress-at-rest-vhosts
+1	v0.0.9	W3rh2	357039.00	0.841	1.461	3570390	--page-cache-egress-at-rest-vhosts
+1	v0.0.9	PHP1	29815.70	1.261	2.909	298157	--page-cache-egress-at-rest-vhosts
+1	v0.0.10	W1	83394.70	10.418	22.342	833947	--page-cache-egress-at-rest-vhosts
+1	v0.0.10	W3s1	432353.00	0.643	2.110	4323530	--page-cache-egress-at-rest-vhosts
+1	v0.0.10	W3h1	259574.90	0.302	2.058	2595749	--page-cache-egress-at-rest-vhosts
+1	v0.0.10	W3rh1	236439.10	0.332	2.186	2364391	--page-cache-egress-at-rest-vhosts
+1	v0.0.10	W3rh2	354369.00	0.818	2.408	3543690	--page-cache-egress-at-rest-vhosts
+1	v0.0.10	PHP1	29246.60	1.273	3.179	292466	--page-cache-egress-at-rest-vhosts
+1	v0.1.2	W1	95063.40	10.381	15.782	950634	--page-cache-egress-at-rest-vhosts
+1	v0.1.2	W3s1	609093.00	0.415	1.775	6090930	--page-cache-egress-at-rest-vhosts
+1	v0.1.2	W3h1	199173.70	0.308	3.208	1991737	--page-cache-egress-at-rest-vhosts
+1	v0.1.2	W3rh1	136757.30	0.364	4.849	1367573	--page-cache-egress-at-rest-vhosts
+1	v0.1.2	W3rh2	465355.00	0.584	1.608	4653550	--page-cache-egress-at-rest-vhosts
+1	v0.1.2	PHP1	34641.20	1.088	2.497	346412	--page-cache-egress-at-rest-vhosts
+1	v0.1.5	W1	94102.40	9.010	20.772	941024	--page-cache-egress-at-rest-vhosts
+1	v0.1.5	W3s1	592047.00	0.411	2.054	5920470	--page-cache-egress-at-rest-vhosts
+1	v0.1.5	W3h1	252328.10	0.305	2.471	2523281	--page-cache-egress-at-rest-vhosts
+1	v0.1.5	W3rh1	206082.00	0.342	3.131	2060820	--page-cache-egress-at-rest-vhosts
+1	v0.1.5	W3rh2	461333.00	0.516	2.463	4613330	--page-cache-egress-at-rest-vhosts
+1	v0.1.5	PHP1	33839.70	1.105	2.639	338397	--page-cache-egress-at-rest-vhosts
+1	v0.1.10	W1	98237.00	9.935	15.038	982370	
+1	v0.1.10	W3s1	585451.00	0.415	2.400	5854510	
+1	v0.1.10	W3h1	262229.30	0.306	2.068	2622293	
+1	v0.1.10	W3rh1	224548.20	0.344	2.742	2245482	
+1	v0.1.10	W3rh2	469648.00	0.521	2.411	4696480	
+1	v0.1.10	PHP1	30968.20	1.164	3.700	309682	
+2	v0.0.9	W1	86561.20	10.477	22.027	865612	--page-cache-egress-at-rest-vhosts
+2	v0.0.9	W3s1	395508.00	0.540	2.905	3955080	--page-cache-egress-at-rest-vhosts
+2	v0.0.9	W3h1	236857.30	0.305	3.078	2368573	--page-cache-egress-at-rest-vhosts
+2	v0.0.9	W3rh1	208721.20	0.338	3.004	2087212	--page-cache-egress-at-rest-vhosts
+2	v0.0.9	W3rh2	352124.00	0.760	2.353	3521240	--page-cache-egress-at-rest-vhosts
+2	v0.0.9	PHP1	28771.00	1.277	3.585	287710	--page-cache-egress-at-rest-vhosts
+2	v0.0.10	W1	77134.40	9.751	36.111	771344	--page-cache-egress-at-rest-vhosts
+2	v0.0.10	W3s1	425998.00	0.641	2.970	4259980	--page-cache-egress-at-rest-vhosts
+2	v0.0.10	W3h1	253099.40	0.307	2.480	2530994	--page-cache-egress-at-rest-vhosts
+2	v0.0.10	W3rh1	242906.10	0.340	1.872	2429061	--page-cache-egress-at-rest-vhosts
+2	v0.0.10	W3rh2	370653.00	0.686	1.849	3706530	--page-cache-egress-at-rest-vhosts
+2	v0.0.10	PHP1	28900.80	1.285	3.295	289008	--page-cache-egress-at-rest-vhosts
+2	v0.1.2	W1	94141.00	9.345	18.774	941410	--page-cache-egress-at-rest-vhosts
+2	v0.1.2	W3s1	605677.00	0.422	1.803	6056770	--page-cache-egress-at-rest-vhosts
+2	v0.1.2	W3h1	236512.80	0.301	3.017	2365128	--page-cache-egress-at-rest-vhosts
+2	v0.1.2	W3rh1	223417.90	0.339	2.688	2234179	--page-cache-egress-at-rest-vhosts
+2	v0.1.2	W3rh2	464622.00	0.553	1.900	4646220	--page-cache-egress-at-rest-vhosts
+2	v0.1.2	PHP1	34643.50	1.083	2.572	346435	--page-cache-egress-at-rest-vhosts
+2	v0.1.5	W1	95496.60	8.584	21.246	954966	--page-cache-egress-at-rest-vhosts
+2	v0.1.5	W3s1	593360.00	0.414	1.879	5933600	--page-cache-egress-at-rest-vhosts
+2	v0.1.5	W3h1	258077.70	0.306	2.168	2580777	--page-cache-egress-at-rest-vhosts
+2	v0.1.5	W3rh1	232739.50	0.347	2.227	2327395	--page-cache-egress-at-rest-vhosts
+2	v0.1.5	W3rh2	235834.00	0.676	5.497	2358340	--page-cache-egress-at-rest-vhosts
+2	v0.1.5	PHP1	28356.10	1.290	3.632	283561	--page-cache-egress-at-rest-vhosts
+2	v0.1.10	W1	98408.60	9.039	16.927	984086	
+2	v0.1.10	W3s1	544145.00	0.441	2.845	5441450	
+2	v0.1.10	W3h1	249417.70	0.305	2.532	2494177	
+2	v0.1.10	W3rh1	233627.10	0.348	2.175	2336271	
+2	v0.1.10	W3rh2	482800.00	0.512	1.807	4828000	
+2	v0.1.10	PHP1	33217.20	1.111	3.081	332172	
+2	v0.0.1	W1	73975.20	12.825	24.659	739752	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+2	v0.0.1	W3s1	474065.00	0.572	1.829	4740650	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+2	v0.0.1	W3h1	271726.80	0.299	1.826	2717268	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+2	v0.0.1	W3rh1	216212.00	0.360	2.455	2162120	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+2	v0.0.1	W3rh2	271791.00	0.709	4.369	2717910	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+2	v0.0.1	PHP1	27408.70	1.380	3.084	274087	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+2	v0.0.2	W1	77889.90	12.212	25.364	778899	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.2	W3s1	500225.00	0.505	2.877	5002250	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.2	W3h1	267396.20	0.301	1.856	2673962	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.2	W3rh1	237214.60	0.349	1.767	2372146	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.2	W3rh2	365373.00	0.787	2.350	3653730	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.2	PHP1	24723.10	1.438	5.264	247231	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.3	W1	67556.90	13.671	28.638	675569	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.3	W3s1	396507.00	0.706	2.487	3965070	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.3	W3h1	272348.50	0.306	1.568	2723485	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.3	W3rh1	204380.80	0.348	2.923	2043808	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.3	W3rh2	314421.00	0.903	3.321	3144210	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+2	v0.0.3	PHP1	26435.60	1.404	3.125	264356	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.1.5	W1	94550.80	8.591	21.400	945508	--page-cache-egress-at-rest-vhosts
+3	v0.1.5	W3s1	606802.00	0.410	1.796	6068020	--page-cache-egress-at-rest-vhosts
+3	v0.1.5	W3h1	266994.20	0.308	1.671	2669942	--page-cache-egress-at-rest-vhosts
+3	v0.1.5	W3rh1	232468.10	0.341	2.269	2324681	--page-cache-egress-at-rest-vhosts
+3	v0.1.5	W3rh2	481896.00	0.545	1.590	4818960	--page-cache-egress-at-rest-vhosts
+3	v0.1.5	PHP1	30850.00	1.186	3.530	308500	--page-cache-egress-at-rest-vhosts
+3	v0.1.10	W1	96403.40	9.932	17.104	964034	
+3	v0.1.10	W3s1	585939.00	0.407	2.315	5859390	
+3	v0.1.10	W3h1	256811.80	0.309	2.314	2568118	
+3	v0.1.10	W3rh1	240686.50	0.348	1.678	2406865	
+3	v0.1.10	W3rh2	481554.00	0.542	1.652	4815540	
+3	v0.1.10	PHP1	34585.00	1.084	2.599	345850	
+3	v0.0.1	W1	40562.10	20.770	59.307	405621	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+3	v0.0.1	W3s1	245975.00	0.666	6.102	2459750	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+3	v0.0.1	W3h1	216676.50	0.297	3.167	2166765	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+3	v0.0.1	W3rh1	208341.30	0.346	2.843	2083413	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+3	v0.0.1	W3rh2	314668.00	0.794	3.730	3146680	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+3	v0.0.1	PHP1	24433.10	1.537	3.621	244331	--page-cache-303-prefixes --page-cache-dict-level --page-cache-egress-at-rest-vhosts --page-cache-opt-in-status --page-cache-vary-default --tls-session-tickets --trusted-proxy-idle-secs
+3	v0.0.2	W1	77912.70	12.345	22.281	779127	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.2	W3s1	568054.00	0.492	1.778	5680540	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.2	W3h1	216032.70	0.298	3.106	2160327	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.2	W3rh1	231185.60	0.347	1.938	2311856	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.2	W3rh2	336923.00	0.853	3.118	3369230	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.2	PHP1	26699.90	1.413	3.202	266999	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.3	W1	72449.70	11.692	28.388	724497	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.3	W3s1	381102.00	0.708	2.807	3811020	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.3	W3h1	255709.50	0.303	2.359	2557095	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.3	W3rh1	189706.30	0.369	2.413	1897063	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.3	W3rh2	311188.00	0.881	3.590	3111880	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.3	PHP1	23792.20	1.492	3.629	237922	--page-cache-egress-at-rest-vhosts --page-cache-vary-default
+3	v0.0.9	W1	85836.70	12.846	18.307	858367	--page-cache-egress-at-rest-vhosts
+3	v0.0.9	W3s1	393156.00	0.715	2.778	3931560	--page-cache-egress-at-rest-vhosts
+3	v0.0.9	W3h1	191817.00	0.309	3.243	1918170	--page-cache-egress-at-rest-vhosts
+3	v0.0.9	W3rh1	212383.80	0.329	3.093	2123838	--page-cache-egress-at-rest-vhosts
+3	v0.0.9	W3rh2	391045.00	0.698	1.679	3910450	--page-cache-egress-at-rest-vhosts
+3	v0.0.9	PHP1	28192.20	1.313	3.417	281922	--page-cache-egress-at-rest-vhosts
+3	v0.0.10	W1	86947.30	11.242	17.899	869473	--page-cache-egress-at-rest-vhosts
+3	v0.0.10	W3s1	394788.00	0.754	2.291	3947880	--page-cache-egress-at-rest-vhosts
+3	v0.0.10	W3h1	255010.60	0.302	2.183	2550106	--page-cache-egress-at-rest-vhosts
+3	v0.0.10	W3rh1	233460.30	0.344	2.016	2334603	--page-cache-egress-at-rest-vhosts
+3	v0.0.10	W3rh2	234091.00	1.029	5.275	2340910	--page-cache-egress-at-rest-vhosts
+3	v0.0.10	PHP1	25120.80	1.460	3.906	251208	--page-cache-egress-at-rest-vhosts
+3	v0.1.2	W1	87300.10	10.720	22.286	873001	--page-cache-egress-at-rest-vhosts
+3	v0.1.2	W3s1	517192.00	0.405	3.082	5171920	--page-cache-egress-at-rest-vhosts
+3	v0.1.2	W3h1	225307.00	0.299	3.075	2253070	--page-cache-egress-at-rest-vhosts
+3	v0.1.2	W3rh1	201770.50	0.336	3.147	2017705	--page-cache-egress-at-rest-vhosts
+3	v0.1.2	W3rh2	434929.00	0.531	2.558	4349290	--page-cache-egress-at-rest-vhosts
+3	v0.1.2	PHP1	30147.90	1.235	3.139	301479	--page-cache-egress-at-rest-vhosts

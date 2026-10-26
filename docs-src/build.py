@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261026c'
+VERSION = '20261026d'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 ROOT = '/web/httpjet'
@@ -655,6 +655,9 @@ def main():
             shutil.copy2(os.path.join(DOCS, df), os.path.join(dist, 'docs', df))
     for af in ('docs.min.css', 'docs.min.js', 'search-index.min.js', 'favicon.svg'):
         shutil.copy2(os.path.join(ASSETS, af), os.path.join(dist, 'docs', 'assets', af))
+    for af in os.listdir(ASSETS):  # benchmark result files the pages link to
+        if af.endswith('.tsv'):
+            shutil.copy2(os.path.join(ASSETS, af), os.path.join(dist, 'docs', 'assets', af))
 
     print('built', len(ORDER), 'pages + clean Pages dist; version', VERSION)
 

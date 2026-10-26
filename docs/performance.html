@@ -125,9 +125,9 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) and the <code>0.1.10</code> bug/perf release is recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>. Use the <strong>All-Builds Curve vs LiteSpeed &amp; nginx</strong> below to see every build with a recorded absolute measurement on one canvas (later releases were measured as relative A/Bs), or step through the <strong>14 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
+      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>) and the <code>0.1.10</code> bug/perf release is recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>. Use the <strong>Release Speed Curve</strong> below to compare every release from v0.0.1 to v0.1.10, each PGO-built from its tag and measured side by side on 2026-10-26 under identical conditions (raw results: <a href="assets/release-sweep-2026-10-26.tsv">release-sweep-2026-10-26.tsv</a>), or step through the <strong>14 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
 
-      <div class="bexp" id="all-builds-curve" aria-label="All builds performance curve vs LiteSpeed, OpenLiteSpeed, and nginx">
+      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve: every release from v0.0.1 to v0.1.10 measured under identical conditions">
         <div class="bexp__curve"></div>
       </div>
 
@@ -325,6 +325,6 @@
     <div class="search-res"></div>
   </div>
 </div>
-<script defer src="assets/docs.min.js?v=20261026c"></script>
+<script defer src="assets/docs.min.js?v=20261026d"></script>
 </body>
 </html>
