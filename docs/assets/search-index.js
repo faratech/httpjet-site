@@ -44,6 +44,11 @@ window.DOCS_INDEX = [
     "kw": "httpjet http: SERVER-IP https: var www etc conf log keyFile certFile httpd_config.xml --root check --strict"
    },
    {
+    "id": "docker",
+    "t": "Docker and WSL 2",
+    "kw": "http: localhost:8080 https: localhost:8443 --method binary --init none sudo httpjetctl run"
+   },
+   {
     "id": "source",
     "t": "Build from source"
    },
@@ -735,6 +740,10 @@ window.DOCS_INDEX = [
    },
    {
     "id": "oci",
+    "t": "Container deployment"
+   },
+   {
+    "id": "oci-example",
     "t": "Hardened OCI example",
     "kw": "packaging oci no-new-privileges noexec nosuid nodev tmp seccomp-httpjet.json io_uring_setup io_uring_enter io_uring_register process_vm_ CAP_SYS_PTRACE run httpjet-certs example.test var lib httpjet etc litespeed logs conf example --privileged --cap-add seccomp unconfined __hj_cache_ready"
    },

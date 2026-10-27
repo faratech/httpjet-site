@@ -37,6 +37,21 @@ Put site files in `/var/www/httpjet`; configuration is under `/etc/httpjet/conf/
         i   GitHub attribution
 Release files have GitHub Actions publication attestations. Before running the installer, you can verify it with `gh attestation verify ./install.sh --repo faratech/httpjet --signer-workflow faratech/httpjet/.github/workflows/installer-publish-now.yml`. The release's full distribution matrix was not completed.
 
+## Docker and WSL 2
+
+Run the published Linux image on Docker Engine or Docker Desktop with the WSL 2 backend. Docker's default seccomp profile blocks io_uring, so download the Compose file and the supplied profile into a new directory:
+
+           **container** · Docker Compose
+```
+curl -fsSLo compose.yaml https://raw.githubusercontent.com/faratech/httpjet/main/packaging/docker/compose.yaml
+curl -fsSLo seccomp-httpjet.json https://raw.githubusercontent.com/faratech/httpjet/main/packaging/oci/seccomp-httpjet.json
+docker compose up -d
+```
+
+Open `http://localhost:8080/` or `https://localhost:8443/`. The container generates a self-signed certificate that persists in a named volume; browsers warn until a trusted certificate is configured. The host kernel and runtime must allow io_uring. Docker Desktop can use the same image through its WSL 2 backend.
+
+The regular installer also works inside a WSL 2 Linux distribution when io_uring is available. With no systemd, select `--method binary --init none` and run `sudo httpjetctl run` in the foreground. See the Docker and WSL 2 guide for PowerShell, service management and troubleshooting.
+
 ## Build from source
 
 The following optional path builds the binary and serves the example on loopback. For a packaged installation, follow the steps above instead.

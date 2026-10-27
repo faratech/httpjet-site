@@ -16,6 +16,16 @@ curl -fk https://127.0.0.1/</code></pre></div>
     </section>
 
     <section>
+      <h2 id="docker">Docker and WSL 2</h2>
+      <p>Run the published Linux image on Docker Engine or Docker Desktop with the WSL 2 backend. Docker's default seccomp profile blocks io_uring, so download the Compose file and the supplied profile into a new directory:</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>container</b> · Docker Compose</span></div><pre><code>curl -fsSLo compose.yaml https://raw.githubusercontent.com/faratech/httpjet/main/packaging/docker/compose.yaml
+curl -fsSLo seccomp-httpjet.json https://raw.githubusercontent.com/faratech/httpjet/main/packaging/oci/seccomp-httpjet.json
+docker compose up -d</code></pre></div>
+      <p>Open <code>http://localhost:8080/</code> or <code>https://localhost:8443/</code>. The container generates a self-signed certificate that persists in a named volume; browsers warn until a trusted certificate is configured. The host kernel and runtime must allow io_uring. Docker Desktop can use the same image through its WSL 2 backend.</p>
+      <p>The regular installer also works inside a WSL 2 Linux distribution when io_uring is available. With no systemd, select <code>--method binary --init none</code> and run <code>sudo httpjetctl run</code> in the foreground. See the <a href="https://github.com/faratech/httpjet/blob/main/packaging/docker/README.md">Docker and WSL 2 guide</a> for PowerShell, service management and troubleshooting.</p>
+    </section>
+
+    <section>
       <h2 id="source">Build from source</h2>
       <p>The following optional path builds the binary and serves the example on loopback. For a packaged installation, follow the steps above instead.</p>
     </section>

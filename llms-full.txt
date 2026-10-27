@@ -147,6 +147,21 @@ Put site files in `/var/www/httpjet`; configuration is under `/etc/httpjet/conf/
         i   GitHub attribution
 Release files have GitHub Actions publication attestations. Before running the installer, you can verify it with `gh attestation verify ./install.sh --repo faratech/httpjet --signer-workflow faratech/httpjet/.github/workflows/installer-publish-now.yml`. The release's full distribution matrix was not completed.
 
+## Docker and WSL 2
+
+Run the published Linux image on Docker Engine or Docker Desktop with the WSL 2 backend. Docker's default seccomp profile blocks io_uring, so download the Compose file and the supplied profile into a new directory:
+
+           **container** · Docker Compose
+```
+curl -fsSLo compose.yaml https://raw.githubusercontent.com/faratech/httpjet/main/packaging/docker/compose.yaml
+curl -fsSLo seccomp-httpjet.json https://raw.githubusercontent.com/faratech/httpjet/main/packaging/oci/seccomp-httpjet.json
+docker compose up -d
+```
+
+Open `http://localhost:8080/` or `https://localhost:8443/`. The container generates a self-signed certificate that persists in a named volume; browsers warn until a trusted certificate is configured. The host kernel and runtime must allow io_uring. Docker Desktop can use the same image through its WSL 2 backend.
+
+The regular installer also works inside a WSL 2 Linux distribution when io_uring is available. With no systemd, select `--method binary --init none` and run `sudo httpjetctl run` in the foreground. See the Docker and WSL 2 guide for PowerShell, service management and troubleshooting.
+
 ## Build from source
 
 The following optional path builds the binary and serves the example on loopback. For a packaged installation, follow the steps above instead.
@@ -2171,7 +2186,11 @@ journalctl -u httpjet -n 100
 
 Metric families, log formats, the request-id header, telemetry TSV, PHP slow log, OpenTelemetry and profiling are all on Observability . Pair the counters with a process monitor (the tree ships a `monit` check whose start timeout stays above the boot gate's worst case).
 
-## Hardened OCI example
+## Container deployment
+
+For a ready-to-run Docker image on Linux or Docker Desktop with WSL 2, follow the Docker quickstart . It includes the seccomp profile required for io_uring and publishes HTTP on 8080 and HTTPS on 8443.
+
+### Hardened OCI example
 
 `packaging/oci/` is an adoption example, not a prescription. The image runs as numeric UID/GID `10001:10001`, binds unprivileged ports, needs no capabilities; the compose file adds a read-only root filesystem, drops every capability, sets `no-new-privileges`, and mounts a small `noexec,nosuid,nodev` `/tmp`. Because Moby's default seccomp allowlist omits io_uring, `seccomp-httpjet.json` is the pinned Moby default plus only `io_uring_setup`, `io_uring_enter` and `io_uring_register` (ptrace/`process_vm_*` gated on `CAP_SYS_PTRACE`).
 

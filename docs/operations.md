@@ -122,7 +122,11 @@ journalctl -u httpjet -n 100
 
 Metric families, log formats, the request-id header, telemetry TSV, PHP slow log, OpenTelemetry and profiling are all on Observability . Pair the counters with a process monitor (the tree ships a `monit` check whose start timeout stays above the boot gate's worst case).
 
-## Hardened OCI example
+## Container deployment
+
+For a ready-to-run Docker image on Linux or Docker Desktop with WSL 2, follow the Docker quickstart . It includes the seccomp profile required for io_uring and publishes HTTP on 8080 and HTTPS on 8443.
+
+### Hardened OCI example
 
 `packaging/oci/` is an adoption example, not a prescription. The image runs as numeric UID/GID `10001:10001`, binds unprivileged ports, needs no capabilities; the compose file adds a read-only root filesystem, drops every capability, sets `no-new-privileges`, and mounts a small `noexec,nosuid,nodev` `/tmp`. Because Moby's default seccomp allowlist omits io_uring, `seccomp-httpjet.json` is the pinned Moby default plus only `io_uring_setup`, `io_uring_enter` and `io_uring_register` (ptrace/`process_vm_*` gated on `CAP_SYS_PTRACE`).
 
