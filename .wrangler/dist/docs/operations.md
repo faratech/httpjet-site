@@ -124,7 +124,7 @@ Metric families, log formats, the request-id header, telemetry TSV, PHP slow log
 
 ## Container deployment
 
-For a ready-to-run Docker image on Linux or Docker Desktop with WSL 2, follow the Docker quickstart . It includes the seccomp profile required for io_uring and publishes HTTP on 8080 and HTTPS on 8443.
+For a ready-to-run Docker image on Linux or Docker Desktop with WSL 2, follow the Docker quickstart . It includes the seccomp profile required for io_uring and publishes HTTP on 8080 and HTTPS on 8443. Microsoft's separate WSL Containers runtime denied io_uring in the environment tested.
 
 ### Hardened OCI example
 

@@ -92,7 +92,7 @@ journalctl -u httpjet -n 100</code></pre></div>
 
     <section>
       <h2 id="oci">Container deployment</h2>
-      <p>For a ready-to-run Docker image on Linux or Docker Desktop with WSL 2, follow the <a href="quickstart.html#docker">Docker quickstart</a>. It includes the seccomp profile required for io_uring and publishes HTTP on 8080 and HTTPS on 8443.</p>
+      <p>For a ready-to-run Docker image on Linux or Docker Desktop with WSL 2, follow the <a href="quickstart.html#docker">Docker quickstart</a>. It includes the seccomp profile required for io_uring and publishes HTTP on 8080 and HTTPS on 8443. Microsoft's separate <a href="quickstart.html#wslc">WSL Containers runtime</a> denied io_uring in the environment tested.</p>
       <h3 id="oci-example">Hardened OCI example</h3>
       <p><code>packaging/oci/</code> is an adoption example, not a prescription. The image runs as numeric UID/GID <code>10001:10001</code>, binds unprivileged ports, needs no capabilities; the compose file adds a read-only root filesystem, drops every capability, sets <code>no-new-privileges</code>, and mounts a small <code>noexec,nosuid,nodev</code> <code>/tmp</code>. Because Moby's default seccomp allowlist omits io_uring, <code>seccomp-httpjet.json</code> is the pinned Moby default plus only <code>io_uring_setup</code>, <code>io_uring_enter</code> and <code>io_uring_register</code> (ptrace/<code>process_vm_*</code> gated on <code>CAP_SYS_PTRACE</code>).</p>
       <div class="tablewrap"><table>

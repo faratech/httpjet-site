@@ -45,8 +45,13 @@ window.DOCS_INDEX = [
    },
    {
     "id": "docker",
-    "t": "Docker and WSL 2",
+    "t": "Docker and Docker Desktop with WSL 2",
     "kw": "http: localhost:8080 https: localhost:8443 --method binary --init none sudo httpjetctl run"
+   },
+   {
+    "id": "wslc",
+    "t": "Microsoft WSL Containers (wslc)",
+    "kw": "io_uring_setup EPERM"
    },
    {
     "id": "source",

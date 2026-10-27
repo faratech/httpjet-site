@@ -37,7 +37,7 @@ Put site files in `/var/www/httpjet`; configuration is under `/etc/httpjet/conf/
         i   GitHub attribution
 Release files have GitHub Actions publication attestations. Before running the installer, you can verify it with `gh attestation verify ./install.sh --repo faratech/httpjet --signer-workflow faratech/httpjet/.github/workflows/installer-publish-now.yml`. The release's full distribution matrix was not completed.
 
-## Docker and WSL 2
+## Docker and Docker Desktop with WSL 2
 
 Run the published Linux image on Docker Engine or Docker Desktop with the WSL 2 backend. Docker's default seccomp profile blocks io_uring, so download the Compose file and the supplied profile into a new directory:
 
@@ -51,6 +51,12 @@ docker compose up -d
 Open `http://localhost:8080/` or `https://localhost:8443/`. The container generates a self-signed certificate that persists in a named volume; browsers warn until a trusted certificate is configured. The host kernel and runtime must allow io_uring. Docker Desktop can use the same image through its WSL 2 backend.
 
 The regular installer also works inside a WSL 2 Linux distribution when io_uring is available. With no systemd, select `--method binary --init none` and run `sudo httpjetctl run` in the foreground. See the Docker and WSL 2 guide for PowerShell, service management and troubleshooting.
+
+## Microsoft WSL Containers (wslc)
+
+Microsoft's WSL Containers is a separate runtime from Docker Desktop. It can pull the public image, but **httpjet did not start in the WSL Containers 3.0.3 Windows runner we tested**: `io_uring_setup` was denied with `EPERM`. The kernel reported io_uring enabled and a seccomp filter active; the exact source of the denial is unconfirmed. WSL Containers 3.0.3 does not expose Docker's custom seccomp-profile option.
+
+httpjet requires io_uring and has no epoll fallback. See the WSL Containers diagnostics and test run before attempting this route.
 
 ## Build from source
 
