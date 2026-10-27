@@ -7,8 +7,9 @@
 - **HTTP/2 Static Throughput (empty bodies, c=50, dedicated load-generator client, 2026-08-27):** ~908k req/s (mean of 4 runs); interleaved with OpenLiteSpeed ~891k vs ~838k req/s (mean of 2 pairs)
 - **Heavy 806-line `.htaccess` Static (c=100, PGO):** 298k req/s HTTP/2, 168.7k req/s HTTP/1.1 (vs nginx 125.4k / 145.6k)
 - **Origin Page Cache Hit vs Full PHP Render:** 19,215 req/s (p50 2 ms) vs 480 req/s (p50 34 ms) — about 40× (loopback, 152 KB page)
-- **PHP over LSAPI (HTTP/1.1, c=40, PGO):** 44.8k req/s vs LiteSpeed 6.3.5 38.5k req/s (41.2k at c=60)
+- **PHP over LSAPI (HTTP/1.1, c=40, PGO, June 2026 build):** 44.8k req/s vs LiteSpeed 6.3.5 38.5k req/s (41.2k at c=60)
 - **Production Latency Attribution:** June 2026 telemetry: httpjet request phases ~0.2% of wall time (~138 µs/req) and PHP renders 86.5–98.8%; 2026-08-30 sample: mean 9.99 ms, LSAPI TTFB 8.96 ms, rewrite + cache lookup 0.09%
+- **Release speed sweep (2026-10-26; every release v0.0.1 to v0.1.10 PGO-built from its tag, measured side by side over loopback with the server on 4 cores and h2load on 4 others, median of 3 rounds):** v0.1.10 vs v0.0.1: HTTP/2 heavy 806-line `.htaccess` 481.6k vs 314.7k req/s, HTTP/2 static 1 KiB 585.5k vs 464.5k, HTTP/2 page-cache hit 98.2k vs 70.9k, PHP over LSAPI (HTTP/1.1, c=40) 33.2k vs 26.3k; raw results: [release-sweep-2026-10-26.tsv](https://httpjet.net/docs/assets/release-sweep-2026-10-26.tsv)
 - **Release 0.1.10 vs 0.1.5 (controlled loopback A/B, relative change, not production throughput):** 0 of 80 metric rows worse; page-cache miss-to-store CPU per request −61% (throughput +16%), warmer burst CPU −38%, open-loop mix p99 −29%, uncached PHP +6% throughput / −6% CPU, RSS −8% to −10%; static-file CPU +1–2% (within noise)
 - **Full Documentation Corpus (single file):** [https://httpjet.net/llms-full.txt](https://httpjet.net/llms-full.txt)
 - **Source Repository:** [https://github.com/faratech/httpjet](https://github.com/faratech/httpjet)

@@ -2612,9 +2612,9 @@ SUMMARY: Measured throughput by regime: three-way benchmarks, the origin cache r
 
 httpjet is fast — and these docs are strict about *where* the time goes. Every figure names its regime, because a **loopback benchmark** (synthetic, on-box, PGO build) is not the same thing as **production telemetry** (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.
 
-        ~908 k rps   h2 static, c=50, dedicated load-generator client (mean of 4 runs)
-        44.8 k rps   PHP/LSAPI over HTTP/1.1, PGO loopback
-        40 ×   cache hit vs the same page through PHP
+        ~908 k rps   h2 static, c=50, dedicated load-generator client (mean of 4 runs, 2026-08-27)
+        44.8 k rps   PHP/LSAPI over HTTP/1.1, PGO loopback (June 2026 build)
+        40 ×   cache hit vs the same page through PHP (June 2026, 152 KB page)
         0.2 %   httpjet's request phases, June 2026 production telemetry
         1.55 IPC   h2 hit path at saturation, June 2026 (hardware counters)
         0.0002 flt   v0.1.5 h2 static minor page faults/req
@@ -2634,7 +2634,7 @@ Every benchmark campaign from the initial Phase 1–7 baseline (`0.0.1`, June 20
 
 ## Loopback throughput
 
-The primary dataset is the August 2026 **three-way** (httpjet vs OpenLiteSpeed vs nginx): the static matrix was driven from a dedicated load-generator client on 2026-08-27 (two interleaved pairs per cell; the server host was not otherwise idle), and the heavy-`.htaccess` rows are a loopback PGO run on 2026-08-28. The June PGO campaign against a commercial-LiteSpeed baseline remains the PHP-path reference.
+These are cross-server comparisons, not current-release numbers; for every httpjet release from v0.1.10 back to v0.0.1 measured side by side under one set of conditions, use the Release Speed Curve above. The cross-server dataset is the August 2026 **three-way** (httpjet vs OpenLiteSpeed vs nginx): the static matrix was driven from a dedicated load-generator client on 2026-08-27 (two interleaved pairs per cell; the server host was not otherwise idle), and the heavy-`.htaccess` rows are a loopback PGO run on 2026-08-28. The June PGO campaign against a commercial-LiteSpeed baseline remains the PHP-path reference.
 
 > [Benchmark Chart: h2-static — HTTP/2 static throughput by concurrency (dedicated load-generator client · 2026-08-27 · empty bodies · mean of 2 interleaved pairs · req/s)]
 
