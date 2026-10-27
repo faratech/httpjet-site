@@ -1,9 +1,10 @@
     <h1>Operations &amp; deployment</h1>
-    <p class="lede">httpjet is designed for a conventional Linux service: a dedicated account, the LiteSpeed-compatible tree, <strong>systemd socket activation</strong> so a binary deploy never refuses a connection, and a <strong>separate persistent PHP pool</strong> so a web-tier restart never cold-starts opcache. The checked-in units are generic references; a hardened OCI example covers container adoption.</p>
+    <p class="lede">A fresh packaged installation runs a static service as a dedicated account. The reference configurations below also show optional socket activation, persistent PHP pools and container deployment for operators who need them.</p>
 
     <section>
       <h2 id="install">Installation</h2>
-      <p>No signed packages are published yet; build from source and install the binary at a stable path <em>outside</em> Cargo's <code>target/</code> so a later <code>cargo clean</code> cannot delete what a running unit depends on.</p>
+      <p>For a fresh Linux server, use the <a href="quickstart.html#install">signed installer</a>. It selects the native package or portable archive, starts the welcome page on ports 80 and 443, and creates a unique self-signed certificate. A browser warning is expected until a trusted certificate is configured. io_uring must be available.</p>
+      <p>To build and deploy from source instead, install the binary at a stable path <em>outside</em> Cargo's <code>target/</code> so a later <code>cargo clean</code> cannot delete what a running unit depends on:</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">source install</span></div><pre><code>cargo build --locked --release -p httpjet
 sudo useradd --system --home-dir /var/lib/httpjet --no-create-home --shell /usr/sbin/nologin httpjet
 sudo install -d /usr/local/httpjet/bin /usr/local/httpjet/conf /usr/local/httpjet/logs
@@ -22,7 +23,8 @@ sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now httpjet-exam
     </section>
 
     <section>
-      <h2 id="systemd">The systemd model</h2>
+      <h2 id="systemd">Advanced systemd socket activation</h2>
+      <p>The following reference topology is optional. The fresh installer uses a single static service and does not set up these socket, PHP-pool or firewall units.</p>
       <!--diagram:systemd-units|<strong>Five core units</strong> (plus the optional edge firewall). The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.-->
       <div class="tablewrap"><table>
         <thead><tr><th>Unit</th><th>Role</th></tr></thead>

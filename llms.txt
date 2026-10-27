@@ -16,7 +16,7 @@
 ## Guide
 
 - [Overview](https://httpjet.net/docs/): httpjet is a from-scratch Rust web server and drop-in LiteSpeed replacement: the same XML configuration, native HTTP/2 and HTTP/3, LSAPI PHP, .htaccess rewriting, reverse proxy and FastCGI gateways, and an opt-in origin page cache.
-- [Quickstart](https://httpjet.net/docs/quickstart): Build httpjet from source, validate a LiteSpeed-compatible configuration tree with check --strict, and serve it on loopback in ten minutes.
+- [Quickstart](https://httpjet.net/docs/quickstart): Install a signed Linux release with HTTP and HTTPS, or build httpjet from source and serve it on loopback.
 - [Architecture](https://httpjet.net/docs/architecture): The httpjet workspace: 19 hj-* library crates under one binary, the frozen hj-core contract, the io_uring transport bridge, the request pipeline, and configuration generations.
 - [Capabilities & limits](https://httpjet.net/docs/capabilities): What httpjet supports today, what is optional behind build features, what is deliberately unsupported, and the fixed operational bounds.
 

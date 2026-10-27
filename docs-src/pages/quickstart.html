@@ -1,8 +1,27 @@
     <h1>Quickstart</h1>
-    <p class="lede">From a source checkout to a running origin in a few minutes: build the binary, validate a LiteSpeed-compatible tree with <code>check --strict</code>, serve it on loopback, and verify. httpjet reads the same <code>conf/httpd_config.xml</code> layout LiteSpeed uses, so an existing tree needs no migration step — but validate it first.</p>
+    <p class="lede">Install httpjet on a fresh Linux server in a few commands, or build it from source and try an example configuration. The packaged install serves a static welcome page over HTTP and HTTPS.</p>
 
     <section>
-      <h2 id="prereqs">Prerequisites</h2>
+      <h2 id="install">Install a published release</h2>
+      <p>For a fresh Linux server on <strong>amd64/x86-64 or arm64/aarch64</strong>, download the installer from GitHub and run it as root. Linux <strong>io_uring</strong> must be available to the service; ports 80 and 443 must be free. No Rust toolchain, LiteSpeed, PHP or domain name is needed.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>install</b> · Linux</span></div><pre><code>curl -fsSLo install.sh https://github.com/faratech/httpjet/releases/latest/download/install.sh
+sudo sh ./install.sh</code></pre></div>
+      <p>The installer selects signed DEB/APT or RPM packages on supported systemd systems, or a signed portable archive with a supported service manager. It verifies the release before installing, creates a dedicated <code>httpjet</code> account, and starts the service on a fresh install. <a href="https://github.com/faratech/httpjet/releases/latest">GitHub Releases</a> also provides DEB, RPM, static Linux archives and source downloads for manual use.</p>
+      <p>Fresh installs serve <code>http://SERVER-IP/</code> on port 80 and <code>https://SERVER-IP/</code> on port 443. Each installation generates its own self-signed certificate; browsers warn until you configure a trusted certificate. HTTP is not redirected to HTTPS automatically. Open TCP ports 80 and 443 in your firewall when remote access is required.</p>
+      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>check</b> · local welcome page</span></div><pre><code>curl -f http://127.0.0.1/
+<span class="t-c"># Accept the self-signed certificate for this loopback check only</span>
+curl -fk https://127.0.0.1/</code></pre></div>
+      <p>Put site files in <code>/var/www/httpjet</code>; configuration is under <code>/etc/httpjet/conf/</code> and logs under <code>/var/log/httpjet</code>. To use a trusted certificate, update the HTTPS listener's <code>keyFile</code> and <code>certFile</code> in <code>/etc/httpjet/conf/httpd_config.xml</code>, run <code>httpjet --root /etc/httpjet check --strict</code>, and restart the service. Existing configuration and certificates are preserved during upgrades. See <a href="https://github.com/faratech/httpjet#install-on-linux">installation options and service commands</a>.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">GitHub attribution</span><p>Release files have GitHub Actions publication attestations. Before running the installer, you can verify it with <code>gh attestation verify ./install.sh --repo faratech/httpjet --signer-workflow faratech/httpjet/.github/workflows/installer-publish-now.yml</code>. The release's full distribution matrix was not completed.</p></div></div>
+    </section>
+
+    <section>
+      <h2 id="source">Build from source</h2>
+      <p>The following optional path builds the binary and serves the example on loopback. For a packaged installation, follow the steps above instead.</p>
+    </section>
+
+    <section>
+      <h2 id="prereqs">Source-build prerequisites</h2>
       <div class="tablewrap"><table>
         <thead><tr><th>Requirement</th><th>Why</th></tr></thead>
         <tbody>
@@ -11,7 +30,7 @@
           <tr><td>OpenSSL 3.x headers + pkg-config</td><td>Only for <code>--features ocsp</code>.</td></tr>
           <tr><td>An LSAPI-capable <code>lsphp</code></td><td>Only for PHP. Static, proxy and FastCGI deployments need no PHP and no LiteSpeed installation.</td></tr>
         </tbody></table></div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Release status</span><p>No signed binary packages are published yet; the source build below is the install path. The repository's PGO and deploy scripts are tailored to one production deployment — do not treat them as a general installer.</p></div></div>
+
     </section>
 
     <section>

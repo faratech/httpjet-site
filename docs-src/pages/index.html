@@ -75,14 +75,14 @@
         <table>
           <thead><tr><th>Aspect</th><th>State (2026-10-26)</th></tr></thead>
           <tbody>
-            <tr><td>Version</td><td><strong>0.1.10</strong> (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3).</td></tr>
+            <tr><td>Version</td><td><strong>0.1.10</strong> (current production release; see <a href="https://github.com/faratech/httpjet/releases/latest">the latest public release</a>) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3).</td></tr>
             <tr><td>Configuration</td><td>LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. <code>check --strict</code> is the deploy gate.</td></tr>
             <tr><td>Transport</td><td>Pure io_uring (monoio) for H1/H2/H3 — the <em>only</em> transport; there is no epoll fallback and no Windows/macOS port.</td></tr>
             <tr><td>PHP</td><td>Native LSAPI; the operator supplies <code>lsphp</code>. Production runs the persistent external pool with zero-downtime generation reloads.</td></tr>
             <tr><td>Page cache</td><td>Off by default; LSCache-protocol opt-in, private tier, per-URL cookie vary, tmpfs file tier, per-vhost dictionaries, generation-scoped namespaces. Live in production.</td></tr>
             <tr><td>Optional features</td><td><code>acme</code>, <code>ocsp</code>, <code>otel</code>, <code>ktls</code>, <code>profiling</code> — build features that still need explicit runtime opt-in.</td></tr>
             <tr><td>Security posture</td><td>Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1, then a five-round review in 0.1.10 that closed 23 issues; see <a href="security.html#audit">audit posture</a>); fail-closed defaults throughout.</td></tr>
-            <tr><td>Release</td><td>Source builds on <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>, generic systemd units, and a hardened OCI example. Signed public packages and a supported-platform matrix are still release work.</td></tr>
+            <tr><td>Release</td><td>The <a href="quickstart.html#install">Linux installer</a> and signed DEB, RPM and static archives are available through <a href="https://github.com/faratech/httpjet/releases/latest">GitHub Releases</a>. The full distribution matrix was not completed for the current release.</td></tr>
           </tbody>
         </table>
       </div>
@@ -92,7 +92,7 @@
       <h2 id="next">Read next</h2>
       <p>The docs follow the request: how the server is structured, the protocols it speaks, how it runs PHP and proxies, who gets in, the page cache, and how it is configured, operated and measured.</p>
       <div class="stats">
-        <a class="stat" href="quickstart.html" style="text-decoration:none"><div class="v" style="font-size:18px">Quickstart →</div><div class="l">Build, validate a tree with <code>check --strict</code>, serve on loopback.</div></a>
+        <a class="stat" href="quickstart.html" style="text-decoration:none"><div class="v" style="font-size:18px">Quickstart →</div><div class="l">Install a signed Linux release, or build and serve from source.</div></a>
         <a class="stat" href="architecture.html" style="text-decoration:none"><div class="v" style="font-size:18px">Architecture →</div><div class="l">20 crates, the frozen <code>hj-core</code> seam, the io_uring bridge, generations.</div></a>
         <a class="stat" href="capabilities.html" style="text-decoration:none"><div class="v" style="font-size:18px">Capabilities →</div><div class="l">Supported, optional, partial, unsupported — and the fixed bounds.</div></a>
         <a class="stat" href="page-cache.html" style="text-decoration:none"><div class="v" style="font-size:18px">Page cache →</div><div class="l">Keys, tiers, admission, purge, the file tier, capsules.</div></a>

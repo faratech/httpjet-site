@@ -9,11 +9,13 @@
 
 # Operations & deployment
 
-httpjet is designed for a conventional Linux service: a dedicated account, the LiteSpeed-compatible tree, **systemd socket activation** so a binary deploy never refuses a connection, and a **separate persistent PHP pool** so a web-tier restart never cold-starts opcache. The checked-in units are generic references; a hardened OCI example covers container adoption.
+A fresh packaged installation runs a static service as a dedicated account. The reference configurations below also show optional socket activation, persistent PHP pools and container deployment for operators who need them.
 
 ## Installation
 
-No signed packages are published yet; build from source and install the binary at a stable path *outside* Cargo's `target/` so a later `cargo clean` cannot delete what a running unit depends on.
+For a fresh Linux server, use the signed installer . It selects the native package or portable archive, starts the welcome page on ports 80 and 443, and creates a unique self-signed certificate. A browser warning is expected until a trusted certificate is configured. io_uring must be available.
+
+To build and deploy from source instead, install the binary at a stable path *outside* Cargo's `target/` so a later `cargo clean` cannot delete what a running unit depends on:
 
            source install
 ```
@@ -36,7 +38,9 @@ sudo systemctl daemon-reload && sudo systemctl enable --now httpjet-example
         !   Review before start
 The example units bind loopback and use example document roots. Set listeners, domains, docroots, TLS material, writable paths and the service identity deliberately before enabling a public service. A permission-preparing `ExecStartPre` that runs as root and then drops to the unprivileged account is the reference shape.
 
-## The systemd model
+## Advanced systemd socket activation
+
+The following reference topology is optional. The fresh installer uses a single static service and does not set up these socket, PHP-pool or firewall units.
 
 > [Diagram: systemd-units] Five core units (plus the optional edge firewall). The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.
 

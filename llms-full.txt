@@ -84,7 +84,7 @@ Headline figures from the checked-in benchmark record — every number names its
 
 | Aspect | State (2026-10-26) |
 
-| Version | **0.1.10** (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
+| Version | **0.1.10** (current production release; see the latest public release ) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
 
 | Configuration | LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. `check --strict` is the deploy gate. |
 
@@ -98,13 +98,13 @@ Headline figures from the checked-in benchmark record — every number names its
 
 | Security posture | Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1, then a five-round review in 0.1.10 that closed 23 issues; see audit posture ); fail-closed defaults throughout. |
 
-| Release | Source builds on github.com/faratech/httpjet , generic systemd units, and a hardened OCI example. Signed public packages and a supported-platform matrix are still release work. |
+| Release | The Linux installer and signed DEB, RPM and static archives are available through GitHub Releases . The full distribution matrix was not completed for the current release. |
 
 ## Read next
 
 The docs follow the request: how the server is structured, the protocols it speaks, how it runs PHP and proxies, who gets in, the page cache, and how it is configured, operated and measured.
 
-          Quickstart →  Build, validate a tree with `check --strict`, serve on loopback.
+          Quickstart →  Install a signed Linux release, or build and serve from source.
           Architecture →  20 crates, the frozen `hj-core` seam, the io_uring bridge, generations.
           Capabilities →  Supported, optional, partial, unsupported — and the fixed bounds.
           Page cache →  Keys, tiers, admission, purge, the file tier, capsules.
@@ -114,14 +114,44 @@ The docs follow the request: how the server is structured, the protocols it spea
 
 ==============================================================================
 PAGE: Quickstart (https://httpjet.net/docs/quickstart)
-SUMMARY: Build httpjet from source, validate a LiteSpeed-compatible configuration tree with check --strict, and serve it on loopback in ten minutes.
+SUMMARY: Install a signed Linux release with HTTP and HTTPS, or build httpjet from source and serve it on loopback.
 ==============================================================================
 
 # Quickstart
 
-From a source checkout to a running origin in a few minutes: build the binary, validate a LiteSpeed-compatible tree with `check --strict`, serve it on loopback, and verify. httpjet reads the same `conf/httpd_config.xml` layout LiteSpeed uses, so an existing tree needs no migration step — but validate it first.
+Install httpjet on a fresh Linux server in a few commands, or build it from source and try an example configuration. The packaged install serves a static welcome page over HTTP and HTTPS.
 
-## Prerequisites
+## Install a published release
+
+For a fresh Linux server on **amd64/x86-64 or arm64/aarch64**, download the installer from GitHub and run it as root. Linux **io_uring** must be available to the service; ports 80 and 443 must be free. No Rust toolchain, LiteSpeed, PHP or domain name is needed.
+
+           **install** · Linux
+```
+curl -fsSLo install.sh https://github.com/faratech/httpjet/releases/latest/download/install.sh
+sudo sh ./install.sh
+```
+
+The installer selects signed DEB/APT or RPM packages on supported systemd systems, or a signed portable archive with a supported service manager. It verifies the release before installing, creates a dedicated `httpjet` account, and starts the service on a fresh install. GitHub Releases also provides DEB, RPM, static Linux archives and source downloads for manual use.
+
+Fresh installs serve `http://SERVER-IP/` on port 80 and `https://SERVER-IP/` on port 443. Each installation generates its own self-signed certificate; browsers warn until you configure a trusted certificate. HTTP is not redirected to HTTPS automatically. Open TCP ports 80 and 443 in your firewall when remote access is required.
+
+           **check** · local welcome page
+```
+curl -f http://127.0.0.1/
+# Accept the self-signed certificate for this loopback check only
+curl -fk https://127.0.0.1/
+```
+
+Put site files in `/var/www/httpjet`; configuration is under `/etc/httpjet/conf/` and logs under `/var/log/httpjet`. To use a trusted certificate, update the HTTPS listener's `keyFile` and `certFile` in `/etc/httpjet/conf/httpd_config.xml`, run `httpjet --root /etc/httpjet check --strict`, and restart the service. Existing configuration and certificates are preserved during upgrades. See installation options and service commands .
+
+        i   GitHub attribution
+Release files have GitHub Actions publication attestations. Before running the installer, you can verify it with `gh attestation verify ./install.sh --repo faratech/httpjet --signer-workflow faratech/httpjet/.github/workflows/installer-publish-now.yml`. The release's full distribution matrix was not completed.
+
+## Build from source
+
+The following optional path builds the binary and serves the example on loopback. For a packaged installation, follow the steps above instead.
+
+## Source-build prerequisites
 
 | Requirement | Why |
 
@@ -132,9 +162,6 @@ From a source checkout to a running origin in a few minutes: build the binary, v
 | OpenSSL 3.x headers + pkg-config | Only for `--features ocsp`. |
 
 | An LSAPI-capable `lsphp` | Only for PHP. Static, proxy and FastCGI deployments need no PHP and no LiteSpeed installation. |
-
-        i   Release status
-No signed binary packages are published yet; the source build below is the install path. The repository's PGO and deploy scripts are tailored to one production deployment — do not treat them as a general installer.
 
 ## 1 · Build the binary
 
@@ -2031,11 +2058,13 @@ SUMMARY: Systemd socket activation, the persistent PHP pool, safe changes, deplo
 
 # Operations & deployment
 
-httpjet is designed for a conventional Linux service: a dedicated account, the LiteSpeed-compatible tree, **systemd socket activation** so a binary deploy never refuses a connection, and a **separate persistent PHP pool** so a web-tier restart never cold-starts opcache. The checked-in units are generic references; a hardened OCI example covers container adoption.
+A fresh packaged installation runs a static service as a dedicated account. The reference configurations below also show optional socket activation, persistent PHP pools and container deployment for operators who need them.
 
 ## Installation
 
-No signed packages are published yet; build from source and install the binary at a stable path *outside* Cargo's `target/` so a later `cargo clean` cannot delete what a running unit depends on.
+For a fresh Linux server, use the signed installer . It selects the native package or portable archive, starts the welcome page on ports 80 and 443, and creates a unique self-signed certificate. A browser warning is expected until a trusted certificate is configured. io_uring must be available.
+
+To build and deploy from source instead, install the binary at a stable path *outside* Cargo's `target/` so a later `cargo clean` cannot delete what a running unit depends on:
 
            source install
 ```
@@ -2058,7 +2087,9 @@ sudo systemctl daemon-reload && sudo systemctl enable --now httpjet-example
         !   Review before start
 The example units bind loopback and use example document roots. Set listeners, domains, docroots, TLS material, writable paths and the service identity deliberately before enabling a public service. A permission-preparing `ExecStartPre` that runs as root and then drops to the unprivileged account is the reference shape.
 
-## The systemd model
+## Advanced systemd socket activation
+
+The following reference topology is optional. The fresh installer uses a single static service and does not set up these socket, PHP-pool or firewall units.
 
 > [Diagram: systemd-units] Five core units (plus the optional edge firewall). The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.
 

@@ -83,7 +83,7 @@ Headline figures from the checked-in benchmark record — every number names its
 
 | Aspect | State (2026-10-26) |
 
-| Version | **0.1.10** (current production release; latest public source tag v0.1.5) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
+| Version | **0.1.10** (current production release; see the latest public release ) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
 
 | Configuration | LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. `check --strict` is the deploy gate. |
 
@@ -97,13 +97,13 @@ Headline figures from the checked-in benchmark record — every number names its
 
 | Security posture | Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1, then a five-round review in 0.1.10 that closed 23 issues; see audit posture ); fail-closed defaults throughout. |
 
-| Release | Source builds on github.com/faratech/httpjet , generic systemd units, and a hardened OCI example. Signed public packages and a supported-platform matrix are still release work. |
+| Release | The Linux installer and signed DEB, RPM and static archives are available through GitHub Releases . The full distribution matrix was not completed for the current release. |
 
 ## Read next
 
 The docs follow the request: how the server is structured, the protocols it speaks, how it runs PHP and proxies, who gets in, the page cache, and how it is configured, operated and measured.
 
-          Quickstart →  Build, validate a tree with `check --strict`, serve on loopback.
+          Quickstart →  Install a signed Linux release, or build and serve from source.
           Architecture →  20 crates, the frozen `hj-core` seam, the io_uring bridge, generations.
           Capabilities →  Supported, optional, partial, unsupported — and the fixed bounds.
           Page cache →  Keys, tiers, admission, purge, the file tier, capsules.

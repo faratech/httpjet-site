@@ -14,7 +14,7 @@ MMD_OUT = os.path.join(HERE, 'rendered')
 DOCS = '/web/httpjet/docs'
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261026d'
+VERSION = '20261027a'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 ROOT = '/web/httpjet'
@@ -51,7 +51,7 @@ CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.co
 NAV = [
   ('Guide', [
     ('index', 'Overview', 'documentation', 'httpjet is a from-scratch Rust web server and drop-in LiteSpeed replacement: the same XML configuration, native HTTP/2 and HTTP/3, LSAPI PHP, .htaccess rewriting, reverse proxy and FastCGI gateways, and an opt-in origin page cache.'),
-    ('quickstart', 'Quickstart', 'quickstart', 'Build httpjet from source, validate a LiteSpeed-compatible configuration tree with check --strict, and serve it on loopback in ten minutes.'),
+    ('quickstart', 'Quickstart', 'quickstart', 'Install a signed Linux release with HTTP and HTTPS, or build httpjet from source and serve it on loopback.'),
     ('architecture', 'Architecture', 'architecture', 'The httpjet workspace: 19 hj-* library crates under one binary, the frozen hj-core contract, the io_uring transport bridge, the request pipeline, and configuration generations.'),
     ('capabilities', 'Capabilities &amp; limits', 'capabilities and limits', 'What httpjet supports today, what is optional behind build features, what is deliberately unsupported, and the fixed operational bounds.'),
   ]),
@@ -262,13 +262,12 @@ def head(slug, title_suffix, desc, nav_title, docs_min_css, lastmod):
         graph.append({
             "@type": "HowTo",
             "@id": url + "#howto",
-            "name": "How to build, validate, and run httpjet from source",
-            "description": "Compile the httpjet Rust binary, validate a LiteSpeed-compatible configuration tree with check --strict, and serve on loopback.",
+            "name": "How to install httpjet on Linux",
+            "description": "Install a signed httpjet release on a fresh Linux server with io_uring.",
             "step": [
-                {"@type": "HowToStep", "position": 1, "name": "Build the binary", "text": "Clone https://github.com/faratech/httpjet.git and run cargo build --release -p httpjet."},
-                {"@type": "HowToStep", "position": 2, "name": "Validate configuration", "text": "Run target/release/httpjet --root \"$PWD/examples/litespeed\" check --strict to lint topology and directives."},
-                {"@type": "HowToStep", "position": 3, "name": "Serve on loopback", "text": "Run target/release/httpjet --root \"$PWD/examples/litespeed\" serve --http-addr 127.0.0.1:8080 --https-addr \"\" --workers 1 --no-php."},
-                {"@type": "HowToStep", "position": 4, "name": "Verify responses and metrics", "text": "Test HTTP/1.1 and h2c responses with curl against 127.0.0.1:8080 and inspect Prometheus metrics on 127.0.0.1:9090/metrics."}
+                {"@type": "HowToStep", "position": 1, "name": "Download the installer", "text": "Download install.sh from the latest faratech/httpjet GitHub release."},
+                {"@type": "HowToStep", "position": 2, "name": "Install httpjet", "text": "Run sudo sh ./install.sh on a fresh amd64 or arm64 Linux server with ports 80 and 443 free."},
+                {"@type": "HowToStep", "position": 3, "name": "Check the welcome page", "text": "Visit HTTP on port 80 or HTTPS on port 443. The initial certificate is self-signed and browsers will warn until a trusted certificate is configured."}
             ]
         })
     elif slug == 'migration':

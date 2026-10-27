@@ -28,7 +28,7 @@ window.DOCS_INDEX = [
    {
     "id": "next",
     "t": "Read next",
-    "kw": "check --strict hj-core faratech httpjet"
+    "kw": "hj-core faratech httpjet"
    }
   ]
  },
@@ -36,11 +36,20 @@ window.DOCS_INDEX = [
   "url": "quickstart",
   "section": "Guide",
   "title": "Quickstart",
-  "blurb": "Build httpjet from source, validate a LiteSpeed-compatible configuration tree with check --strict, and serve it on loopback in ten minutes.",
+  "blurb": "Install a signed Linux release with HTTP and HTTPS, or build httpjet from source and serve it on loopback.",
   "headings": [
    {
+    "id": "install",
+    "t": "Install a published release",
+    "kw": "httpjet http: SERVER-IP https: var www etc conf log keyFile certFile httpd_config.xml --root check --strict"
+   },
+   {
+    "id": "source",
+    "t": "Build from source"
+   },
+   {
     "id": "prereqs",
-    "t": "Prerequisites",
+    "t": "Source-build prerequisites",
     "kw": "io_uring_setup io_uring_enter io_uring_register --features ocsp lsphp"
    },
    {
@@ -696,7 +705,7 @@ window.DOCS_INDEX = [
    },
    {
     "id": "systemd",
-    "t": "The systemd model",
+    "t": "Advanced systemd socket activation",
     "kw": "httpjet.socket ReusePort yes Backlog serve --workers sockets.target httpjet-boot-ready.service Type notify httpjet.service Restart always OOMScoreAdjust LimitNOFILE TimeoutStopSec Conflicts lshttpd.service httpjet.service.d systemctl show ExecStart --value systemd zz-hardening.conf ProtectSystem strict ReadWritePaths PrivateTmp PrivateDevices ProtectProc invisible MemoryDenyWriteExecute RestrictAddressFamilies system-service systemd-analyze security httpjet-lsphp.socket RemoveOnStop httpjet-lsphp.service httpjet lsphp ExecReload lsphp-reload RuntimeDirectory httpjet-edge-firewall.service scripts httpjet-edge-firewall.sh"
    },
    {

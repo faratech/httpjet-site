@@ -1,6 +1,6 @@
 # Quickstart — httpjet Documentation
 
-> Build httpjet from source, validate a LiteSpeed-compatible configuration tree with check --strict, and serve it on loopback in ten minutes.
+> Install a signed Linux release with HTTP and HTTPS, or build httpjet from source and serve it on loopback.
 
 - **Canonical URL:** https://httpjet.net/docs/quickstart
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -9,9 +9,39 @@
 
 # Quickstart
 
-From a source checkout to a running origin in a few minutes: build the binary, validate a LiteSpeed-compatible tree with `check --strict`, serve it on loopback, and verify. httpjet reads the same `conf/httpd_config.xml` layout LiteSpeed uses, so an existing tree needs no migration step — but validate it first.
+Install httpjet on a fresh Linux server in a few commands, or build it from source and try an example configuration. The packaged install serves a static welcome page over HTTP and HTTPS.
 
-## Prerequisites
+## Install a published release
+
+For a fresh Linux server on **amd64/x86-64 or arm64/aarch64**, download the installer from GitHub and run it as root. Linux **io_uring** must be available to the service; ports 80 and 443 must be free. No Rust toolchain, LiteSpeed, PHP or domain name is needed.
+
+           **install** · Linux
+```
+curl -fsSLo install.sh https://github.com/faratech/httpjet/releases/latest/download/install.sh
+sudo sh ./install.sh
+```
+
+The installer selects signed DEB/APT or RPM packages on supported systemd systems, or a signed portable archive with a supported service manager. It verifies the release before installing, creates a dedicated `httpjet` account, and starts the service on a fresh install. GitHub Releases also provides DEB, RPM, static Linux archives and source downloads for manual use.
+
+Fresh installs serve `http://SERVER-IP/` on port 80 and `https://SERVER-IP/` on port 443. Each installation generates its own self-signed certificate; browsers warn until you configure a trusted certificate. HTTP is not redirected to HTTPS automatically. Open TCP ports 80 and 443 in your firewall when remote access is required.
+
+           **check** · local welcome page
+```
+curl -f http://127.0.0.1/
+# Accept the self-signed certificate for this loopback check only
+curl -fk https://127.0.0.1/
+```
+
+Put site files in `/var/www/httpjet`; configuration is under `/etc/httpjet/conf/` and logs under `/var/log/httpjet`. To use a trusted certificate, update the HTTPS listener's `keyFile` and `certFile` in `/etc/httpjet/conf/httpd_config.xml`, run `httpjet --root /etc/httpjet check --strict`, and restart the service. Existing configuration and certificates are preserved during upgrades. See installation options and service commands .
+
+        i   GitHub attribution
+Release files have GitHub Actions publication attestations. Before running the installer, you can verify it with `gh attestation verify ./install.sh --repo faratech/httpjet --signer-workflow faratech/httpjet/.github/workflows/installer-publish-now.yml`. The release's full distribution matrix was not completed.
+
+## Build from source
+
+The following optional path builds the binary and serves the example on loopback. For a packaged installation, follow the steps above instead.
+
+## Source-build prerequisites
 
 | Requirement | Why |
 
@@ -22,9 +52,6 @@ From a source checkout to a running origin in a few minutes: build the binary, v
 | OpenSSL 3.x headers + pkg-config | Only for `--features ocsp`. |
 
 | An LSAPI-capable `lsphp` | Only for PHP. Static, proxy and FastCGI deployments need no PHP and no LiteSpeed installation. |
-
-        i   Release status
-No signed binary packages are published yet; the source build below is the install path. The repository's PGO and deploy scripts are tailored to one production deployment — do not treat them as a general installer.
 
 ## 1 · Build the binary
 
