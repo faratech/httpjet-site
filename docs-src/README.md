@@ -16,16 +16,21 @@ serve-help.txt      `httpjet serve --help` snapshot the CLI page table was gener
 ## Rebuild
 
 ```bash
-cd /web/httpjet/docs-src
-npm install                              # mermaid + esbuild (puppeteer comes from /web/node_modules)
+cd docs-src                              # /web/httpjet/docs-src on the server, or any checkout
+npm install                              # mermaid + esbuild (package.json)
 node render.js [name-prefix]             # only when a .mmd changed (needs /usr/bin/google-chrome)
 python3 build.py                         # writes ../docs/*.html, assets/search-index.js, docs-head.js, *.min.*
 ```
 
 Paths: `build.py` writes into the checkout it lives in (override with
-`HTTPJET_SITE_ROOT`); `render.js`/`check.js`/`shot.js` take `PUPPETEER_PATH`
-(default `/web/node_modules/puppeteer`) and `CHROME_PATH` (default
-`/usr/bin/google-chrome`).
+`HTTPJET_SITE_ROOT`); `render.js`/`check.js`/`shot.js` find puppeteer and Chrome via
+`browser.js`: `PUPPETEER_PATH`, else normal Node resolution from `docs-src/`
+(which reaches `/web/node_modules` when the checkout is `/web/httpjet`), else
+`/web/node_modules/puppeteer`; `CHROME_PATH`, else `/usr/bin/google-chrome` if it
+exists, else puppeteer's own Chrome. In a plain checkout without either,
+`npm install --no-save puppeteer` (it is not in `package.json` so the server
+keeps using the shared copy). `scripts/validate_sitemap.py` also reads the
+checkout it lives in.
 
 Bump `VERSION` in `build.py` (the `?v=` cache-buster) on every asset change, then
 purge the Cloudflare cache for httpjet.net. Charts are defined in `CHARTS` inside

@@ -1,0 +1,13 @@
+{
+  "name": "httpjet-docs-src",
+  "private": true,
+  "description": "Build tooling for httpjet.net/docs (see README.md)",
+  "scripts": {
+    "render": "node render.js",
+    "build": "python3 build.py"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "mermaid": "^11.12.0"
+  }
+}

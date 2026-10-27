@@ -1,5 +1,5 @@
 // Render every *.mmd in ./src to ./out/<name>.svg with a dark theme matching docs.css.
-const puppeteer = require(process.env.PUPPETEER_PATH || '/web/node_modules/puppeteer');
+const { puppeteer, executablePath } = require('./browser');
 const fs = require('fs');
 const path = require('path');
 
@@ -49,7 +49,7 @@ const themeVariables = {
 };
 
 (async () => {
-  const browser = await puppeteer.launch({ headless: true, executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox', '--disable-gpu'] });
+  const browser = await puppeteer.launch({ headless: true, executablePath, args: ['--no-sandbox', '--disable-gpu'] });
   const page = await browser.newPage();
   await page.setContent('<!doctype html><html><body style="background:#0e1424"></body></html>');
   await page.addScriptTag({ content: mermaidJs });
