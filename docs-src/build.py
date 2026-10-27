@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble /web/httpjet/docs/*.html from body fragments + rendered mermaid SVGs.
+"""Assemble <site root>/docs/*.html from body fragments + rendered mermaid SVGs.
 
 pages/<slug>.html   : the inner content of <main class="content"> (no pager/docfoot)
 ../mmd/src/<n>.mmd  : mermaid sources;  ../mmd/out/<n>.svg : rendered by render.js
@@ -11,13 +11,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PAGES = os.path.join(HERE, 'pages')
 MMD_SRC = os.path.join(HERE, 'diagrams')
 MMD_OUT = os.path.join(HERE, 'rendered')
-DOCS = '/web/httpjet/docs'
+# Site root: the repo checkout this script lives in (/web/httpjet on the server);
+# override with HTTPJET_SITE_ROOT to build into another tree.
+ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HERE))
+DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
 VERSION = '20261027e'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
-ROOT = '/web/httpjet'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
 INDEXNOW_KEY = '7b3e5c1a9d4f48e2a6c0b8d1e3f5a79c'      # public by design (served at /<key>.txt)
 import hashlib, datetime
@@ -562,7 +564,7 @@ def main():
     with open(os.path.join(ASSETS, 'docs-head.js'), 'w', encoding='utf-8') as f:
         f.write(dh)
     # sync 404.html asset version
-    p404 = '/web/httpjet/404.html'
+    p404 = os.path.join(ROOT, '404.html')
     if os.path.exists(p404):
         s404 = re.sub(r'docs\.min\.css\?v=[^"]+', 'docs.min.css?v=' + VERSION, read(p404))
         with open(p404, 'w', encoding='utf-8') as f:
@@ -610,7 +612,7 @@ def main():
             loc = 'https://httpjet.net/docs/' if slug == 'index' else f'https://httpjet.net/docs/{slug}'
             llms.append(f'- [{unesc(nav_title)}]({loc}): {unesc(desc)}')
         llms.append('')
-    with open('/web/httpjet/llms.txt', 'w', encoding='utf-8') as f:
+    with open(os.path.join(ROOT, 'llms.txt'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(llms))
 
     llms_full = [
@@ -629,26 +631,26 @@ def main():
         llms_full.append('')
         llms_full.append(html_to_md(raw_body))
         llms_full.append('')
-    with open('/web/httpjet/llms-full.txt', 'w', encoding='utf-8') as f:
+    with open(os.path.join(ROOT, 'llms-full.txt'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(llms_full))
 
     # minify JS assets
     for src, dst, loader in [('docs.js', 'docs.min.js', 'js'), ('docs-head.js', 'docs-head.min.js', 'js'), ('search-index.js', 'search-index.min.js', 'js')]:
         subprocess.run([ESBUILD, os.path.join(ASSETS, src), '--minify', '--log-level=warning', '--outfile=' + os.path.join(ASSETS, dst)], check=True)
 
-    # stage clean Cloudflare Pages bundle in /web/httpjet/.wrangler/dist (excludes docs-src, CLAUDE.md, .htaccess, unminified sources)
+    # stage clean Cloudflare Pages bundle in <root>/.wrangler/dist (excludes docs-src, CLAUDE.md, .htaccess, unminified sources)
     import shutil
-    dist = '/web/httpjet/.wrangler/dist'
+    dist = os.path.join(ROOT, '.wrangler', 'dist')
     if os.path.exists(dist):
         shutil.rmtree(dist)
     os.makedirs(os.path.join(dist, 'assets', 'logos'), exist_ok=True)
     os.makedirs(os.path.join(dist, 'docs', 'assets'), exist_ok=True)
     for rf in ('index.html', '404.html', 'index.min.css', 'index.min.js', 'og.jpg', 'robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'site.webmanifest', INDEXNOW_KEY + '.txt', '_headers', '_redirects'):
-        src_p = os.path.join('/web/httpjet', rf)
+        src_p = os.path.join(ROOT, rf)
         if os.path.exists(src_p):
             shutil.copy2(src_p, os.path.join(dist, rf))
-    for lf in os.listdir('/web/httpjet/assets/logos'):
-        shutil.copy2(os.path.join('/web/httpjet/assets/logos', lf), os.path.join(dist, 'assets', 'logos', lf))
+    for lf in os.listdir(os.path.join(ROOT, 'assets', 'logos')):
+        shutil.copy2(os.path.join(os.path.join(ROOT, 'assets', 'logos'), lf), os.path.join(dist, 'assets', 'logos', lf))
     for df in os.listdir(DOCS):
         if df.endswith(('.html', '.md')):
             shutil.copy2(os.path.join(DOCS, df), os.path.join(dist, 'docs', df))
