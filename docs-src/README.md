@@ -22,6 +22,11 @@ node render.js [name-prefix]             # only when a .mmd changed (needs /usr/
 python3 build.py                         # writes ../docs/*.html, assets/search-index.js, docs-head.js, *.min.*
 ```
 
+Paths: `build.py` writes into the checkout it lives in (override with
+`HTTPJET_SITE_ROOT`); `render.js`/`check.js`/`shot.js` take `PUPPETEER_PATH`
+(default `/web/node_modules/puppeteer`) and `CHROME_PATH` (default
+`/usr/bin/google-chrome`).
+
 Bump `VERSION` in `build.py` (the `?v=` cache-buster) on every asset change, then
 purge the Cloudflare cache for httpjet.net. Charts are defined in `CHARTS` inside
 `build.py` and referenced as `<!--chart:<name>-->`; the categorical palette
