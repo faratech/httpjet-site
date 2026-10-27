@@ -1,0 +1,59 @@
+# Rebuild the docs from docs-src/ and verify the result before it can reach Cloudflare Pages
+# (Pages deploys the committed .wrangler/dist, so stale generated files ship as-is).
+name: Docs build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-build-${{ github.ref }}
+  cancel-in-progress: true
+
+# Used only until docs-src/ has its own package-lock.json; then `npm ci` pins the versions.
+env:
+  ESBUILD_VERSION: 0.28.2
+  MERMAID_VERSION: 12.2.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install esbuild + mermaid
+        working-directory: docs-src
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-save --no-package-lock --no-audit --no-fund "esbuild@${ESBUILD_VERSION}" "mermaid@${MERMAID_VERSION}"
+          fi
+
+      - name: Build docs (docs-src/build.py)
+        run: python3 docs-src/build.py
+
+      - name: Generated files match the commit
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::docs-src/build.py changed committed files. Run 'python3 docs-src/build.py' and commit the result."
+            git status --short
+            git --no-pager diff --stat
+            exit 1
+          fi
+
+      - name: Internal links resolve in the Pages bundle
+        run: python3 scripts/check_links.py
+
+      - name: Sitemap is valid
+        run: python3 scripts/validate_sitemap.py

@@ -2,11 +2,12 @@
 """Validate sitemap.xml: schema shape, limits, canonical locs, lastmod format,
 and (with --live) that every <loc> answers 200 with no redirect and a matching
 canonical tag. Also cross-checks robots.txt and the IndexNow key file."""
-import re, sys, urllib.request, urllib.error, xml.etree.ElementTree as ET
+import os, re, sys, urllib.request, urllib.error, xml.etree.ElementTree as ET
 from datetime import date
 
 NS = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
 SITE = 'https://httpjet.net'
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 live = '--live' in sys.argv
 errs = []
 
@@ -23,7 +24,7 @@ def fetch(u):
     except urllib.error.HTTPError as e:
         return e.code, ''
 
-src = fetch(SITE + '/sitemap.xml')[1] if live else open('/web/httpjet/sitemap.xml').read()
+src = fetch(SITE + '/sitemap.xml')[1] if live else open(os.path.join(ROOT, 'sitemap.xml')).read()
 try:
     root = ET.fromstring(src)
 except ET.ParseError as e:
@@ -50,7 +51,7 @@ if live:
         if 'noindex' in html.lower().split('</head>')[0] and re.search(r'name="robots"[^>]*noindex', html): fail(f'{l} is noindex')
     rb = fetch(SITE + '/robots.txt')[1]
     if f'Sitemap: {SITE}/sitemap.xml' not in rb: fail('robots.txt missing Sitemap line')
-    key = re.search(r"INDEXNOW_KEY = '(\w+)'", open('/web/httpjet/docs-src/build.py').read()).group(1)
+    key = re.search(r"INDEXNOW_KEY = '(\w+)'", open(os.path.join(ROOT, 'docs-src', 'build.py')).read()).group(1)
     code, body = fetch(f'{SITE}/{key}.txt')
     if code != 200 or body.strip() != key: fail('IndexNow key file not live / mismatched')
 if live:
