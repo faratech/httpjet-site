@@ -129,8 +129,8 @@ docker compose up -d</code></pre></div>
 
     <section>
       <h2 id="wslc">Microsoft WSL Containers (<code>wslc</code>)</h2>
-      <p>Microsoft's WSL Containers is a separate runtime from Docker Desktop. It can pull the public image, but <strong>httpjet did not start in the WSL Containers 3.0.3 Windows runner we tested</strong>: <code>io_uring_setup</code> was denied with <code>EPERM</code>. The kernel reported io_uring enabled and a seccomp filter active; the exact source of the denial is unconfirmed. WSL Containers 3.0.3 does not expose Docker's custom seccomp-profile option.</p>
-      <p>httpjet requires io_uring and has no epoll fallback. See the <a href="https://github.com/faratech/httpjet/blob/main/packaging/docker/README.md#microsoft-wsl-containers-wslc">WSL Containers diagnostics</a> and <a href="https://github.com/faratech/httpjet/actions/runs/40459373096">test run</a> before attempting this route.</p>
+      <p>Microsoft's WSL Containers is a separate runtime from Docker Desktop. It can pull the public image, but <strong>httpjet did not start in the WSL Containers 3.0.3 Windows runner we tested</strong>: <code>io_uring_setup</code> was denied with <code>EPERM</code>. The kernel reported io_uring enabled and a seccomp filter active. A comparison in the session showed that the same image and user could run the io_uring probe with a narrow per-container profile; WSL Containers 3.0.3 does not expose Docker's custom seccomp-profile option.</p>
+      <p>The internal Docker route initialized both server listeners, but the session-local HTTP check failed and Windows port forwarding remains unresolved. httpjet requires io_uring and has no epoll fallback. See the <a href="https://github.com/faratech/httpjet/blob/main/packaging/docker/README.md#microsoft-wsl-containers-wslc">WSL Containers diagnostics</a> and <a href="https://github.com/faratech/httpjet/actions/runs/40460449802">comparison run</a>.</p>
     </section>
 
     <section>
@@ -254,6 +254,6 @@ httpjet <span class="t-k">--root</span> /abs/root serve <span class="t-k">--http
     <div class="search-res"></div>
   </div>
 </div>
-<script defer src="assets/docs.min.js?v=20261027c"></script>
+<script defer src="assets/docs.min.js?v=20261027d"></script>
 </body>
 </html>
