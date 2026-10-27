@@ -2,9 +2,9 @@
     <p class="lede">httpjet is fast — and these docs are strict about <em>where</em> the time goes. Every figure names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.</p>
 
     <div class="stats">
-      <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static, c=50, dedicated load-generator client (mean of 4 runs)</div></div>
-      <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI over HTTP/1.1, PGO loopback</div></div>
-      <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs the same page through PHP</div></div>
+      <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static, c=50, dedicated load-generator client (mean of 4 runs, 2026-08-27)</div></div>
+      <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI over HTTP/1.1, PGO loopback (June 2026 build)</div></div>
+      <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs the same page through PHP (June 2026, 152 KB page)</div></div>
       <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's request phases, June 2026 production telemetry</div></div>
       <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation, June 2026 (hardware counters)</div></div>
       <div class="stat accent"><div class="v">0.0002<span class="u">flt</span></div><div class="l">v0.1.5 h2 static minor page faults/req</div></div>
@@ -39,7 +39,7 @@
 
     <section>
       <h2 id="loopback">Loopback throughput</h2>
-      <p>The primary dataset is the August 2026 <strong>three-way</strong> (httpjet vs OpenLiteSpeed vs nginx): the static matrix was driven from a dedicated load-generator client on 2026-08-27 (two interleaved pairs per cell; the server host was not otherwise idle), and the heavy-<code>.htaccess</code> rows are a loopback PGO run on 2026-08-28. The June PGO campaign against a commercial-LiteSpeed baseline remains the PHP-path reference.</p>
+      <p>These are cross-server comparisons, not current-release numbers; for every httpjet release from v0.1.10 back to v0.0.1 measured side by side under one set of conditions, use the <a href="#timeline">Release Speed Curve</a> above. The cross-server dataset is the August 2026 <strong>three-way</strong> (httpjet vs OpenLiteSpeed vs nginx): the static matrix was driven from a dedicated load-generator client on 2026-08-27 (two interleaved pairs per cell; the server host was not otherwise idle), and the heavy-<code>.htaccess</code> rows are a loopback PGO run on 2026-08-28. The June PGO campaign against a commercial-LiteSpeed baseline remains the PHP-path reference.</p>
       <!--chart:h2-static-->
       <p>One h2 connection is not a ceiling (~58k req/s at c=1), and throughput keeps rising with concurrency instead of collapsing; the earlier "h2 collapses past c=50" shape belonged to the June build and its measurement conditions, not the transport. HTTP/1.1 empty bodies at c=1000: ~202k vs OpenLiteSpeed's ~183k.</p>
       <!--chart:heavy-rewrite-->

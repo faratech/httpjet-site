@@ -2235,7 +2235,7 @@
 
         var h = [];
         h.push('<div class="bexp__top">');
-        h.push('<div class="bexp__modes" role="tablist" aria-label="All-builds speed curve workload">');
+        h.push('<div class="bexp__modes" role="tablist" aria-label="Release speed curve workload">');
         CURVES.forEach(function (cv, idx) {
           h.push('<button type="button" class="bexp__mode" role="tab" data-ccurve="' + idx + '" aria-selected="' + (idx === curCurve) + '">' + esc(cv.name) + '</button>');
         });
