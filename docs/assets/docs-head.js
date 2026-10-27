@@ -103,7 +103,7 @@
   const top = document.createDocumentFragment();
   appendNodes(top, toNodes(header));
   body.insertBefore(top, shell);
-  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20261027d"]') || body.querySelector('script[src="assets/docs.min.js?v=20261027d"]');
+  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20261027e"]') || body.querySelector('script[src="assets/docs.min.js?v=20261027e"]');
   if (searchSlot) {
     const fragment = document.createDocumentFragment();
     appendNodes(fragment, toNodes(searchOverlay));

@@ -56,7 +56,7 @@ The regular installer also works inside a WSL 2 Linux distribution when io_uring
 
 Microsoft's WSL Containers is a separate runtime from Docker Desktop. It can pull the public image, but **httpjet did not start in the WSL Containers 3.0.3 Windows runner we tested**: `io_uring_setup` was denied with `EPERM`. The kernel reported io_uring enabled and a seccomp filter active. A comparison in the session showed that the same image and user could run the io_uring probe with a narrow per-container profile; WSL Containers 3.0.3 does not expose Docker's custom seccomp-profile option.
 
-The internal Docker route initialized both server listeners, but the session-local HTTP check failed and Windows port forwarding remains unresolved. httpjet requires io_uring and has no epoll fallback. See the WSL Containers diagnostics and comparison run .
+With that profile, httpjet served HTTP and HTTPS inside the container and HTTP via its session-VM bridge IP. Docker's mapped VM-loopback ports refused connections and the direct Windows port timed out; a separate `wslc`-managed nginx control was reachable from Windows. Windows-facing httpjet remains unresolved. See the WSL Containers diagnostics and network check .
 
 ## Build from source
 

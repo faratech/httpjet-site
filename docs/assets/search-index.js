@@ -51,7 +51,7 @@ window.DOCS_INDEX = [
    {
     "id": "wslc",
     "t": "Microsoft WSL Containers (wslc)",
-    "kw": "io_uring_setup EPERM"
+    "kw": "io_uring_setup EPERM wslc"
    },
    {
     "id": "source",
