@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261108j'
+VERSION = '20261108k'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -657,6 +657,9 @@ def main():
         shutil.rmtree(dist)
     os.makedirs(os.path.join(dist, 'assets', 'logos'), exist_ok=True)
     os.makedirs(os.path.join(dist, 'docs', 'assets'), exist_ok=True)
+    bench_src = os.path.join(ROOT, 'benchmarks')
+    if os.path.isdir(bench_src):  # public copy of the prod-generated benchmark page
+        shutil.copytree(bench_src, os.path.join(dist, 'benchmarks'))
     for rf in ('index.html', '404.html', 'index.min.css', 'index.min.js', 'og.jpg', 'robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'site.webmanifest', INDEXNOW_KEY + '.txt', '_headers', '_redirects'):
         src_p = os.path.join(ROOT, rf)
         if os.path.exists(src_p):

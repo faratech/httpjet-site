@@ -1,0 +1,8 @@
+target,protocol,vhost,path,size,concurrency,keepalive,rps,p50,p90,p99,max,failed
+nginx,h1,mcp.windowsforum.com,/__hjbench/1k.bin,1k,50,1,117979.48,0.361ms,0.439ms,0.641ms,6.364ms,0
+nginx,h2,mcp.windowsforum.com,/__hjbench/1k.bin,1k,50,1,180939.80,1.945ms,2.553ms,5.349ms,9.189ms,0
+nginx,h3,mcp.windowsforum.com,/__hjbench/1k.bin,1k,50,1,27985.41,7.863ms,14.801ms,43.509ms,61.523ms,0
+nginx,h1,mcp.windowsforum.com,/__hjbench/1k.bin,1k,50,0,1470.91,33,40,45,49,0
+nginx,h1,mcp.windowsforum.com,/__hjbench/64k.bin,64k,50,1,33953.61,1.339ms,1.591ms,1.918ms,8.291ms,0
+nginx,h2,mcp.windowsforum.com,/__hjbench/64k.bin,64k,50,1,35063.36,12.950ms,15.052ms,17.258ms,20.488ms,0
+nginx,h3,mcp.windowsforum.com,/__hjbench/64k.bin,64k,50,1,5283.77,45.154ms,86.876ms,146.309ms,244.607ms,0

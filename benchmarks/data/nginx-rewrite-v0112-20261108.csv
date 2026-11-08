@@ -1,0 +1,5 @@
+target,protocol,vhost,path,size,concurrency,keepalive,rps,p50,p90,p99,max,failed
+nginx,h1,mcp.windowsforum.com,/robots.txt,small,100,1,136896.29,0.459ms,0.629ms,0.938ms,13.789ms,0
+nginx,h2,mcp.windowsforum.com,/robots.txt,small,100,10,151478.43,4.243ms,6.210ms,7.810ms,10.641ms,0
+nginx,h1,windowsforum.com,/robots.txt,small,100,1,125054.71,0.549ms,0.714ms,1.333ms,14.126ms,0
+nginx,h2,windowsforum.com,/robots.txt,small,100,10,131954.55,5.568ms,6.675ms,12.461ms,15.324ms,0

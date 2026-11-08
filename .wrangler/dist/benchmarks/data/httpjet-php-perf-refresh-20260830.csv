@@ -1,0 +1,7 @@
+target,protocol,vhost,path,size,concurrency,keepalive,rps,p50,p90,p99,max,failed
+httpjet,h1,windowsforum.com,/admin/httpjet/bench.php,php-get,20,1,13608.33,1.42ms,NA,NA,28.00ms,0
+httpjet,h1,windowsforum.com,/admin/httpjet/bench.php,php-get,40,1,16550.90,2.26ms,NA,NA,16.52ms,0
+httpjet,h1,windowsforum.com,/admin/httpjet/bench.php,php-get,60,1,16957.73,3.20ms,NA,NA,32.90ms,0
+httpjet,h2,windowsforum.com,/admin/httpjet/bench.php,php-get,30,2,18425.37,2.99ms,NA,NA,14.39ms,0
+httpjet,h1,windowsforum.com,/admin/httpjet/bench.php,php-post-1024,40,1,19484.54,2,3,6,38,0
+httpjet,h1,windowsforum.com,/admin/httpjet/bench.php,php-post-65536,40,1,789.07,45,49,51,89,8

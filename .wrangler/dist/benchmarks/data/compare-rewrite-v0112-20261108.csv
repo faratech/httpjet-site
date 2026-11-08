@@ -1,0 +1,13 @@
+target,protocol,vhost,path,size,concurrency,keepalive,rps,p50,p90,p99,max,failed
+httpjet,h1,mcp.windowsforum.com,/robots.txt,small,100,1,158556.50,0.344ms,0.627ms,2.191ms,15.153ms,0
+httpjet,h2,mcp.windowsforum.com,/robots.txt,small,100,10,342590.90,0.821ms,1.341ms,3.296ms,5.797ms,0
+httpjet,h1,windowsforum.com,/robots.txt,small,100,1,31147.83,0.275ms,0.443ms,0.911ms,850.317ms,0
+httpjet,h2,windowsforum.com,/robots.txt,small,100,10,271117.82,1.137ms,2.246ms,3.729ms,6.639ms,0
+nginx,h1,mcp.windowsforum.com,/robots.txt,small,100,1,136896.29,0.459ms,0.629ms,0.938ms,13.789ms,0
+nginx,h2,mcp.windowsforum.com,/robots.txt,small,100,10,151478.43,4.243ms,6.210ms,7.810ms,10.641ms,0
+nginx,h1,windowsforum.com,/robots.txt,small,100,1,125054.71,0.549ms,0.714ms,1.333ms,14.126ms,0
+nginx,h2,windowsforum.com,/robots.txt,small,100,10,131954.55,5.568ms,6.675ms,12.461ms,15.324ms,0
+openlitespeed,h1,mcp.windowsforum.com,/robots.txt,small,100,1,160970.98,0.382ms,0.595ms,1.439ms,13.594ms,0
+openlitespeed,h2,mcp.windowsforum.com,/robots.txt,small,100,10,338321.70,0.776ms,2.755ms,4.582ms,7.105ms,0
+openlitespeed,h1,windowsforum.com,/robots.txt,small,100,1,188025.30,0.335ms,0.510ms,1.231ms,13.213ms,0
+openlitespeed,h2,windowsforum.com,/robots.txt,small,100,10,333518.62,0.736ms,2.478ms,5.171ms,9.319ms,0

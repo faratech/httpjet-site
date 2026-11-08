@@ -1,0 +1,5 @@
+target,protocol,vhost,path,size,concurrency,keepalive,rps,p50,p90,p99,max,failed
+openlitespeed,h1,mcp.windowsforum.com,/robots.txt,small,100,1,176663.88,386us,NA,NA,11.36ms,0
+openlitespeed,h2,mcp.windowsforum.com,/robots.txt,small,100,10,343308.35,1.13ms,NA,NA,10.07ms,0
+openlitespeed,h1,windowsforum.com,/robots.txt,small,100,1,169099.83,424us,NA,NA,16.18ms,0
+openlitespeed,h2,windowsforum.com,/robots.txt,small,100,10,283280.77,1.34ms,NA,NA,15.42ms,0

@@ -1,0 +1,5 @@
+target,protocol,vhost,path,size,concurrency,keepalive,rps,p50,p90,p99,max,failed
+httpjet,h1,mcp.windowsforum.com,/robots.txt,small,100,1,156489.62,441us,NA,NA,16.95ms,0
+httpjet,h2,mcp.windowsforum.com,/robots.txt,small,100,10,326882.85,819us,NA,NA,12.55ms,0
+httpjet,h1,windowsforum.com,/robots.txt,small,100,1,168701.39,424us,NA,NA,14.82ms,0
+httpjet,h2,windowsforum.com,/robots.txt,small,100,10,297982.66,1.32ms,NA,NA,14.53ms,0

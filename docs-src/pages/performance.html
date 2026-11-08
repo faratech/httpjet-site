@@ -137,7 +137,7 @@
       <p><code>wrk</code> cross-check (H1, 1 KiB, c=100, 15 s): httpjet <strong>540,911</strong>, nginx 439,433, OpenLiteSpeed 341,344 req/s. Dedicated cells never compare with same-host rows. Compare August 2026 dedicated data: 891k empty-body.</p>
       <p>Same three servers, second regime: the <a href="assets/release-sweep-2026-11-08/">lab VM</a> re-run (loopback, server on 4 cores, loadgen on 4). Use it to compare httpjet releases against each other; the dedicated-client chart above stays the cross-server headline because it matches how LiteSpeed and nginx publish.</p>
       <!--chart:lab-threeway-->
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Honest caveats</span><p>This build ran on a shared production host here. This section forms no A/B against <code>0.1.11</code>. The rows exercise memoized and fast-serve paths directly. They exercise cache-hit serving and logging too. Treat older dedicated-host comparisons as approximate. Full CSV receipts are published with the release on the <a href="https://windowsforum.com/admin/httpjet/benchmarks/">benchmark page</a>.</p></div></div>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Honest caveats</span><p>This build ran on a shared production host here. This section forms no A/B against <code>0.1.11</code>. The rows exercise memoized and fast-serve paths directly. They exercise cache-hit serving and logging too. Treat older dedicated-host comparisons as approximate. Full CSV receipts are published with the release on the <a href="/benchmarks/">benchmark page</a>.</p></div></div>
     </section>
 
     <section>
@@ -293,7 +293,7 @@
             <tr data-group="zerofault">
               <th><code>v0.1.12</code> &middot; Hot-Path Allocation &amp; Contention Reductions<span class="mini">2026-11-08 &middot; <code>85b99e16</code></span></th>
               <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 cores / loadgen 4 cores, all 10 releases</span></td>
-              <td class="wrap">See <a href="#release-0-1-12">Release 0.1.12</a>: lab medians vs v0.1.11 — H2 1 KiB <strong>440.9k &rarr; 424.6k (rounds overlap)</strong>, H1 1 KiB <strong>222.0k &rarr; 242.0k</strong>, page-cache <strong>132.1k &rarr; 129.2k</strong>; dedicated-client three-way H2 <strong>371,540</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-08.tsv">release-sweep-2026-11-08.tsv</a> + <a href="assets/release-sweep-2026-11-08/">raw logs</a>; three-way CSVs on the <a href="https://windowsforum.com/admin/httpjet/benchmarks/">benchmark page</a></span></td>
+              <td class="wrap">See <a href="#release-0-1-12">Release 0.1.12</a>: lab medians vs v0.1.11 — H2 1 KiB <strong>443.2k &rarr; 549.7k</strong>, H1 1 KiB <strong>267.2k &rarr; 284.3k</strong>, page-cache <strong>396.0k &rarr; 485.7k</strong>; dedicated-client three-way H2 <strong>371,540</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-08.tsv">release-sweep-2026-11-08.tsv</a> + <a href="assets/release-sweep-2026-11-08/">raw logs</a>; three-way CSVs on the <a href="/benchmarks/">benchmark page</a></span></td>
             </tr>
             <tr data-group="zerofault">
               <th><code>experiment</code> &middot; H3 GSO Segment Cap<span class="mini">SINGULARITY &middot; same-binary A/B</span></th>

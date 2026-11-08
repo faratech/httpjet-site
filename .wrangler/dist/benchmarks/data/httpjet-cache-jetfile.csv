@@ -1,0 +1,8 @@
+target,workload,concurrency,rps,p50_ms,p90_ms,p99_ms,note
+httpjet,guest-page-cache-hit,1,4861.98,0,0,0,152KB homepage via jetcache file tier + hot tier (prod live during run)
+httpjet,guest-page-cache-hit,50,18211.17,1,0,0,152KB homepage via jetcache file tier + hot tier (prod live during run)
+httpjet,guest-page-cache-hit,200,17782.39,6,0,0,152KB homepage via jetcache file tier + hot tier (prod live during run)
+httpjet,guest-page-full-php,20,217.87,7,27,5539,logged-in bypass -> LSAPI+MySQL render (DB shared with live prod)
+httpjet,guest-page-full-php,40,136.10,11,25,7963,logged-in bypass -> LSAPI+MySQL render (DB shared with live prod)
+httpjet,static-robots-txt,50,93455.32,0,1,1,static reference
+httpjet,static-robots-txt,200,74537.12,2,2,4,static reference

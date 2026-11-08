@@ -1,0 +1,5 @@
+target,protocol,vhost,path,size,concurrency,keepalive,rps,p50,p90,p99,max,failed
+httpjet,h2,windowsforum.com,/help/cookies/,cache-hit,32,32,110157.64,6.413ms,9.331ms,13.606ms,19.139ms,0
+httpjet,h1,windowsforum.com,/help/cookies/,cache-hit,100,1,80024.65,0.821ms,1.498ms,3.377ms,16.232ms,0
+httpjet,h2,windowsforum.com,/help/smilies/,cache-hit,32,32,99719.79,4.739ms,10.765ms,26.010ms,47.700ms,0
+httpjet,h1,windowsforum.com,/help/smilies/,cache-hit,100,1,78408.93,0.928ms,1.395ms,3.302ms,18.916ms,0
