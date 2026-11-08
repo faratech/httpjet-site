@@ -1,1 +1,15 @@
 ALL_BENCH_DONE
+ALL_EXTENDED_DONE
+tag	binary_version	version_match	static_1k	heavy_robots	php_bench	cache_hit	empty	big_64k	config_check
+v0.0.1	0.0.1	yes	200	200	200	yes	200	200	0
+v0.0.2	0.0.2	yes	200	200	200	yes	200	200	0
+v0.0.3	0.0.3	yes	200	200	200	yes	200	200	0
+v0.0.9	0.0.9	yes	200	200	200	yes	200	200	0
+v0.0.10	0.0.10	yes	200	200	200	yes	200	200	0
+v0.1.2	0.1.2	yes	200	200	200	yes	200	200	0
+v0.1.5	0.1.5	yes	200	200	200	yes	200	200	0
+v0.1.10	0.1.10	yes	200	200	200	yes	200	200	0
+v0.1.11	0.1.11	yes	200	200	200	yes	200	200	0
+v0.1.12	0.1.12	yes	200	200	200	yes	200	200	0
+ALL_CHECKS_DONE
+FINISHED

@@ -1903,12 +1903,12 @@
           unit: "k rps",
           series: ["v0.1.11", "v0.1.12"],
           rows: [
-            ["Static 1 KiB H2 c=32x10", [440.9, 424.6]],
-            ["Static 1 KiB H1 c=100", [222.0, 242.0]],
-            ["Heavy .htaccess H2 c=32x10", [111.2, 110.1]],
-            ["Heavy .htaccess H1 c=100", [201.1, 201.0]],
-            ["PHP/LSAPI H1 c=40", [15.6, 15.3]],
-            ["Page-cache hit H2 c=32x32", [132.1, 129.2]]
+            ["Static 1 KiB H2 c=32x10", [443.2, 549.7]],
+            ["Static 1 KiB H1 c=100", [267.2, 284.3]],
+            ["Heavy .htaccess H2 c=32x10", [355.0, 425.8]],
+            ["Heavy .htaccess H1 c=100", [233.5, 253.0]],
+            ["PHP/LSAPI H1 c=40", [27.3, 27.8]],
+            ["Page-cache hit H2 c=32x32", [396.0, 485.7]]
           ],
           foot: "Absolute loopback numbers on a lab VM, not a capacity claim. Heavy H2 is connection-bound on the lab self-signed RSA certificate for every build; read H1 for trend. All ten releases, per-round: assets/release-sweep-2026-11-08.tsv; raw h2load logs: assets/release-sweep-2026-11-08/."
         },
@@ -2218,23 +2218,23 @@
           ymax: 300,
           ystep: 100,
           pts: [
-            { idx: 6, tag: "v0.0.1", h2: 112.9, h1: 205.8, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: 114.7, h1: 209.4, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", h2: 110.5, h1: 207.2, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", h2: 114.4, h1: 204.2, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", h2: 106.7, h1: 209.1, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", h2: 109.0, h1: 208.6, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", h2: 107.8, h1: 200.7, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 111.9, h1: 200.8, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", h2: 111.2, h1: 201.1, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", h2: 110.1, h1: 201.0, note: "Hot-path reductions" }
+            { idx: 6, tag: "v0.0.1", h2: 362.5, h1: 230.0, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 387.3, h1: 230.8, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 292.9, h1: 222.0, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", h2: 386.4, h1: 235.7, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", h2: 365.4, h1: 234.9, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", h2: 349.7, h1: 222.7, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", h2: 334.4, h1: 246.0, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 363.7, h1: 225.5, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", h2: 355.0, h1: 233.5, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", h2: 425.8, h1: 253.0, note: "Hot-path reductions" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.1.12 re-measured 2026-11-08 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all ten builds), 3 rounds in rotated order, median shown. The lab has no XenForo database, so the page-cache workload is a 37 KB PHP fixture page through the real cache path and PHP is the bench.php fixture over the real lsphp. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. Per-round data: assets/release-sweep-2026-11-08.tsv; raw h2load logs, server logs and the bench driver: assets/release-sweep-2026-11-08/."
+          foot: "Every release from v0.0.1 to v0.1.12 re-measured 2026-11-08 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all ten builds), 3 rounds in rotated order, median shown. The lab has no XenForo database, so the page-cache workload is a 37 KB PHP fixture page through the real cache path and PHP is the bench.php fixture over the real lsphp. PHP for v0.0.1–v0.0.3 is cold-pool-ramp-bound (those builds grow their lsphp pool slowly from cold; warm, v0.0.1 sustains ~32k req/s), so read their PHP points as a floor, not steady state. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. Per-round data: assets/release-sweep-2026-11-08.tsv; raw h2load logs, server logs and the bench driver: assets/release-sweep-2026-11-08/."
         },
         {
           id: "c-static",
@@ -2245,23 +2245,23 @@
           ymax: 600,
           ystep: 200,
           pts: [
-            { idx: 6, tag: "v0.0.1", h2: 414.3, h1: 225.2, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: 363.0, h1: 221.3, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", h2: 398.7, h1: 243.3, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", h2: 386.0, h1: 236.3, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", h2: 392.4, h1: 251.4, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", h2: 446.2, h1: 239.6, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", h2: 422.3, h1: 238.0, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 393.3, h1: 246.6, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", h2: 440.9, h1: 222.0, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", h2: 424.6, h1: 242.0, note: "Hot-path reductions" }
+            { idx: 6, tag: "v0.0.1", h2: 402.9, h1: 261.6, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 369.1, h1: 264.0, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 461.4, h1: 266.4, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", h2: 381.3, h1: 270.7, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", h2: 418.6, h1: 265.2, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", h2: 370.1, h1: 248.5, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", h2: 446.9, h1: 250.9, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 456.0, h1: 246.4, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", h2: 443.2, h1: 267.2, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", h2: 549.7, h1: 284.3, note: "Hot-path reductions" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.1.12 re-measured 2026-11-08 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all ten builds), 3 rounds in rotated order, median shown. The lab has no XenForo database, so the page-cache workload is a 37 KB PHP fixture page through the real cache path and PHP is the bench.php fixture over the real lsphp. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. Per-round data: assets/release-sweep-2026-11-08.tsv; raw h2load logs, server logs and the bench driver: assets/release-sweep-2026-11-08/."
+          foot: "Every release from v0.0.1 to v0.1.12 re-measured 2026-11-08 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all ten builds), 3 rounds in rotated order, median shown. The lab has no XenForo database, so the page-cache workload is a 37 KB PHP fixture page through the real cache path and PHP is the bench.php fixture over the real lsphp. PHP for v0.0.1–v0.0.3 is cold-pool-ramp-bound (those builds grow their lsphp pool slowly from cold; warm, v0.0.1 sustains ~32k req/s), so read their PHP points as a floor, not steady state. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. Per-round data: assets/release-sweep-2026-11-08.tsv; raw h2load logs, server logs and the bench driver: assets/release-sweep-2026-11-08/."
         },
         {
           id: "c-php",
@@ -2272,23 +2272,23 @@
           ymax: 150,
           ystep: 50,
           pts: [
-            { idx: 6, tag: "v0.0.1", php: 15.2, cache: 98.8, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", php: 15.0, cache: 107.8, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", php: 15.1, cache: 105.5, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", php: 15.5, cache: 117.7, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", php: 15.1, cache: 119.3, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", php: 15.4, cache: 108.4, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", php: 15.3, cache: 108.1, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", php: 15.3, cache: 108.6, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", php: 15.6, cache: 132.1, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", php: 15.3, cache: 129.2, note: "Hot-path reductions" }
+            { idx: 6, tag: "v0.0.1", php: 0.6, cache: 94.6, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", php: 0.6, cache: 107.4, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", php: 0.6, cache: 98.7, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", php: 24.7, cache: 145.9, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", php: 24.6, cache: 124.7, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", php: 27.0, cache: 135.2, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", php: 26.9, cache: 154.6, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", php: 27.3, cache: 173.9, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", php: 27.3, cache: 396.0, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", php: 27.8, cache: 485.7, note: "Hot-path reductions" }
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
             { key: "cache", label: "httpjet page-cache hit H2 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.1.12 re-measured 2026-11-08 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all ten builds), 3 rounds in rotated order, median shown. The lab has no XenForo database, so the page-cache workload is a 37 KB PHP fixture page through the real cache path and PHP is the bench.php fixture over the real lsphp. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. Per-round data: assets/release-sweep-2026-11-08.tsv; raw h2load logs, server logs and the bench driver: assets/release-sweep-2026-11-08/."
+          foot: "Every release from v0.0.1 to v0.1.12 re-measured 2026-11-08 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all ten builds), 3 rounds in rotated order, median shown. The lab has no XenForo database, so the page-cache workload is a 37 KB PHP fixture page through the real cache path and PHP is the bench.php fixture over the real lsphp. PHP for v0.0.1–v0.0.3 is cold-pool-ramp-bound (those builds grow their lsphp pool slowly from cold; warm, v0.0.1 sustains ~32k req/s), so read their PHP points as a floor, not steady state. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. Per-round data: assets/release-sweep-2026-11-08.tsv; raw h2load logs, server logs and the bench driver: assets/release-sweep-2026-11-08/."
         }
       ];
 

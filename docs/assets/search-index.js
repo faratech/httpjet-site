@@ -933,7 +933,7 @@ window.DOCS_INDEX = [
    {
     "id": "timeline",
     "t": "Performance across builds — interactive presentation",
-    "kw": "h2load"
+    "kw": "h2load htaccess"
    },
    {
     "id": "attribution",

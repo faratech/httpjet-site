@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Lab loopback bench: server taskset 0-3 (--workers 4), h2load taskset 4-7, all 127.0.0.1.
+# Lab loopback bench (extended): server taskset 0-3 (--workers 4), h2load taskset 4-7, all 127.0.0.1.
+# 8 workloads x 10 tags x 3 rotated rounds. Raw h2load logs under $RAW/<tag>/.
 set -uo pipefail
+exec 9>/var/tmp/sweep/run.lock
+flock -n 9 || { echo "another lab phase is running; refusing to start" >&2; exit 1; }
 export PATH=/root/.cargo/bin:$PATH
 ROOT=/var/tmp/sweep
 LOGD=$ROOT/bench-logs; RAW=$ROOT/raw; mkdir -p "$LOGD" "$RAW"
@@ -43,6 +46,8 @@ bench_one() { # tag round
   $L --h1 -t 4 -c 100 -m 1 -n 100000 -H 'Host: windowsforum.com' https://windowsforum.com:18443/robots.txt > "$out/heavy-h1-r$round.log" 2>&1
   $L --h1 -t 4 -c 40 -m 1 -n 20000 -H 'Host: windowsforum.com' 'https://windowsforum.com:18443/admin/httpjet/bench.php?n=50' > "$out/php-h1-r$round.log" 2>&1
   $L -t 4 -c 32 -m 32 -n 30000 -H 'Host: windowsforum.com' -H "User-Agent: $BUA" -H 'Accept-Encoding: gzip, deflate, br, zstd' https://windowsforum.com:18443/cachebench.php > "$out/cache-h2-r$round.log" 2>&1
+  $L -t 4 -c 32 -m 10 -n 100000 -H 'Host: mcp.windowsforum.com' https://mcp.windowsforum.com:18443/__hjbench/empty.bin > "$out/empty-h2-r$round.log" 2>&1
+  $L -t 4 -c 32 -m 10 -n 20000 -H 'Host: mcp.windowsforum.com' https://mcp.windowsforum.com:18443/__hjbench/64k.bin > "$out/big-h2-r$round.log" 2>&1
   echo "done $tag round $round" >> "$LOGD/progress.log"
   kill $pid 2>/dev/null; wait $pid 2>/dev/null; sleep 2; rm -rf "$RD"
 }

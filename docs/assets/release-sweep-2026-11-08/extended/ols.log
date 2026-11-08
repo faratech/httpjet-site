@@ -1,0 +1,70 @@
+deb download failed; adding repo
+[OK] litespeed: pid=12719.
+2026-11-08 20:09:27.981248 [NOTICE] [12745] [*:8088] Worker #7 activates SO_REUSEPORT #7 socket, fd: 29
+2026-11-08 20:09:27.981254 [NOTICE] [12745] Stop listener *:7080, fd 22.
+2026-11-08 20:09:27.981288 [NOTICE] [12719] [AutoRestarter] new child process with pid=12746 is forked!
+2026-11-08 20:09:27.981344 [NOTICE] [12745] Successfully change current user to nobody
+2026-11-08 20:09:27.981350 [NOTICE] [12745] Core dump is enabled.
+2026-11-08 20:09:27.981358 [NOTICE] [12745] Setup swapping space...
+2026-11-08 20:09:27.981372 [NOTICE] [12745] LiteSpeed/1.9.4 Open starts successfully!
+2026-11-08 20:09:27.981478 [INFO] [12746] Close SO_REUSEPORT #1 fd: 23.
+2026-11-08 20:09:27.981493 [INFO] [12746] Close SO_REUSEPORT #2 fd: 24.
+2026-11-08 20:09:27.981494 [INFO] [12746] Close SO_REUSEPORT #3 fd: 25.
+2026-11-08 20:09:27.981495 [INFO] [12746] Close SO_REUSEPORT #4 fd: 26.
+2026-11-08 20:09:27.981496 [INFO] [12746] Close SO_REUSEPORT #5 fd: 27.
+2026-11-08 20:09:27.981497 [INFO] [12746] Close SO_REUSEPORT #6 fd: 28.
+2026-11-08 20:09:27.981499 [INFO] [12746] Close SO_REUSEPORT #7 fd: 29.
+2026-11-08 20:09:27.981500 [NOTICE] [12746] [*:8088] Worker #8 activates SO_REUSEPORT #8 socket, fd: 30
+2026-11-08 20:09:27.981506 [NOTICE] [12746] Stop listener *:7080, fd 22.
+2026-11-08 20:09:27.981599 [NOTICE] [12746] Successfully change current user to nobody
+2026-11-08 20:09:27.981605 [NOTICE] [12746] Core dump is enabled.
+2026-11-08 20:09:27.981613 [NOTICE] [12746] Setup swapping space...
+2026-11-08 20:09:27.981626 [NOTICE] [12746] LiteSpeed/1.9.4 Open starts successfully!
+Can't determine the Home of LiteSpeed Web Server, exit!
+[ERROR] Failed to start litespeed!
+Can't determine the Home of LiteSpeed Web Server, exit!
+[ERROR] Failed to start litespeed!
+2026-11-08 20:10:13.001748 [NOTICE] [12743] Event-loop lingering start.
+2026-11-08 20:10:13.001759 [NOTICE] [12743] Event-loop lingering done.
+2026-11-08 20:10:13.001760 [NOTICE] [12743] Shut down successfully! 
+2026-11-08 20:10:13.001761 [NOTICE] [12719] [AutoRestarter] child process with pid=12740 exited with status=0!
+2026-11-08 20:10:13.001765 [NOTICE] [12743] HttpServerImpl::releaseAll called.
+2026-11-08 20:10:13.001777 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12741 !
+2026-11-08 20:10:13.002851 [NOTICE] [12719] [AutoRestarter] child process with pid=12741 exited with status=0!
+2026-11-08 20:10:13.002868 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12742 !
+2026-11-08 20:10:13.003004 [NOTICE] [12719] [AutoRestarter] child process with pid=12742 exited with status=0!
+2026-11-08 20:10:13.003012 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12739 !
+2026-11-08 20:10:13.103078 [NOTICE] [12719] [AutoRestarter] child process with pid=12739 exited with status=0!
+2026-11-08 20:10:13.103099 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12743 !
+2026-11-08 20:10:13.203167 [NOTICE] [12719] [AutoRestarter] child process with pid=12743 exited with status=0!
+2026-11-08 20:10:13.203188 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12744 !
+2026-11-08 20:10:13.303289 [NOTICE] [12719] [AutoRestarter] child process with pid=12744 exited with status=0!
+2026-11-08 20:10:13.303311 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12745 !
+2026-11-08 20:10:13.403404 [NOTICE] [12719] [AutoRestarter] child process with pid=12745 exited with status=0!
+2026-11-08 20:10:13.403427 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12746 !
+2026-11-08 20:10:13.503521 [NOTICE] [12719] [AutoRestarter] child process with pid=12746 exited with status=0!
+2026-11-08 20:10:13.503538 [NOTICE] [12719] Server Stopped!
+Can't determine the Home of LiteSpeed Web Server, exit!
+[ERROR] Failed to start litespeed!
+Can't determine the Home of LiteSpeed Web Server, exit!
+[ERROR] Failed to start litespeed!
+2026-11-08 20:10:13.001748 [NOTICE] [12743] Event-loop lingering start.
+2026-11-08 20:10:13.001759 [NOTICE] [12743] Event-loop lingering done.
+2026-11-08 20:10:13.001760 [NOTICE] [12743] Shut down successfully! 
+2026-11-08 20:10:13.001761 [NOTICE] [12719] [AutoRestarter] child process with pid=12740 exited with status=0!
+2026-11-08 20:10:13.001765 [NOTICE] [12743] HttpServerImpl::releaseAll called.
+2026-11-08 20:10:13.001777 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12741 !
+2026-11-08 20:10:13.002851 [NOTICE] [12719] [AutoRestarter] child process with pid=12741 exited with status=0!
+2026-11-08 20:10:13.002868 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12742 !
+2026-11-08 20:10:13.003004 [NOTICE] [12719] [AutoRestarter] child process with pid=12742 exited with status=0!
+2026-11-08 20:10:13.003012 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12739 !
+2026-11-08 20:10:13.103078 [NOTICE] [12719] [AutoRestarter] child process with pid=12739 exited with status=0!
+2026-11-08 20:10:13.103099 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12743 !
+2026-11-08 20:10:13.203167 [NOTICE] [12719] [AutoRestarter] child process with pid=12743 exited with status=0!
+2026-11-08 20:10:13.203188 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12744 !
+2026-11-08 20:10:13.303289 [NOTICE] [12719] [AutoRestarter] child process with pid=12744 exited with status=0!
+2026-11-08 20:10:13.303311 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12745 !
+2026-11-08 20:10:13.403404 [NOTICE] [12719] [AutoRestarter] child process with pid=12745 exited with status=0!
+2026-11-08 20:10:13.403427 [NOTICE] [12719] [AutoRestarter] cleanup children processes and unix sockets belong to process 12746 !
+2026-11-08 20:10:13.503521 [NOTICE] [12719] [AutoRestarter] child process with pid=12746 exited with status=0!
+2026-11-08 20:10:13.503538 [NOTICE] [12719] Server Stopped!

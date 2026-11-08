@@ -34,6 +34,9 @@ You find every campaign below with regime, commit, and receipt name. The curve c
 
 Compare v0.0.1–v0.1.12 in the **Release Speed Curve**. Every release was re-measured on 2026-11-08 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: release-sweep-2026-11-08.tsv ; raw `h2load` logs, server logs and the bench driver: release-sweep-2026-11-08/ . (The earlier 2026-10-26 sweep of v0.0.1–v0.1.10 is archived .) Then step through **16 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
 
+        ⎁   One test, every version
+To keep this page simple, every version-to-version number comes from **one run under one set of conditions**: a dedicated lab VM (c4-highmem-8, the production machine type), loopback only, server pinned to 4 cores, `h2load` on the other 4, each release PGO-built from its tag the same way, same flags, same eight workloads, 3 rounds each, median shown. Before benching, every binary also had to pass the **same functional checks** (start, static file, `.htaccess` page, PHP page, cache hit, empty and 64 KiB files, config lint): lab-checks-2026-11-08.tsv . Numbers from *other* regimes — the dedicated-client server comparison, production telemetry, the dated build-history slides — are always labelled with their own conditions and are never mixed into the curve.
+
 ## Where the time actually goes
 
 > [Benchmark Chart: attribution — Where a production request spends its time (live sample · 2026-08-30 · mean request 9.99 ms)]
@@ -152,6 +155,10 @@ Re-run 2026-11-08: `h2load` + `wrk` check, **dedicated load-generator VM** (c4-h
 > [Benchmark Chart: dedicated-0112 — Dedicated load-generator client, three-way (httpjet 0.1.12) (c4-highcpu-8 client VM, same zone · full-host servers over VPC · h2load c=50 x100, 1M requests/cell · median of 3 rounds · 2026-11-08 · req/s)]
 
 `wrk` cross-check (H1, 1 KiB, c=100, 15 s): httpjet **540,911**, nginx 439,433, OpenLiteSpeed 341,344 req/s. Dedicated cells never compare with same-host rows. Compare August 2026 dedicated data: 891k empty-body.
+
+Same three servers, second regime: the lab VM re-run (loopback, server on 4 cores, loadgen on 4). Use it to compare httpjet releases against each other; the dedicated-client chart above stays the cross-server headline because it matches how LiteSpeed and nginx publish.
+
+> [Benchmark Chart: lab-threeway — Lab three-way, same-host loopback (httpjet vs nginx vs OpenLiteSpeed) (dedicated lab VM c4-highmem-8 · server cores 0-3 / loadgen cores 4-7 · h2load c=32 x10 (64 KiB: n=20k) · median of 3 rounds · 2026-11-08 · req/s)]
 
         ⎁   Honest caveats
 This build ran on a shared production host here. This section forms no A/B against `0.1.11`. The rows exercise memoized and fast-serve paths directly. They exercise cache-hit serving and logging too. Treat older dedicated-host comparisons as approximate. Full CSV receipts are published with the release on the benchmark page .

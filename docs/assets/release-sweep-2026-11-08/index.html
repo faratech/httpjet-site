@@ -1,72 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Release sweep 2026-11-08 — raw benchmark logs</title>
-<style>
-  body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#0b1220; color:#dbe7f3; margin:2rem auto; max-width:60rem; padding:0 1rem; line-height:1.55; }
-  a { color:#22d3ee; } h1 { font-size:1.3rem; } h2 { font-size:1.05rem; margin-top:2rem; }
-  table { border-collapse:collapse; } td,th { border:1px solid #263650; padding:.3rem .6rem; text-align:right; }
-  th:first-child, td:first-child { text-align:left; } .mini { color:#8fa8c0; font-size:.85em; }
-  code { color:#a5f3fc; }
-</style>
-</head>
-<body>
-<h1>Release sweep 2026-11-08 — raw logs</h1>
-<p>Every release from v0.0.1 to v0.1.12, re-measured under identical conditions on a
-dedicated lab VM (Google Cloud <code>c4-highmem-8</code>, Ubuntu 26.10, same machine type as the
-production x86 origin). No production host was loaded: the server and the load generator both ran
-inside the lab VM, over its own loopback, with the server pinned to cores 0–3 and
-<code>h2load</code> to cores 4–7.</p>
-<p>Each release was PGO-built from its public tag with one unified gather profile
-(Rust 1.99.1), then served with the current production flags (uniform for all ten builds —
-no per-build dropped flags; see <code>*.dropped</code> in the bench run, all empty).
-Three rounds per build in rotated order (round 2 reversed); the published curve shows medians.
-Fixtures are the repository bench fixtures: 1 KiB static file, <code>/robots.txt</code> through the
-real 806-line forum <code>.htaccess</code> chain, <code>bench.php?n=50</code> over the real
-<code>lsphp</code> (PHP 8.5.12), and a 37 KB PHP fixture page (<code>cachebench.php</code>) served
-through the real origin page cache — the lab has no XenForo database, so the cache workload is a
-fixture, not a forum page. TLS used a lab self-signed RSA-2048 certificate; heavy-<code>.htaccess</code>
-H2 is connection-bound on that certificate (~110k req/s for every build), so read its H1 line for trend.</p>
-<p>Per-round numbers: <a href="../release-sweep-2026-11-08.tsv">release-sweep-2026-11-08.tsv</a>.
-Driver: <a href="lab-bench.sh">lab-bench.sh</a> · provisioning: <a href="lab-setup.sh">lab-setup.sh</a> ·
-binary hashes: <a href="binaries.sha256">binaries.sha256</a> · run order: <a href="progress.log">progress.log</a> ·
-cache primes: <a href="prime.log">prime.log</a> · server logs: <code>serve-&lt;tag&gt;.log</code> beside this page.
-All 180 runs finished with zero 4xx/5xx responses.</p>
-<h2>Median results (k req/s, median of 3 rounds)</h2>
-<table>
-<tr><th>Build</th><th>Static H2</th><th>Static H1</th><th>Heavy H2</th><th>Heavy H1</th><th>PHP H1</th><th>Cache H2</th></tr>
-<tr><td>v0.0.1</td><td>414.3</td><td>225.2</td><td>112.9</td><td>205.8</td><td>15.2</td><td>98.8</td></tr>
-<tr><td>v0.0.2</td><td>363.0</td><td>221.3</td><td>114.7</td><td>209.4</td><td>15.0</td><td>107.8</td></tr>
-<tr><td>v0.0.3</td><td>398.7</td><td>243.3</td><td>110.5</td><td>207.2</td><td>15.1</td><td>105.5</td></tr>
-<tr><td>v0.0.9</td><td>386.0</td><td>236.3</td><td>114.4</td><td>204.2</td><td>15.5</td><td>117.7</td></tr>
-<tr><td>v0.0.10</td><td>392.4</td><td>251.4</td><td>106.7</td><td>209.1</td><td>15.1</td><td>119.3</td></tr>
-<tr><td>v0.1.2</td><td>446.2</td><td>239.6</td><td>109.0</td><td>208.6</td><td>15.4</td><td>108.4</td></tr>
-<tr><td>v0.1.5</td><td>422.3</td><td>238.0</td><td>107.8</td><td>200.7</td><td>15.3</td><td>108.1</td></tr>
-<tr><td>v0.1.10</td><td>393.3</td><td>246.6</td><td>111.9</td><td>200.8</td><td>15.3</td><td>108.6</td></tr>
-<tr><td>v0.1.11</td><td>440.9</td><td>222.0</td><td>111.2</td><td>201.1</td><td>15.6</td><td>132.1</td></tr>
-<tr><td>v0.1.12</td><td>424.6</td><td>242.0</td><td>110.1</td><td>201.0</td><td>15.3</td><td>129.2</td></tr>
+<style>body{font-family:ui-monospace,Menlo,monospace;background:#0b1220;color:#dbe7f3;margin:2rem auto;max-width:64rem;padding:0 1rem;line-height:1.55}a{color:#22d3ee}table{border-collapse:collapse}td,th{border:1px solid #263650;padding:.3rem .6rem;text-align:right}th:first-child,td:first-child{text-align:left}.mini{color:#8fa8c0;font-size:.85em}code{color:#a5f3fc}</style>
+</head><body>
+<h1>Release sweep 2026-11-08 — raw logs and checks</h1>
+<p>Every release from v0.0.1 to v0.1.12, measured under <strong>identical conditions</strong> on a dedicated lab VM
+(Google Cloud <code>c4-highmem-8</code>, Ubuntu 26.10 — the production x86 origin's machine type). No production host was loaded:
+server and load generator both ran inside the VM, over its loopback, server pinned to cores 0-3
+(<code>--workers 4</code>), <code>h2load</code> to cores 4-7. Each release was PGO-built from its tag with one
+unified gather profile (Rust 1.99.1) and served with uniform production flags. Three rounds per build in
+rotated order; tables show medians. Per-round data: <a href="../release-sweep-2026-11-08.tsv">release-sweep-2026-11-08.tsv</a>.</p>
+<p>Workloads: <code>static</code> = 1 KiB file (h2 c=32 m=10 / h1 c=100); <code>empty</code> = 0-byte file (h2);
+<code>big</code> = 64 KiB file (h2, n=20k); <code>heavy</code> = <code>/robots.txt</code> through the real 806-line forum
+<code>.htaccess</code> chain; <code>php</code> = <code>bench.php?n=50</code> over the real <code>lsphp</code> (h1 c=40);
+<code>cache</code> = 37 KB PHP fixture page (<code>cachebench.php</code>) through the real origin page cache (h2 c=32 m=32) —
+the lab has no XenForo database, so the cache workload is a fixture, not a forum page. PHP for v0.0.1–v0.0.3 measures cold-pool ramp: those builds grow their lsphp pool slowly from cold (single request ~3 ms; warm pool ~32k req/s on v0.0.1 — see <code>extended/php-warm-v0.0.1.log</code>).
+TLS used a lab self-signed RSA-2048 certificate; heavy H2 is connection-bound on it (~110k for every build), so read its H1 line for trend.</p>
+<h2>Median results (k req/s)</h2>
+<table><tr><th>Build</th><th>static-h2</th><th>static-h1</th><th>heavy-h2</th><th>heavy-h1</th><th>php-h1</th><th>cache-h2</th><th>empty-h2</th><th>big-h2</th></tr>
+<tr><td>v0.0.1</td><td>402.9</td><td>261.6</td><td>362.5</td><td>230.0</td><td>0.6</td><td>94.6</td><td>504.2</td><td>81.4</td></tr>
+<tr><td>v0.0.2</td><td>369.1</td><td>264.0</td><td>387.3</td><td>230.8</td><td>0.6</td><td>107.4</td><td>437.4</td><td>75.0</td></tr>
+<tr><td>v0.0.3</td><td>461.4</td><td>266.4</td><td>292.9</td><td>222.0</td><td>0.6</td><td>98.7</td><td>464.5</td><td>74.2</td></tr>
+<tr><td>v0.0.9</td><td>381.3</td><td>270.7</td><td>386.4</td><td>235.7</td><td>24.7</td><td>145.9</td><td>518.5</td><td>86.1</td></tr>
+<tr><td>v0.0.10</td><td>418.6</td><td>265.2</td><td>365.4</td><td>234.9</td><td>24.6</td><td>124.7</td><td>453.3</td><td>72.4</td></tr>
+<tr><td>v0.1.2</td><td>370.1</td><td>248.5</td><td>349.7</td><td>222.7</td><td>27.0</td><td>135.2</td><td>538.6</td><td>77.8</td></tr>
+<tr><td>v0.1.5</td><td>446.9</td><td>250.9</td><td>334.4</td><td>246.0</td><td>26.9</td><td>154.6</td><td>478.5</td><td>88.5</td></tr>
+<tr><td>v0.1.10</td><td>456.0</td><td>246.4</td><td>363.7</td><td>225.5</td><td>27.3</td><td>173.9</td><td>491.3</td><td>87.9</td></tr>
+<tr><td>v0.1.11</td><td>443.2</td><td>267.2</td><td>355.0</td><td>233.5</td><td>27.3</td><td>396.0</td><td>508.1</td><td>90.7</td></tr>
+<tr><td>v0.1.12</td><td>549.7</td><td>284.3</td><td>425.8</td><td>253.0</td><td>27.8</td><td>485.7</td><td>600.5</td><td>104.0</td></tr>
 </table>
-<p class="mini">Workloads: static = 1 KiB file, h2 c=32 m=10 / h1 c=100; heavy = /robots.txt through the
-806-line chain, same shapes; php = bench.php?n=50, h1 c=40; cache = cachebench.php page-cache hit, h2 c=32 m=32.
-Round spreads overlap between neighbouring builds on most workloads; treat small median gaps as noise.</p>
-<h2>Raw h2load logs</h2>
-<p id="links">Generating links…</p>
+<p class="mini">Round spreads overlap between neighbouring builds on most workloads; treat small median gaps as noise.</p>
+<h2>Functional checks (same harness, every version)</h2>
+<p>Each binary was started fresh and given the same requests. Full table:
+<a href="../lab-checks-2026-11-08.tsv">lab-checks-2026-11-08.tsv</a>; per-version logs in <code>checks/</code>.</p>
+<table><tr><th>tag</th><th>binary</th><th>match</th><th>static</th><th>heavy</th><th>php</th><th>cache hit</th><th>empty</th><th>64k</th><th>config check</th></tr>
+<tr><td>v0.0.1</td><td>0.0.1</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.0.2</td><td>0.0.2</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.0.3</td><td>0.0.3</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.0.9</td><td>0.0.9</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.0.10</td><td>0.0.10</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.2</td><td>0.1.2</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.5</td><td>0.1.5</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.10</td><td>0.1.10</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.11</td><td>0.1.11</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.12</td><td>0.1.12</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+</table>
+<h2>Files</h2>
+<p><code>raw/&lt;tag&gt;/</code> — 240 raw <code>h2load</code> logs (8 workloads x 3 rounds per build) ·
+<code>extended/</code> — three-way (nginx/OpenLiteSpeed) + <code>perf stat</code> raw output ·
+<code>checks/</code> — per-version check logs · <code>bench-logs/</code> — server logs, primes, run order.</p>
+<p id="links">Generating file links…</p>
 <script>
-  var tags = ["v0.0.1","v0.0.2","v0.0.3","v0.0.9","v0.0.10","v0.1.2","v0.1.5","v0.1.10","v0.1.11","v0.1.12"];
-  var wls = ["static-h2","static-h1","heavy-h2","heavy-h1","php-h1","cache-h2"];
-  var h = "";
-  tags.forEach(function (t) {
-    h += "<strong>" + t + "</strong>: ";
-    wls.forEach(function (w) {
-      h += w + " ";
-      for (var r = 1; r <= 3; r++) h += '<a href="' + t + "/" + w + "-r" + r + '.log">r' + r + "</a> ";
-      h += "· ";
-    });
-    h += '<a href="serve-' + t + '.log">server log</a><br>';
+var tags = ['v0.0.1', 'v0.0.2', 'v0.0.3', 'v0.0.9', 'v0.0.10', 'v0.1.2', 'v0.1.5', 'v0.1.10', 'v0.1.11', 'v0.1.12'];
+var wls = ['static-h2', 'static-h1', 'heavy-h2', 'heavy-h1', 'php-h1', 'cache-h2', 'empty-h2', 'big-h2'];
+var h = "";
+tags.forEach(function (t) {
+  h += "<strong>" + t + "</strong>: ";
+  wls.forEach(function (w) {
+    h += w + " ";
+    for (var r = 1; r <= 3; r++) h += '<a href="raw/' + t + "/" + w + "-r" + r + '.log">r' + r + "</a> ";
+    h += "· ";
   });
-  document.getElementById("links").innerHTML = h;
+  h += '<a href="checks/' + t + '.log">check log</a><br>';
+});
+document.getElementById("links").innerHTML = h;
 </script>
-</body>
-</html>
+</body></html>

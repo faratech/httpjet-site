@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261108i'
+VERSION = '20261108j'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -131,6 +131,10 @@ CHARTS = {
    ['httpjet', 'OpenLiteSpeed', 'nginx'],
    [('h2 empty', [1182.7, 892.1, 388.0]), ('h2 1 KiB', [1097.1, 740.3, 319.2]), ('h1 1 KiB (h2load)', [427.0, 302.6, 346.8])],
    'Same tools and topology as the published LiteSpeed/nginx benchmarks: h2load on a separate client, servers unpinned on the full host. wrk cross-check (h1 1 KiB, c=100, 15 s): httpjet 540,911, nginx 439,433, OpenLiteSpeed 341,344 req/s.'),
+ 'lab-threeway': ('Lab three-way, same-host loopback (httpjet vs nginx vs OpenLiteSpeed)', 'dedicated lab VM c4-highmem-8 \u00b7 server cores 0-3 / loadgen cores 4-7 \u00b7 h2load c=32 x10 (64 KiB: n=20k) \u00b7 median of 3 rounds \u00b7 2026-11-08 \u00b7 req/s', 'k rps',
+   ['httpjet v0.1.11', 'httpjet v0.1.12', 'nginx'],
+   [('h2 empty', [494.0, 592.6, 274.2]), ('h2 1 KiB', [538.7, 516.9, 190.4]), ('h2 64 KiB', [98.1, 82.2, 45.0]), ('h1 1 KiB (h2load)', [263.7, 255.8, 210.6]), ('h2 /robots.txt (.htaccess chain*)', [403.3, 449.4, 208.4])],
+   'Loopback lab numbers, not a capacity claim. *Only httpjet runs the full 806-line .htaccess chain; nginx ignores .htaccess and OpenLiteSpeed applies its subset, so that row is not like-for-like. wrk cross-check (h1 1 KiB, c=100, 15 s): httpjet v0.1.11 303,327, httpjet v0.1.12 328,224, nginx 270,166 req/s. Raw logs: assets/release-sweep-2026-11-08/ ../extended in the lab results; per-round data: assets/lab-threeway-2026-11-08.tsv.'),
  'cache-vs-php': ('One forum page: cache hit vs full PHP render', 'HTTPS loopback · PGO · 152 KB page · req/s', 'rps',
    ['requests / s'],
    [('page-cache HIT (p50 2 ms)', [19215]), ('full DB-backed PHP render (p50 34 ms)', [480])],

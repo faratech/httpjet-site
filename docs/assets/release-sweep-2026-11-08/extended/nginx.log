@@ -1,0 +1,14 @@
+2026/11/08 20:08:44 [emerg] 11987#11987: getgrnam("nobody") failed in /var/tmp/lab/nginx.conf:1
+nginx: configuration file /var/tmp/lab/nginx.conf test failed
+nginx: the configuration file /var/tmp/lab/nginx.conf syntax is ok
+nginx: [warn] 4096 worker_connections exceed open file resource limit: 1024
+nginx: configuration file /var/tmp/lab/nginx.conf test is successful
+nginx: [warn] 4096 worker_connections exceed open file resource limit: 1024
+nginx: the configuration file /var/tmp/lab/nginx.conf syntax is ok
+nginx: [warn] 4096 worker_connections exceed open file resource limit: 1024
+nginx: configuration file /var/tmp/lab/nginx.conf test is successful
+nginx: [warn] 4096 worker_connections exceed open file resource limit: 1024
+nginx: the configuration file /var/tmp/lab/nginx.conf syntax is ok
+nginx: [warn] 4096 worker_connections exceed open file resource limit: 1024
+nginx: configuration file /var/tmp/lab/nginx.conf test is successful
+nginx: [warn] 4096 worker_connections exceed open file resource limit: 1024
