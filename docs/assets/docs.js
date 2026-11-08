@@ -1885,6 +1885,37 @@
           "The memo keeps the native entry's exact freshness, Age and purge fences, so a purge or expiry revokes it immediately (--no-page-cache-response-memo disables; the old opt-in flag still parses).",
           "The release also removes the retired Beeper/eBPF kernel-fastpath experiment and clears the remaining panic-ratchet sites in the H1 and H3 send paths."
         ]
+      },
+      {
+        id: "b16", tag: "v0.1.12", short: "Hot-Path Reductions", date: "2026-11-08", commit: "85b99e16", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
+        regime: "paired run · live production host · server pinned to 4 cores, loadgen on 4 · production PGO binaries (bin/httpjet.prev vs bin/httpjet) · median of 3 rounds · live traffic present",
+        title: "v0.1.12 — Hot-Path Allocation & Contention Reductions",
+        summary: "Borrowed vhost routing, a single-pass fast-serve header scan, HPACK header-name reuse, batched request IDs, sharded telemetry counters and page-cache diskstore/metablob refinements. Static throughput rises double digits; cache-hit and heavy-rewrite medians sit within the (wide) round spread on a shared host.",
+        kpis: [
+          { v: "+13.8%", d: "RPS", n: false, l: "HTTP/2 static 1 KiB, c=32 x10 (525.0k -> 597.4k)" },
+          { v: "+10.7%", d: "RPS", n: false, l: "HTTP/1.1 static 1 KiB, c=100 (197.6k -> 218.7k)" },
+          { v: "+3.3%", d: "RPS", n: false, l: "PHP/LSAPI fixture, H1 c=40 (31.5k -> 32.6k)" },
+          { v: "-4.5%", d: "RPS (noise)", n: true, l: "Page-cache hits H2 c=32 x32 (105.3k -> 100.6k); heavy-rewrite H2 -5.0% with a 377k-461k round spread" }
+        ],
+        chart: {
+          title: "v0.1.12 vs v0.1.11, Paired Loopback (k req/s)",
+          sub: "live production host · server 4 cores / loadgen 4 cores · median of 3 rounds · production PGO binaries",
+          unit: "k rps",
+          series: ["v0.1.11", "v0.1.12"],
+          rows: [
+            ["Static 1 KiB H2 c=32x10", [525.0, 597.4]],
+            ["Static 1 KiB H1 c=100", [197.6, 218.7]],
+            ["Heavy .htaccess H2 c=32x10", [436.1, 414.3]],
+            ["Heavy .htaccess H1 c=100", [187.0, 183.8]],
+            ["PHP/LSAPI H1 c=40", [31.5, 32.6]],
+            ["Page-cache hit H2 c=32x32", [105.3, 100.6]]
+          ],
+          foot: "Absolute loopback numbers on a shared production host, not a capacity claim. Three-way c=50 receipts (nginx/OpenLiteSpeed) and the CSV set are on the benchmark page and in the Release 0.1.12 section above."
+        },
+        notes: [
+          "No flags or configuration changed; the wire behavior is unchanged (fast-memo parity gate: 192 cells, zero diffs, before deployment).",
+          "Deployed to both production origins on 2026-11-08 after the full cache-gate set passed (cross-URL, cross-scheme, cross-host, private-tier, capsule purge, kill-shot)."
+        ]
       }
     ];
 
@@ -2040,7 +2071,7 @@
       return out.join("");
     }
 
-    var curIdx = BUILDS.length - 1; /* start on latest build v0.1.10 or allow user to step from 0 */
+    var curIdx = BUILDS.length - 1; /* start on latest build v0.1.12 or allow user to step from 0 */
     curIdx = 0; /* start at slide 1 (0.0.1) so the user can step chronologically through the story */
     var curMode = "deck";
     var curLens = 0;
@@ -2194,14 +2225,16 @@
             { idx: 10, tag: "v0.0.10", h2: 354.4, h1: 236.4, note: "TLS idle + dict L3" },
             { idx: 11, tag: "v0.1.2", h2: 464.6, h1: 201.8, note: "Recycled task pools" },
             { idx: 12, tag: "v0.1.5", h2: 461.3, h1: 232.5, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 481.6, h1: 233.6, note: "Bug/perf bash" }
+            { idx: 13, tag: "v0.1.10", h2: 481.6, h1: 233.6, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", h2: 436.1, h1: 187.0, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", h2: 414.3, h1: 183.8, note: "Hot-path reductions" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides."
+          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. v0.1.11 and v0.1.12 points were added 2026-11-08 from a paired run on the live production host under the same workload shapes and 4-core/4-core split (production PGO binaries bin/httpjet.prev and bin/httpjet, median of 3 rounds, live traffic present); read that pair against each other, not as continuous with the 2026-10-26 sweep."
         },
         {
           id: "c-static",
@@ -2219,14 +2252,16 @@
             { idx: 10, tag: "v0.0.10", h2: 426.0, h1: 255.0, note: "TLS idle + dict L3" },
             { idx: 11, tag: "v0.1.2", h2: 605.7, h1: 225.3, note: "Recycled task pools" },
             { idx: 12, tag: "v0.1.5", h2: 593.4, h1: 258.1, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 585.5, h1: 256.8, note: "Bug/perf bash" }
+            { idx: 13, tag: "v0.1.10", h2: 585.5, h1: 256.8, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", h2: 525.0, h1: 197.6, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", h2: 597.4, h1: 218.7, note: "Hot-path reductions" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides."
+          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. v0.1.11 and v0.1.12 points were added 2026-11-08 from a paired run on the live production host under the same workload shapes and 4-core/4-core split (production PGO binaries bin/httpjet.prev and bin/httpjet, median of 3 rounds, live traffic present); read that pair against each other, not as continuous with the 2026-10-26 sweep."
         },
         {
           id: "c-php",
@@ -2244,14 +2279,16 @@
             { idx: 10, tag: "v0.0.10", php: 28.9, cache: 83.4, note: "TLS idle + dict L3" },
             { idx: 11, tag: "v0.1.2", php: 34.6, cache: 94.1, note: "Recycled task pools" },
             { idx: 12, tag: "v0.1.5", php: 30.9, cache: 94.6, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", php: 33.2, cache: 98.2, note: "Bug/perf bash" }
+            { idx: 13, tag: "v0.1.10", php: 33.2, cache: 98.2, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", php: 31.5, cache: 105.3, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", php: 32.6, cache: 100.6, note: "Hot-path reductions" }
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
             { key: "cache", label: "httpjet page-cache hit H2 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides."
+          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. v0.1.11 and v0.1.12 points were added 2026-11-08 from a paired run on the live production host under the same workload shapes and 4-core/4-core split (production PGO binaries bin/httpjet.prev and bin/httpjet, median of 3 rounds, live traffic present); read that pair against each other, not as continuous with the 2026-10-26 sweep."
         }
       ];
 

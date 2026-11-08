@@ -126,16 +126,16 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>), the <code>0.1.10</code> bug/perf release, the <code>0.1.11</code> defaults release and the <code>0.1.12</code> hot-path release are recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>. Use the <strong>Release Speed Curve</strong> below to compare every release from v0.0.1 to v0.1.10, each PGO-built from its tag and measured side by side on 2026-10-26 under identical conditions (raw results: <a href="assets/release-sweep-2026-10-26.tsv">release-sweep-2026-10-26.tsv</a>), or step through the <strong>15 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
+      <p>Every benchmark campaign from the initial Phase 1–7 baseline (<code>0.0.1</code>, June 2026) through the October 2026 zero-fault pooling release (<code>v0.1.5</code>), the <code>0.1.10</code> bug/perf release, the <code>0.1.11</code> defaults release and the <code>0.1.12</code> hot-path release are recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>. Use the <strong>Release Speed Curve</strong> below to compare every release from v0.0.1 to v0.1.10, each PGO-built from its tag and measured side by side on 2026-10-26 under identical conditions (raw results: <a href="assets/release-sweep-2026-10-26.tsv">release-sweep-2026-10-26.tsv</a>); the v0.1.11 and v0.1.12 points were added 2026-11-08 from a paired run of the two production PGO binaries under the same workload shapes and core split. Step through the <strong>16 build slides</strong>, <strong>Workload Trajectories</strong>, and <strong>Build-vs-Build Diff</strong>.</p>
 
-      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve: every release from v0.0.1 to v0.1.10 measured under identical conditions">
+      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve: every release from v0.0.1 to v0.1.12 (v0.1.11 and v0.1.12 from a paired 2026-11-08 run)">
         <div class="bexp__curve"></div>
       </div>
 
       <div class="bexp" id="build-explorer" tabindex="0" aria-label="Interactive performance across builds presentation">
         <div class="bexp__interactive"></div>
         <div class="bexp__fallback">
-          <p class="mini">Enable JavaScript for the interactive slide deck, cross-build trajectory charts, and build-vs-build comparator. All 15 builds are listed in the <a href="#build-ledger">complete receipts ledger</a> below.</p>
+          <p class="mini">Enable JavaScript for the interactive slide deck, cross-build trajectory charts, and build-vs-build comparator. All 16 builds are listed in the <a href="#build-ledger">complete receipts ledger</a> below.</p>
         </div>
       </div>
     </section>
@@ -385,6 +385,11 @@
               <td class="wrap"><code>--uring-ring coop</code> and the page-cache response memo became defaults. Cookieless H2 page-cache hits: throughput <strong><code>+27.6%</code></strong>, CPU/req <strong><code>&minus;26.7%</code></strong>, p50 <strong><code>&minus;36%</code></strong>, p99 <strong><code>&minus;32%</code></strong>; cookied hits CPU/req <code>&minus;4.4%</code>; static 1 KiB neutral; RSS <code>+~2 MB</code>. <span class="mini">Relative A/B of flag defaults, not production throughput. Receipt: source commit <code>54df571f</code>.</span></td>
             </tr>
             <tr data-group="zerofault">
+              <th><code>v0.1.12</code> &middot; Hot-Path Allocation &amp; Contention Reductions<span class="mini">2026-11-08 &middot; <code>85b99e16</code></span></th>
+              <td class="def">paired run<br><span class="mini">live production host, server 4 cores / loadgen 4 cores</span></td>
+              <td class="wrap">Borrowed vhost routing, single-pass fast-serve header scan, HPACK header-name reuse, sharded telemetry counters, page-cache diskstore/metablob refinements. Paired against v0.1.11 (median of 3 rounds): static 1 KiB H2 <strong>525.0k &rarr; 597.4k (<code>+13.8%</code>)</strong>, static H1 <strong>197.6k &rarr; 218.7k (<code>+10.7%</code>)</strong>, PHP/LSAPI <strong>31.5k &rarr; 32.6k (<code>+3.3%</code>)</strong>; page-cache hits <strong>105.3k &rarr; 100.6k</strong> and heavy-<code>.htaccess</code> H2 <strong>436.1k &rarr; 414.3k</strong> are within the shared-host round spread. Three-way c=50: H2 1 KiB <strong>371,540</strong> (nginx 180,940; OLS 399,505). <span class="mini">Receipts: <code>*-v0112-20261108.csv</code> on the <a href="https://windowsforum.com/admin/httpjet/benchmarks/">benchmark page</a>; paired curve addendum 2026-11-08</span></td>
+            </tr>
+            <tr data-group="zerofault">
               <th><code>experiment</code> &middot; H3 GSO Segment Cap<span class="mini">SINGULARITY &middot; same-binary A/B</span></th>
               <td class="def">H3 32 KiB, 100k req/arm<br><span class="mini">GSO cap 10 vs 20</span></td>
               <td class="wrap">Static <code>6,052 &rarr; 7,816/6,552 rps</code> (p99 <code>49.5 &rarr; 33.9 ms</code>), page-cache <code>6,135 &rarr; 7,063/7,360 rps</code>, <code>sendmsg</code> calls <code>&minus;44.6%</code> — but system CPU dominates and instructions/response moved <code>&lt;1%</code>, so the default stays at 10. <span class="mini">Receipt: <code>docs/h3-gso-segment-experiment.md</code> in the source tree</span></td>
@@ -408,6 +413,6 @@
     <div class="search-res"></div>
   </div>
 </div>
-<script defer src="assets/docs.min.js?v=20261108c"></script>
+<script defer src="assets/docs.min.js?v=20261108d"></script>
 </body>
 </html>
