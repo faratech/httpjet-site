@@ -18,6 +18,7 @@ httpjet is fast — and these docs are strict about *where* the time goes. Every
         1.55 IPC   h2 hit path at saturation, June 2026 (hardware counters)
         0.0002 flt   v0.1.5 h2 static minor page faults/req
         0 / 80   metric rows worse, 0.1.10 vs 0.1.5 (controlled A/B)
+        +27.6 %   h2 page-cache hit RPS, 0.1.11 defaults (coop ring + response memo, x86 ABBA)
 
 ## Read the regime, not just the number
 
@@ -29,7 +30,7 @@ A loopback benchmark removes the network, real TLS handshakes and the CDN — it
 
 ## Performance across builds — interactive presentation
 
-Every benchmark campaign from the initial Phase 1–7 baseline (`0.0.1`, June 2026) through the October 2026 zero-fault pooling release (`v0.1.5`) and the `0.1.10` bug/perf release is recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at github.com/faratech/httpjet . Use the **Release Speed Curve** below to compare every release from v0.0.1 to v0.1.10, each PGO-built from its tag and measured side by side on 2026-10-26 under identical conditions (raw results: release-sweep-2026-10-26.tsv ), or step through the **14 build slides**, **Workload Trajectories**, and **Build-vs-Build Diff**.
+Every benchmark campaign from the initial Phase 1–7 baseline (`0.0.1`, June 2026) through the October 2026 zero-fault pooling release (`v0.1.5`), the `0.1.10` bug/perf release, the `0.1.11` defaults release and the `0.1.12` hot-path release are recorded below with its regime, development-tree commit and receipt name; the CSV receipts and the results log are not part of the public source export at github.com/faratech/httpjet . Use the **Release Speed Curve** below to compare every release from v0.0.1 to v0.1.10, each PGO-built from its tag and measured side by side on 2026-10-26 under identical conditions (raw results: release-sweep-2026-10-26.tsv ), or step through the **15 build slides**, **Workload Trajectories**, and **Build-vs-Build Diff**.
 
 ## Loopback throughput
 
@@ -75,6 +76,64 @@ Static-file CPU per request is up 1–2%, which is within the measurement noise.
 Measured against `0.1.9` alone, the `0.1.10` review changes CPU per request by **−4.7%** on uncached PHP, **−4.3%** on beacon POSTs, **−4.2%** on cookied page-cache serves and **−1.8%** on h2 cache hits. Microbenchmarks behind that: HPACK header-block encode went from **4.73 µs to 1.34 µs** (word-at-a-time Huffman plus a long-literal memo), and cookie `SetEnvIf` evaluation on the production `.htaccess` from **29 µs to 1 µs** (lookahead conjunctions now run in linear time).
 
 The release also fixes a live bug: under systemd `RestrictSUIDSGID=yes`, `openat2` returns `ENOSYS` and static files of a sandboxed vhost answered 404. A component-by-component no-follow walk now resolves beneath the docroot, and a transient unit with that option confirmed it (`0.1.9`: 404, `0.1.10`: 200).
+
+## Release 0.1.11: two defaults flipped on
+
+The `0.1.11` release (November 7, 2026) makes two measured optimizations the **default** instead of opt-in flags: the `coop` io_uring ring setup (`--uring-ring coop`; `legacy`/`defer` stay selectable) and the per-worker **response memo** for finalized public page-cache hits (`--no-page-cache-response-memo` turns it off; the old `--page-cache-response-memo` opt-in still parses). The ARM origin already ran both; the x86 origin ran neither.
+
+An alt-port ABBA on x86 (same build, flags on vs off, both orders) measured the pair on the dominant production shape:
+
+| Workload | Throughput | p50 | p99 | CPU / request | RSS |
+
+| Cookieless H2 page-cache hits | **+27.6%** | **−36%** | **−32%** | **−26.7%** | +~2 MB |
+
+| Cookied page-cache hits | – | – | – | −4.4% | – |
+
+| Static 1 KiB | neutral (within noise) |
+
+        ⎁   Honest caveats
+This is a *relative* loopback A/B of two flag defaults on one x86 host, not a new absolute throughput record — the ~908k req/s h2 static figure above is unchanged. On aarch64 the `coop` ring alone was neutral against `legacy`. The memo only retains cookieless public GET hits and keeps the native entry's exact freshness, Age and purge fences, so a purge or expiry revokes it immediately; correctness gates (40 memo-focused tests, a pipeline purge-revocation test, and 24 H1/H2 smoke arms plus 4 H3 arms that must record real memo hits) ran before the default flipped.
+
+The release also removes the retired Beeper/eBPF kernel-fastpath experiment code, adopts the ARM canary source for the voidrune origin, and clears the remaining panic-ratchet sites in the H1 and H3 send paths. Packaging fixes that followed in the same release line (musl release build, H3 dispatch stack use, Gentoo `DIGESTS` parsing) do not change serving behavior.
+
+The memo half of the pair was also measured on its own, as instructions per request on a frozen non-PGO binary (SINGULARITY loopback, 1 KiB public-cache hits, 500k responses per arm, off/on/on/off):
+
+| Protocol | Memo off (instr/req) | Memo on (instr/req) | Change |
+
+| H1 plaintext | 60,337 | 30,811 | **−48.9%** |
+
+| H1 TLS | 72,720 | 40,561 | **−44.2%** |
+
+| H2 plaintext | 65,975 | 36,621 | **−44.5%** |
+
+| H2 TLS | 72,742 | 41,532 | **−42.9%** |
+
+| H3 | 98,293 | 68,024 | **−30.8%** |
+
+Instructions are user-mode PMU counts over warmup + measurement; they show less native cache-hit work, not a whole-machine CPU saving, and throughput/tails in that run were mixed under unrelated compiler load — which is why the shipped claim above rests on the x86 ABBA, not this table. Source: `docs/pagecache-response-memo-experiment.md` in the source tree.
+
+## Release 0.1.12: hot-path allocation and contention reductions
+
+The `0.1.12` release (November 8, 2026) reduces per-request allocation and lock contention on the serving hot paths: borrowed vhost routing (`Router::resolve_ref`), a single-pass fast-serve header scan, HPACK header-name reuse, batched request IDs and cached HTTP dates, sharded telemetry and fast-bridge counters, page-cache diskstore/metablob refinements, and allocation-light access-log rendering. No flag or configuration changes are required; the wire behavior is unchanged (the fast-memo parity gate compared memo-on against memo-off byte-for-byte over 192 cells with zero diffs before deployment).
+
+Loopback throughput on the production x86_64 host (PGO build, 8 cores, live production traffic on the same host — directional, not a capacity claim), measured 2026-11-08 with the standard bench suites:
+
+| Workload (c50 unless noted) | httpjet 0.1.12 | nginx | OpenLiteSpeed |
+
+| HTTP/2 static 1 KiB | **371,540 req/s** | 180,940 req/s | 399,505 req/s |
+
+| HTTP/1.1 static 1 KiB | **195,446 req/s** | 117,979 req/s | 201,306 req/s |
+
+| HTTP/2 static 64 KiB | **68,689 req/s** | 35,063 req/s | — |
+
+| Heavy `.htaccess` vhost, HTTP/2 (c100) | **271,118 req/s** | 131,955 req/s | 333,519 req/s |
+
+| Warm page-cache hit, HTTP/2 (c32/m32) | **110,158 req/s** | — | — |
+
+| Warm page-cache hit, HTTP/1.1 (c100) | **80,025 req/s** | — | — |
+
+        ⎁   Honest caveats
+These are absolute loopback numbers for this build on a shared production host, not an A/B against `0.1.11`: the changed paths (memoized/fast-serve serves, cache-hit serving, logging) are exactly the ones the rows above exercise, but treat the comparison against the older dedicated-host baselines elsewhere on this page as approximate. Full CSV receipts are published with the release on the benchmark page .
 
 ## The origin cache result
 
@@ -164,4 +223,16 @@ Filter by build tag, commit, workload, regime, or CSV receipt file across all 14
 
 | `v0.1.5` · BODY_BUFS 2026-10-24 · `16ed92f9` | perf stat PGO x86 + ARM64 | `BODY_BUFS` `TieredPool >` frozen via `Bytes::from_owner`, zero-copy LSAPI `PacketReader` slices, `spawn_blocking` variant/dict fills, per-thread `PageDict` `DCtx`, `MAP_POPULATE` tmpfs mmaps, and per-core TLS record size-class retention: streamed 117 KB `/login/` H2 faults/req dropped **`1.80 → 0.106 (−94%)`**, W1 cache hit **`0.0325 → 0.0005`**, W3s1 1 KiB **`0.185 → 0.0002`**, and 500-URL miss→store RSS dropped **`165–195 MB → 125–132 MB`**. Receipt: PR `#1163` (`16ed92f9`) |
 
+| `v0.1.6` · Prod-Weighted Egress-at-Rest 2026-10-25 · `8938bea` | prod-weighted ABBA voidrune ARM + x86 | Production cost profile first: voidrune `3.7 ms/req` vs x86 `0.65 ms/req` (egress 25%, dict encode 23%, store 16% of voidrune cost). Egress-at-rest on a cookieless miss→store: instructions/req **`−39.9%`** [`0.6005, 0.6022`], CPU/req `−31.4%`, RSS `−23%` (never-store bound `−46.7%`). Receipt: `RESULTS.md` 2026-10-25 (0.1.6), `docs/performance/BASELINE.md` |
+
+| `v0.1.7` · Egress-at-Rest x86 + HPACK Huffman 2026-10-25 · `6885820` | same-binary flag off/on, both orders admission threshold 1 | Miss→store CPU/req **`−61%`** (throughput `+14.6%`), warmer burst CPU/req `−36.4%`, hits `±1.3%`, RSS `−12..−13%`. Cache-resident HPACK Huffman table: cold decode x86 `16.6 → 4.6 µs`, voidrune `~32 → 8 µs`. Receipt: `RESULTS.md` 2026-10-25 (0.1.7) |
+
+| `v0.1.8` · LSAPI Header Dedupe 2026-10-25 · `4eefffd` | microbench + W2 ABBA same-binary kill switch | Each request header reaches `lsphp` once: env+block+encode `5.7 → 4.2 µs` (`−26%`), `BEGIN_REQUEST` `2,993 → 2,009 B`, env pairs `41 → 21`; W2 CPU/req `−1.4%` (below tau), 0 rows worse. Receipt: `RESULTS.md` 2026-10-25 (0.1.8) |
+
+| `v0.1.9` · Reset Replay + Prod-Weighted PGO 2026-10-25 · `fdca111` | x86 A/B + voidrune PGO ABBA the order that reproduced the 502s | A pre-response LSAPI reset now replays on a fresh dial: fix arm **23 replays, 0 exhaustions, 0 502s** (0.1.8 arm: one run-aborting 502); cost 0 rows worse. Voidrune prod-weighted PGO: W2 instr `−2.5%`, W8 `−2.0%`, CPU `−3.1%`; the x86 forum profile was rejected (W1 `−6.2%`). Receipt: `RESULTS.md` 2026-10-25 (0.1.9) |
+
 | `v0.1.10` · Bug/Perf Bash 2026-10-26 · `c07d345` | loopback A/B, both orders x86, vs public v0.1.5 | 16 workloads × 5 blocks: **`0 of 80`** metric rows worse. Page-cache miss→store CPU/req **`−61%`** (throughput `+16%`), warmer burst CPU/req **`−38%`**, open-loop mix p99 **`−29%`**, uncached PHP `+6%` throughput / `−6%` CPU, RSS `−8..−10%` across the board. Static-file CPU `+0.8..+1.8%` (within noise); h2-hit p99 `+20%` is a noisy metric. HPACK encode `4.73 → 1.34 µs`, cookie `SetEnvIf` `29 → 1 µs`. Relative A/B, not production throughput. |
+
+| `v0.1.11` · Coop Ring + Response Memo Defaults 2026-11-07 · `54df571f` | alt-port ABBA, both orders x86; aarch64 neutral | `--uring-ring coop` and the page-cache response memo became defaults. Cookieless H2 page-cache hits: throughput **`+27.6%`**, CPU/req **`−26.7%`**, p50 **`−36%`**, p99 **`−32%`**; cookied hits CPU/req `−4.4%`; static 1 KiB neutral; RSS `+~2 MB`. Relative A/B of flag defaults, not production throughput. Receipt: source commit `54df571f`. |
+
+| `experiment` · H3 GSO Segment Cap SINGULARITY · same-binary A/B | H3 32 KiB, 100k req/arm GSO cap 10 vs 20 | Static `6,052 → 7,816/6,552 rps` (p99 `49.5 → 33.9 ms`), page-cache `6,135 → 7,063/7,360 rps`, `sendmsg` calls `−44.6%` — but system CPU dominates and instructions/response moved ` Receipt: `docs/h3-gso-segment-experiment.md` in the source tree |

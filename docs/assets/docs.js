@@ -1854,6 +1854,37 @@
           "HPACK header-block encode went from 4.73 µs to 1.34 µs (word-at-a-time Huffman plus a long-literal memo); cookie SetEnvIf evaluation on the production .htaccess went from 29 µs to 1 µs.",
           "Sandbox fix: under systemd RestrictSUIDSGID=yes, openat2 returns ENOSYS and static files of a sandboxed vhost answered 404; a no-follow component walk now resolves beneath the docroot (v0.1.9: 404, v0.1.10: 200)."
         ]
+      },
+      {
+        id: "b15", tag: "v0.1.11", short: "Coop + Response Memo Defaults", date: "2026-11-07", commit: "54df571f", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
+        regime: "alt-port ABBA, both run orders · x86_64 · same build, flags on vs off · aarch64 coop neutral",
+        title: "v0.1.11 — Coop Ring + Response Memo Become Defaults",
+        summary: "Two measured opt-ins became the default: --uring-ring coop and the per-worker response memo for finalized public page-cache hits. The ARM origin already ran both; x86 ran neither. Relative A/B of flag defaults, not production throughput.",
+        kpis: [
+          { v: "+27.6%", d: "RPS", n: false, l: "Cookieless H2 page-cache hits (x86 ABBA)" },
+          { v: "−26.7%", d: "CPU per request", n: false, l: "Same workload; p50 −36%, p99 −32%" },
+          { v: "−44.5%", d: "instructions / request", n: false, l: "H2 response memo on vs off (SINGULARITY PMU)" },
+          { v: "+~2 MB", d: "RSS", n: true, l: "Cost of the default-on memo" }
+        ],
+        chart: {
+          title: "Response Memo: Instructions per Request, Indexed (off = 100)",
+          sub: "SINGULARITY loopback · frozen non-PGO binary · 1 KiB public-cache hits · 500k responses/arm · off/on/on/off (lower is better)",
+          unit: "index",
+          series: ["memo off", "memo on"],
+          rows: [
+            ["H1 plaintext", [100, 51]],
+            ["H1 TLS", [100, 56]],
+            ["H2 plaintext", [100, 56]],
+            ["H2 TLS", [100, 57]],
+            ["H3", [100, 69]]
+          ],
+          foot: "User-mode PMU instructions over warmup + measurement: less native cache-hit work, not a whole-machine saving. Cookieless H2 throughput claim (+27.6% RPS) is from the separate x86 coop+memo ABBA. Source: docs/pagecache-response-memo-experiment.md; ABBA in source commit 54df571f."
+        },
+        notes: [
+          "Cookied page-cache hits used 4.4% less CPU; static 1 KiB was neutral; on aarch64 the coop ring alone was neutral against legacy.",
+          "The memo keeps the native entry's exact freshness, Age and purge fences, so a purge or expiry revokes it immediately (--no-page-cache-response-memo disables; the old opt-in flag still parses).",
+          "The release also removes the retired Beeper/eBPF kernel-fastpath experiment and clears the remaining panic-ratchet sites in the H1 and H3 send paths."
+        ]
       }
     ];
 

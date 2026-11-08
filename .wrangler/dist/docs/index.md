@@ -7,7 +7,7 @@
 
 ---
 
-httpjet · documentation · v0.1.10
+httpjet · documentation · v0.1.12
 
 # httpjet
 
@@ -60,7 +60,7 @@ httpjet is a complete origin server on a memory-safe Rust core, built so that an
 - Loopback status + transactional config API , WAF sidecar , compile-time extensions
 
         i   Where it runs
-httpjet serves WindowsForum.com on an x86_64 origin and MoonTimeNow.com + ThisDayInHistory.ai on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version **0.1.10**, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See Capabilities & limits for the honest matrix.
+httpjet serves WindowsForum.com on an x86_64 origin and MoonTimeNow.com + ThisDayInHistory.ai on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version **0.1.12**, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See Capabilities & limits for the honest matrix.
 
 ## How the pieces fit
 
@@ -83,7 +83,7 @@ Headline figures from the checked-in benchmark record — every number names its
 
 | Aspect | State (2026-10-26) |
 
-| Version | **0.1.10** (current production release; see the latest public release ) — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024; dependencies current (0.1.x sweep: tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3). |
+| Version | **0.1.12** (current production release, November 8, 2026; see the latest public release ) — headline change: hot-path allocation and contention reductions (borrowed vhost routing, a single-pass fast-serve header scan, HPACK header-name reuse, sharded telemetry counters); loopback on the production x86_64 host: HTTP/2 1 KiB static 371,540 req/s at c50 (nginx 180,940; OpenLiteSpeed 399,505), heavy-`.htaccess` HTTP/2 271,118 req/s (nginx 131,955), warm page-cache hits 110,158 req/s over HTTP/2; see Performance — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
 
 | Configuration | LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. `check --strict` is the deploy gate. |
 

@@ -14,7 +14,7 @@
         <span class="chip"><span class="dot"></span>Tag purge · stale-while-revalidate · stale-if-error · single flight</span>
         <span class="chip"><span class="dot"></span>Per-vhost dictionaries · survives restarts</span>
       </div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Not the fast-path memo</span><p>Static files have a separate, default-on per-worker finished-response memo (1 s TTL) that sits even earlier on the on-core path — see <a href="rewrite.html#memo">Rewrite → fast-path memo</a>. It never serves page-cache entries.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Two memos, kept apart</span><p>Static files have a separate, default-on per-worker finished-response memo (1 s TTL) that sits even earlier on the on-core path — see <a href="rewrite.html#memo">Rewrite → fast-path memo</a>. It never serves page-cache entries. Since 0.1.11 the page cache has its <em>own</em> default-on response memo: a per-worker copy of a finalized cookieless public hit, fenced by the native entry's exact freshness, Age and purge epochs so invalidation revokes it immediately (<code>--no-page-cache-response-memo</code> disables it). Together with the default <code>coop</code> io_uring ring it measured +27.6% RPS / −26.7% CPU per cookieless H2 hit — see <a href="performance.html#release-0-1-11">Performance → 0.1.11</a>.</p></div></div>
     </section>
 
     <section>

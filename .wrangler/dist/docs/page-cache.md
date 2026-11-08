@@ -24,8 +24,8 @@ Two crates split the work. `hj-pagecache` is the transport-agnostic store: a sha
            Tag purge · stale-while-revalidate · stale-if-error · single flight
            Per-vhost dictionaries · survives restarts
 
-        i   Not the fast-path memo
-Static files have a separate, default-on per-worker finished-response memo (1 s TTL) that sits even earlier on the on-core path — see Rewrite → fast-path memo . It never serves page-cache entries.
+        i   Two memos, kept apart
+Static files have a separate, default-on per-worker finished-response memo (1 s TTL) that sits even earlier on the on-core path — see Rewrite → fast-path memo . It never serves page-cache entries. Since 0.1.11 the page cache has its *own* default-on response memo: a per-worker copy of a finalized cookieless public hit, fenced by the native entry's exact freshness, Age and purge epochs so invalidation revokes it immediately (`--no-page-cache-response-memo` disables it). Together with the default `coop` io_uring ring it measured +27.6% RPS / −26.7% CPU per cookieless H2 hit — see Performance → 0.1.11 .
 
 ## Opt-in by the app
 

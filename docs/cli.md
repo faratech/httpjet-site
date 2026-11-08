@@ -9,7 +9,7 @@
 
 # CLI reference
 
-One binary, four subcommands. `--root` is the only global option. Persistent policy lives in the XML; **everything on the command line is an operational override** — addresses, workers, PHP wiring, cache budgets, feature opt-ins. This page is generated from `httpjet serve --help` of v0.1.10 plus the feature-gated flags.
+One binary, four subcommands. `--root` is the only global option. Persistent policy lives in the XML; **everything on the command line is an operational override** — addresses, workers, PHP wiring, cache budgets, feature opt-ins. This page is generated from `httpjet serve --help` of v0.1.12 plus the feature-gated flags.
 
 ## Subcommands
 
@@ -19,7 +19,7 @@ httpjet --root /abs/root check [--strict]     # parse + summary + lint; --strict
 httpjet --root /abs/root serve [flags…]       # bind the configured listeners and serve
 httpjet --root /abs/root lsphp [flags…]       # run a standalone persistent lsphp pool (the PHP half of a zero-downtime deploy)
 httpjet lsphp-reload [flags…]                 # ask a running pool to replace its worker generation without closing the listener
-httpjet --version                             # httpjet 0.1.10
+httpjet --version                             # httpjet 0.1.12
 ```
 
 | Subcommand · flag | Default | Meaning |
@@ -56,7 +56,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --no-core-pinning | off | Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the machine's CPU count; this flag is the kill switch if pinned placement worsens tail latency |
 
-| --uring-ring   | legacy | io_uring ring setup for the per-core transport runtimes. `legacy` (default) = flagless rings — the A/B measured `coop` (COOP_TASKRUN + SUBMIT_ALL) as noise and `defer` (+SINGLE_ISSUER + DEFER_TASKRUN) as a consistent ~-2% on this virtualized guest; both stay available for other hardware. Ring size always stays default — ring memory is memlock-charged and bigger rings under the prod unit's LimitMEMLOCK bankrupt late runtimes (2026-08-27 crash-loop). Unsupported flags fall back to plain rings per-thread with a warning Values: `legacy, coop, defer`. |
+| --uring-ring   | coop | io_uring ring setup for the per-core transport runtimes. `coop` (default since 0.1.11; COOP_TASKRUN + SUBMIT_ALL) measured +28% RPS / −27% CPU per cookieless H2 page-cache hit on x86 together with the default-on response memo (2026-11-07 ABBA); alone it was neutral on aarch64. `legacy` = flagless rings; `defer` (+SINGLE_ISSUER + DEFER_TASKRUN) measured ~−2% on the GCE guest. Ring size always stays default — ring memory is memlock-charged and bigger rings under the prod unit's LimitMEMLOCK bankrupt late runtimes (2026-08-27 crash-loop). Unsupported flags fall back to plain rings per-thread with a warning Values: `legacy, coop, defer`. |
 
 | --no-multishot-accept | off | Disable multishot accept: submit one accept SQE per connection (the pre-multishot behavior) instead of one armed SQE per listener |
 
@@ -173,6 +173,8 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 | Performance knobs |
 
 | --no-fast-memo | off | Disable the finished-response memo on the on-core static fast path (default ON; per-thread, 1 s TTL, byte-identity-gated — see `pipeline::fast_memo`). Env `HJ_FAST_MEMO=0` is equivalent |
+
+| --no-page-cache-response-memo | off | Disable the per-worker memo of finalized public page-cache hits (default ON since 0.1.11, with `--page-cache`; cookieless GET only; entries keep exact freshness/Age/purge fences and share the fast-memo budget). The old `--page-cache-response-memo` opt-in still parses for existing units |
 
 | --fast-early-bridge   | off | Bridge a cookieless request to the full pipeline before the on-core prefix when nothing on-core can serve it: the page cache cannot answer the path and the static branch would decline. `off` (default) is today's path; `shadow` only counts what `on` would do (`httpjet_fast_early_predicted_total`, `httpjet_fast_early_forfeit_total`). Env `HJ_FAST_EARLY_BRIDGE` is equivalent and takes precedence. Values: `off, shadow, on`. |
 

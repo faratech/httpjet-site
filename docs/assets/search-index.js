@@ -23,7 +23,7 @@ window.DOCS_INDEX = [
    {
     "id": "status",
     "t": "Project status",
-    "kw": "check --strict lsphp acme ocsp otel ktls profiling"
+    "kw": "htaccess check --strict lsphp acme ocsp otel ktls profiling"
    },
    {
     "id": "next",
@@ -513,7 +513,7 @@ window.DOCS_INDEX = [
    {
     "id": "overview",
     "t": "Overview",
-    "kw": "hj-pagecache hj-cache lscache cache_lookup cache_store finalize_response --page-cache"
+    "kw": "hj-pagecache hj-cache lscache cache_lookup cache_store finalize_response --page-cache --no-page-cache-response-memo coop"
    },
    {
     "id": "opt-in",
@@ -688,7 +688,7 @@ window.DOCS_INDEX = [
    {
     "id": "serve",
     "t": "serve flags",
-    "kw": "legacy coop defer unix: auto --features ktls tls-hw-tx-offload off --ktls perIpRate httpjet_tls_handshakes_resumed_total htaccess PHP_LSAPI_CHILDREN maxConns httpjet lsphp maxProcessTime cache enableCache CacheLookup X-LiteSpeed-Cache-Control cache_store vhost path level name value xf_style_id X-LiteSpeed-Cache-Control: public whats-new --cf-send-zstd X-LiteSpeed-Vary: cookie private max-age PARAM proxy.php image wf-unfurl Cache-Control: checkPublicCache prefixes all-get-classified pipeline::fast_memo HJ_FAST_MEMO shadow"
+    "kw": "coop legacy defer unix: auto --features ktls tls-hw-tx-offload off --ktls perIpRate httpjet_tls_handshakes_resumed_total htaccess PHP_LSAPI_CHILDREN maxConns httpjet lsphp maxProcessTime cache enableCache CacheLookup X-LiteSpeed-Cache-Control cache_store vhost path level name value xf_style_id X-LiteSpeed-Cache-Control: public whats-new --cf-send-zstd X-LiteSpeed-Vary: cookie private max-age PARAM proxy.php image wf-unfurl Cache-Control: checkPublicCache prefixes all-get-classified pipeline::fast_memo HJ_FAST_MEMO --page-cache"
    },
    {
     "id": "env",
@@ -906,6 +906,16 @@ window.DOCS_INDEX = [
     "id": "release-0-1-10",
     "t": "Release 0.1.10: controlled A/B against 0.1.5",
     "kw": "v0.1.5 htaccess SetEnvIf RestrictSUIDSGID yes openat2 ENOSYS"
+   },
+   {
+    "id": "release-0-1-11",
+    "t": "Release 0.1.11: two defaults flipped on",
+    "kw": "coop --uring-ring legacy defer --no-page-cache-response-memo --page-cache-response-memo DIGESTS docs pagecache-response-memo-experiment.md"
+   },
+   {
+    "id": "release-0-1-12",
+    "t": "Release 0.1.12: hot-path allocation and contention reductions",
+    "kw": "Router::resolve_ref htaccess"
    },
    {
     "id": "cache-result",
