@@ -60,7 +60,7 @@ httpjet is a complete origin server on a memory-safe Rust core, built so that an
 - Loopback status + transactional config API , WAF sidecar , compile-time extensions
 
         i   Where it runs
-httpjet serves WindowsForum.com on an x86_64 origin and MoonTimeNow.com + ThisDayInHistory.ai on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It is early-stage software (semantic version **0.1.12**, Rust 1.99.1+, edition 2024, GPL-3.0-only) built around these production deployments — test on alternate ports before trusting it elsewhere. See Capabilities & limits for the honest matrix.
+httpjet serves WindowsForum.com on an x86_64 origin and MoonTimeNow.com + ThisDayInHistory.ai on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It replaced LiteSpeed as the production origin server for all three sites (semantic version **0.1.12**, Rust 1.99.1+, edition 2024, GPL-3.0-only) — validate your configuration with `check --strict` and test on alternate ports before cutover. See Capabilities & limits for the honest matrix.
 
 ## How the pieces fit
 

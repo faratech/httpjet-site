@@ -9,7 +9,7 @@ window.DOCS_INDEX = [
    {
     "id": "what",
     "t": "What httpjet is",
-    "kw": "--root mime.properties lsphp Header ErrorDocument X-LiteSpeed-Cache-Control Tag Vary Purge fileETag html h2: h2s: sub_filter"
+    "kw": "--root mime.properties lsphp Header ErrorDocument X-LiteSpeed-Cache-Control Tag Vary Purge fileETag html h2: h2s: sub_filter check --strict"
    },
    {
     "id": "map",
