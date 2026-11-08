@@ -2225,16 +2225,14 @@
             { idx: 10, tag: "v0.0.10", h2: 354.4, h1: 236.4, note: "TLS idle + dict L3" },
             { idx: 11, tag: "v0.1.2", h2: 464.6, h1: 201.8, note: "Recycled task pools" },
             { idx: 12, tag: "v0.1.5", h2: 461.3, h1: 232.5, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 481.6, h1: 233.6, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", h2: 436.1, h1: 187.0, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", h2: 414.3, h1: 183.8, note: "Hot-path reductions" }
+            { idx: 13, tag: "v0.1.10", h2: 481.6, h1: 233.6, note: "Bug/perf bash" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. v0.1.11 and v0.1.12 points were added 2026-11-08 from a paired run on the live production host under the same workload shapes and 4-core/4-core split (production PGO binaries bin/httpjet.prev and bin/httpjet, median of 3 rounds, live traffic present); read that pair against each other, not as continuous with the 2026-10-26 sweep."
+          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. The v0.1.11/v0.1.12 paired comparison (same workload shapes, 2026-11-08) is in the build slides and the Release 0.1.12 section; it is deliberately not drawn on this curve because it was measured on a busier host and would read as a regression it does not show."
         },
         {
           id: "c-static",
@@ -2252,16 +2250,14 @@
             { idx: 10, tag: "v0.0.10", h2: 426.0, h1: 255.0, note: "TLS idle + dict L3" },
             { idx: 11, tag: "v0.1.2", h2: 605.7, h1: 225.3, note: "Recycled task pools" },
             { idx: 12, tag: "v0.1.5", h2: 593.4, h1: 258.1, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 585.5, h1: 256.8, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", h2: 525.0, h1: 197.6, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", h2: 597.4, h1: 218.7, note: "Hot-path reductions" }
+            { idx: 13, tag: "v0.1.10", h2: 585.5, h1: 256.8, note: "Bug/perf bash" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. v0.1.11 and v0.1.12 points were added 2026-11-08 from a paired run on the live production host under the same workload shapes and 4-core/4-core split (production PGO binaries bin/httpjet.prev and bin/httpjet, median of 3 rounds, live traffic present); read that pair against each other, not as continuous with the 2026-10-26 sweep."
+          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. The v0.1.11/v0.1.12 paired comparison (same workload shapes, 2026-11-08) is in the build slides and the Release 0.1.12 section; it is deliberately not drawn on this curve because it was measured on a busier host and would read as a regression it does not show."
         },
         {
           id: "c-php",
@@ -2279,16 +2275,14 @@
             { idx: 10, tag: "v0.0.10", php: 28.9, cache: 83.4, note: "TLS idle + dict L3" },
             { idx: 11, tag: "v0.1.2", php: 34.6, cache: 94.1, note: "Recycled task pools" },
             { idx: 12, tag: "v0.1.5", php: 30.9, cache: 94.6, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", php: 33.2, cache: 98.2, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", php: 31.5, cache: 105.3, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", php: 32.6, cache: 100.6, note: "Hot-path reductions" }
+            { idx: 13, tag: "v0.1.10", php: 33.2, cache: 98.2, note: "Bug/perf bash" }
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
             { key: "cache", label: "httpjet page-cache hit H2 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. v0.1.11 and v0.1.12 points were added 2026-11-08 from a paired run on the live production host under the same workload shapes and 4-core/4-core split (production PGO binaries bin/httpjet.prev and bin/httpjet, median of 3 rounds, live traffic present); read that pair against each other, not as continuous with the 2026-10-26 sweep."
+          foot: "Every release from v0.0.1 to v0.1.10 measured 2026-10-26 under identical conditions: PGO-built from its tag, same host over loopback, server on 4 cores and h2load on 4 others, current production flags (minus any a release predates), 3 rounds in rotated order, median shown. Earlier June 2026 development builds were measured under different conditions; their figures are in their build slides. The v0.1.11/v0.1.12 paired comparison (same workload shapes, 2026-11-08) is in the build slides and the Release 0.1.12 section; it is deliberately not drawn on this curve because it was measured on a busier host and would read as a regression it does not show."
         }
       ];
 

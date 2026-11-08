@@ -32,7 +32,7 @@ Loopback removes network, handshakes, CDN. It isolates server code for compariso
 
 You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (`0.0.1`, June 2026) through `0.1.12`. CSV receipts stay outside the public export at github.com/faratech/httpjet .
 
-Compare v0.0.1–v0.1.12 in the **Release Speed Curve**, PGO tag builds. v0.0.1–v0.1.10: side-by-side, 2026-10-26 ( release-sweep-2026-10-26.tsv ). v0.1.11/v0.1.12: paired, 2026-11-08, same shapes/split. Then step through **16 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
+Compare v0.0.1–v0.1.12 in the **Release Speed Curve**, PGO tag builds. v0.0.1–v0.1.10: side-by-side, 2026-10-26 ( release-sweep-2026-10-26.tsv ). The paired v0.1.11 vs v0.1.12 run (2026-11-08, same shapes/split) is in the build slides below; it is not drawn on the curve — the host was busier, so its absolute points would read as a regression the paired deltas do not show. Then step through **16 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
 
 ## Where the time actually goes
 
