@@ -1,6 +1,6 @@
 # CLI reference — httpjet Documentation
 
-> Every httpjet subcommand and serve flag, grouped and filterable, plus the environment variables the binary reads.
+> Every command, flag, and environment variable.
 
 - **Canonical URL:** https://httpjet.net/docs/cli
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -9,7 +9,7 @@
 
 # CLI reference
 
-One binary, four subcommands. `--root` is the only global option. Persistent policy lives in the XML; **everything on the command line is an operational override** — addresses, workers, PHP wiring, cache budgets, feature opt-ins. This page is generated from `httpjet serve --help` of v0.1.12 plus the feature-gated flags.
+One binary, four subcommands. You set persistent policy in XML. You set operational overrides on the command line. This page is generated from `httpjet serve --help` of the current release.
 
 ## Subcommands
 
@@ -42,6 +42,8 @@ httpjet --version                             # httpjet 0.1.12
 
 ## serve flags
 
+**Most operators need these:** `--http-addr`, `--https-addr`, `--workers`, `--root`, `--page-cache`, `--php-socket`, `--lsphp-external`, `--no-mtls`, `--metrics-addr`, and `--no-php`. You set the rest only for specific needs.
+
 Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* means an empty string disables the feature.
 
 | Flag | Default | Meaning |
@@ -56,13 +58,13 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --no-core-pinning | off | Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the machine's CPU count; this flag is the kill switch if pinned placement worsens tail latency |
 
-| --uring-ring   | coop | io_uring ring setup for the per-core transport runtimes. `coop` (default since 0.1.11; COOP_TASKRUN + SUBMIT_ALL) measured +28% RPS / −27% CPU per cookieless H2 page-cache hit on x86 together with the default-on response memo (2026-11-07 ABBA); alone it was neutral on aarch64. `legacy` = flagless rings; `defer` (+SINGLE_ISSUER + DEFER_TASKRUN) measured ~−2% on the GCE guest. Ring size always stays default — ring memory is memlock-charged and bigger rings under the prod unit's LimitMEMLOCK bankrupt late runtimes (2026-08-27 crash-loop). Unsupported flags fall back to plain rings per-thread with a warning Values: `legacy, coop, defer`. |
+| --uring-ring   | coop | Sets io_uring ring mode: `coop`, `legacy`, or `defer`. Measured: see Performance . |
 
 | --no-multishot-accept | off | Disable multishot accept: submit one accept SQE per connection (the pre-multishot behavior) instead of one armed SQE per listener |
 
 | --http-uds   | — | Additionally serve plain HTTP on this unix domain socket (H1 + h2c prior knowledge, one accept core). Peers have no address: ACLs and logs see fabricated loopback and the access log renders `unix:` — the socket file's mode/owner is the real access boundary. A socket-activated fd at the same path (socket unit) is adopted for zero-downtime restarts |
 
-| --ktls [ ] | auto | Kernel-TLS on the io_uring TLS path: after the rustls handshake, upgrade the socket to kTLS so H1/H2 serve plaintext over the raw fd (kernel encrypt/decrypt), removing the userspace AEAD copy on large-body egress. Runs only on the io_uring TLS path (the default transport). `auto` (default) requires a `--features ktls` build, a physical default-route NIC, and active `tls-hw-tx-offload`; otherwise it logs one reason and stays on rustls. `on` forces kTLS for isolated benchmarking and fails when the feature is absent; `off` never enables it. A bare `--ktls` remains an alias for `--ktls=on`. TLS 1.3 only (1.2 falls back to userspace); peer KeyUpdate is handled (RX rekey + reply). STAGED — validate on an alt port before production. Values: `auto, on, off`. |
+| --ktls [ ] | auto | Controls kernel TLS: `auto`, `on`, or `off`. Limit: TLS 1.3 only; validate first. |
 
 | Security & limits |
 
@@ -92,9 +94,9 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --lsphp-generation-file   | — | Shared lsphp generation epoch used to invalidate pooled external connections after a supervisor reload or restart. When supplied with --lsphp-external, startup fails if the 16-byte mapping cannot be opened |
 
-| --php-max-process-time-ms   | — | Total request processing deadline in milliseconds. When exceeded, the handler closes the connection (504); in OWNED/spawn mode the monitor also kills+restarts the worker (Tier-2). Under --lsphp-external (prod) there is no monitor in this process, so only the Tier-1 504 applies — a wedged worker is NOT auto-reclaimed here. 0 = no deadline (matches the LiteSpeed XML `maxProcessTime` 0-means-unlimited convention). Absent ⇒ the XML value if present, else no deadline. Must be conservative: too low kills slow renders |
+| --php-max-process-time-ms   | — | Sets the PHP processing deadline. Limit: external pools return 504 only; workers stay wedged. |
 
-| Page cache |
+| Page cache — you enable the tier, then size storage, then tune admission and vary rules. Most sites need only `--page-cache` plus memory sizing. |
 
 | --page-cache | off | Enable the LSCache-equivalent origin full-page cache (OFF by default; opt-in / R&D). Per-vhost ` ` + `.htaccess CacheLookup` still gate each request, and the app must opt responses in via `X-LiteSpeed-Cache-Control`. With this flag absent the cache is inert |
 
@@ -110,7 +112,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --page-cache-hot-mem   | 201326592 | Byte cap of the in-RAM hot tier in front of the file store (zero-syscall zero-copy serves for the hottest bodies). Only meaningful with --page-cache-store-path. Default 192 MiB |
 
-| --page-cache-dict   | (empty) | Path to a shared zstd dictionary used to store cached bodies far smaller. CMS pages share ~60%+ of their bytes as position-shifted boilerplate that only a dictionary captures; with this set, `cache_store` dict-compresses the stored body (the SERVED bytes stay standard zstd/br/gzip — browsers/CF can't decode a private dict). Absent/empty/unreadable ⇒ bodies are stored as plain identity (today's behaviour). Build one from a reviewed local corpus with scripts/train-pagecache-dict-from-files.sh |
+| --page-cache-dict   | (empty) | Sets the shared zstd dictionary path. Limit: absent stores plain identity. |
 
 | --page-cache-dict-vhost   | (empty) | Comma-separated `vhost=path` pairs: a PER-VHOST zstd dictionary, trained on that vhost's own content (train one local corpus per vhost). A shared dictionary trained on one site's boilerplate does little for a differently templated site, so each vhost compresses against its own. A vhost not listed here falls back to --page-cache-dict if set, else stores identity (today's behaviour). Example: `forum.example=conf/pagecache-forum.dict,moon.example=conf/pagecache-moon.dict` |
 
@@ -124,9 +126,9 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --page-cache-stream-fill-vhosts   | (empty) | Comma-separated vhost names whose cacheable page-cache misses WITHOUT a Content-Length (progressive template output) are sent to the client as the backend writes them and stored once the backend finishes, instead of being buffered whole first. Only identity-encoded public 200s; a body that errors, is cut short or grows past the object cap is served but never stored. Empty = off |
 
-| --page-cache-egress-at-rest-vhosts   | (empty) | Comma-separated vhost names whose stored misses keep a dictionary-less zstd body (plain zstd) instead of being re-encoded against the vhost dictionary in the background. A miss answered with zstd (a CDN peer under `--cf-send-zstd`) stores the encode made for its own response, one encode instead of two; any other miss stores the identity and encodes it plain in the background. A zstd hit is served the stored bytes until the entry is hot enough for its L9 variant. The stored copy is larger than a dictionary-compressed one. Buffered misses only (not --page-cache-stream-fill-vhosts); with --xf-capsule dedicated storage, capsule renders keep the dictionary path. Empty = off |
+| --page-cache-egress-at-rest-vhosts   | (empty) | Keeps plain zstd storage for listed vhosts. Limit: buffered misses only; storage grows. |
 
-| --page-cache-admit-threshold   | 2 | (W-TinyLFU) Base admission bar: minimum frequency a cacheable response must show before it is STORED. One request counts as ONE sighting — the on-core fast path probes uncounted and records only a hit it serves. 2 = store on the 2nd sighting (miss-miss-hit; rejects the long-tail of one-hit-wonders — the default). 1 = store on the 1st sighting (miss-hit; cache everything — now cheap with --page-cache-dict, with the store's byte LRU protecting the hot set). Size-weighting adds +1 per 256 KiB on top. Watch httpjet_cache_hit_ratio_real to tune |
+| --page-cache-admit-threshold   | 2 | Sets the W-TinyLFU admission bar. Limit: size adds +1 per 256 KiB. |
 
 | --page-cache-vary-cookies   | xf_style_variation,xf_style_id,xf_language_id | Comma-separated public-vary cookie names: a cacheable public response may declare `X-LiteSpeed-Vary: cookie=NAME,...` and the entry is keyed by these cookies' values (shared, non-sensitive prefs). Default matches the XenForo style/language set |
 
@@ -138,11 +140,11 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --page-cache-private-user-cookie   | xf_user | Request cookie whose PRESENCE routes a request to the private tier (the logged-in marker; XenForo's remember cookie) |
 
-| --page-cache-shared-paths   | (empty) | Comma-separated matchers for visitor-invariant endpoints that MEMBER (logged-in) requests may still read/populate on the PUBLIC cache tier — sharing one entry across guests and every member session instead of duplicating per session and re-rendering each member's first view through PHP. Two matcher forms: `PATH?PARAM` (path equals PATH exactly AND the query carries `PARAM=`, e.g. `proxy.php?image`) and `PATH` (path prefix, e.g. `/wf-unfurl/image`); a missing leading `/` is normalized on. ONLY list endpoints whose bytes are identical for every visitor (HMAC-gated image proxies) — never HTML pages. Malformed specs abort startup. Empty/absent = feature inert (kill switch; members keep today's private routing). GLOBAL like the other --page-cache-private-* knobs — not per-vhost — but a matching request still passes every per-vhost public gate (`vhost` cache policy, `.htaccess` CacheLookup) and every public-store guard before it is served or stored |
+| --page-cache-shared-paths   | (empty) | Lists visitor-invariant endpoints members may share publicly. Limit: list identical bytes only, never HTML. |
 
 | --page-cache-shared-paths-canary-percent   | 100 | Deterministic percentage (0-100) of member requests matching --page-cache-shared-paths that actually route to the public tier; the rest keep today's private-tier behavior. Sticky per member (bucketed by a hash of the user/session cookie value, exactly like --xf-capsule-member-canary-percent), so one member never flickers between tiers. 100 = all matching requests |
 
-| --page-cache-standard-vhosts   | (empty) | Comma-separated vhost names put into "standards mode": they honor a standard `Cache-Control: public, max-age=N` as a cache opt-in (OpenLiteSpeed's `checkPublicCache` equivalent), get a default public cache policy when they declare no ` ` block, and default `CacheLookup` to on — so a non-LiteSpeed app (e.g. moon.example) caches like a standards-compliant shared cache. ALLOWLIST, not a global switch: a vhost not listed is unaffected (X-LiteSpeed opt-in only), so opting one content site in can't make an unrelated vhost (status/admin API) cache a response it merely marked public. All other guards (GET-only, Set-Cookie/private-cookie, vary, status, self-redirect) always apply |
+| --page-cache-standard-vhosts   | (empty) | Puts listed vhosts in standards mode. Limit: unlisted vhosts stay X-LiteSpeed-only. |
 
 | --page-cache-stale-default-secs   | 0 | Stale-while-revalidate window (seconds) applied when the app declares none. 0 = off (serve only fresh unless the app sets stale-while-revalidate / max-stale) |
 
@@ -178,7 +180,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --fast-early-bridge   | off | Bridge a cookieless request to the full pipeline before the on-core prefix when nothing on-core can serve it: the page cache cannot answer the path and the static branch would decline. `off` (default) is today's path; `shadow` only counts what `on` would do (`httpjet_fast_early_predicted_total`, `httpjet_fast_early_forfeit_total`). Env `HJ_FAST_EARLY_BRIDGE` is equivalent and takes precedence. Values: `off, shadow, on`. |
 
-| --cf-send-zstd | off | Compress responses to a trusted-proxy (Cloudflare) peer as zstd, ignoring the forwarded Accept-Encoding. CF asks the origin for br/gzip but decodes an origin `Content-Encoding: zstd` and re-encodes per browser at its edge — so this hands CF the cheapest-to-produce form (zstd ≪ brotli to compress) without changing what browsers receive. Officially unsupported CF↔origin; opt-in, default off. Never applies to untrusted (direct) clients. Off ⇒ byte-identical to today |
+| --cf-send-zstd | off | Sends zstd to trusted Cloudflare peers. Limit: never applies to direct clients. |
 
 | --rewrite-outcome-ttl-ms   | 1000 | TTL in milliseconds for the rewrite-outcome cache (memoized rewrite decisions for `path_cacheable` chains, keyed by vhost/scheme/ method/host/path/query + any keyable header vars). 0 disables the cache entirely. The default (1000 ms) matches the historical hard-coded TTL — it bounds `-f`/`-d` filesystem staleness exactly like the StatCache and lets `.htaccess` edits take effect within ~1 s |
 
@@ -224,13 +226,13 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --waf-sidecar-uid   | — | The uid a `unix:` sidecar must run as. Default: root or this process's uid |
 
-| --waf-sidecar-path   | /inspect |  |
+| --waf-sidecar-path   | /inspect | Sets the sidecar inspection path. |
 
-| --waf-timeout-ms   | 100 |  |
+| --waf-timeout-ms   | 100 | Sets the sidecar timeout in milliseconds. |
 
-| --waf-body-max   | 65536 |  |
+| --waf-body-max   | 65536 | Caps inspected body bytes. |
 
-| --waf-concurrency   | 128 |  |
+| --waf-concurrency   | 128 | Caps concurrent sidecar inspections. |
 
 | --waf-fail-open | off | Continue when the configured WAF sidecar is unavailable or malformed. Default is fail-closed (503); this weaker policy requires explicit opt-in |
 

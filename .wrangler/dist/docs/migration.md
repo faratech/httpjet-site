@@ -1,6 +1,6 @@
 # Migrating from LiteSpeed — httpjet Documentation
 
-> A validation-first migration path from LiteSpeed or OpenLiteSpeed: inventory, check --strict, isolated candidate, behavioral proof, caching, cutover and rollback.
+> Move an existing LiteSpeed site step by step.
 
 - **Canonical URL:** https://httpjet.net/docs/migration
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -9,25 +9,42 @@
 
 # Migrating from LiteSpeed
 
-httpjet consumes LiteSpeed-compatible XML and LSAPI, but a migration is a **compatibility project**, not a binary swap that can skip validation. Directive coverage, filesystem identity, listener ownership, PHP supervision, TLS trust and cache behavior must each be proved for the target deployment. This is the path that proves them in order.
+httpjet reads LiteSpeed-compatible XML and speaks LSAPI. You still must prove compatibility for your tree before you move traffic.
 
 > [Diagram: migration-path] Eight steps, three gates. Nothing binds the incumbent ports until behavior — not just startup — has been proved on an isolated candidate; caching is introduced only after uncached parity.
 
+      i   Prerequisites
+Start with a copied configuration root. Keep your `lsphp` binary available for PHP tests. Run every candidate on alternate ports first.
+
 ## 1 · Inventory before changing traffic
 
-- Main and per-vhost XML, included files, variables, listener/vhost maps.
+### Config
 
-- Document roots, symlink policy, `.htaccess` files, error documents, MIME maps, htpasswd files.
+- Collect main XML and per-vhost XML. Include included files and variables.
 
-- TLS identities, chains, client-CA/CRL policy, renewal ownership (certbot? built-in ACME?), SNI maps.
+- List listener maps and vhost maps. Record document roots and symlink policy.
 
-- LSAPI processors, PHP environment, child limits, socket owner/mode, application health checks.
+- Collect `.htaccess` files and error documents. Add MIME maps and htpasswd files.
 
-- Proxy/WebSocket targets, timeout and retry assumptions, trusted-proxy networks.
+- Record TLS identities and chains. Note client-CA/CRL policy and renewal ownership.
 
-- Cache opt-in and purge headers, public/private variation, stale behavior, every external cache/CDN layer.
+### Traffic
 
-- Service user/group, writable paths, open-file/memory limits, socket activation, firewall rules, monitoring probes.
+- List LSAPI processors and PHP environment. Record child limits and socket owner/mode.
+
+- Add application health checks. List proxy and WebSocket targets.
+
+- Record timeout and retry assumptions. List trusted-proxy networks.
+
+- Record cache opt-in and purge headers. Note public/private variation and stale behavior.
+
+- List every external cache and CDN layer.
+
+### Ops
+
+- Record service user and group. List writable paths and resource limits.
+
+- Note socket activation and firewall rules. Add monitoring probes.
 
 Keep secrets and host-specific paths out of migration reports and example repositories.
 
@@ -39,10 +56,15 @@ target/release/httpjet --root /abs/copied-root check --strict
 sudo -u   target/release/httpjet --root /abs/copied-root check --strict
 ```
 
-Treat errors as blockers — shared or missing docroots, mapped vhosts whose config did not load, geo rules without their database. Review every warning — ignored security elements (`lsrecaptcha`, `censorshipControl`), generic CGI contexts, wildcard maps, TLS over a Unix socket, unsupported auth forms, vhosts without an exact domain, and settings that require a restart rather than a reload. *Parsed does not mean equivalent.* Compare the resulting listener/vhost map and effective limits with the source server, and run the check as the runtime identity too: readable-by-root is not proof the service user can read certificates or write logs, sockets and cache.
+Treat three errors as blockers:
 
-        !   Things LiteSpeed does that httpjet will not
-`RequestHeader` and `Header edit` are ignored; traditional DES and `$5$`/`$6$` `crypt()` htpasswd hashes verify false (bcrypt, APR1 `$apr1$`, MD5-crypt `$1$` and `{SHA}` are supported); `Require` forms other than `all granted`/`valid-user`/`user` deny; anti-abuse elements are inert; `cacheStorePath` is unused; `respBuffer` always streams; `instances>1` is a single upstream. Each is on the capability matrix . You can also paste any `.htaccess` file into the interactive `.htaccess` & `fast_memo` readiness inspector to preview directive support and `MemoClass` eligibility in the browser.
+- Shared or missing docroots block you.
+
+- Mapped vhosts whose config did not load block you.
+
+- Geo rules without their database block you.
+
+Run the check as the runtime identity too. Readable-by-root does not prove service access. Review all warnings before you proceed. See Capabilities & limits for ignored directives.
 
 ## 3 · Build the smallest required binary
 
@@ -51,7 +73,7 @@ Treat errors as blockers — shared or missing docroots, mapped vhosts whose con
 CARGO_INCREMENTAL=0 cargo build --locked --release -p httpjet
 ```
 
-Add `acme`, `ocsp`, `otel`, `profiling` or `ktls` only for a reviewed need, and keep every default-off feature and runtime switch off during initial parity testing. A `ktls` build defaults to `--ktls=auto`, which stays on rustls unless a physical NIC advertises active `tls-hw-tx-offload`.
+Add `acme`, `ocsp`, `otel`, `profiling` or `ktls` only for a reviewed need. Keep default-off features off during parity testing. A `ktls` build defaults to `--ktls=auto`. It stays on rustls without active `tls-hw-tx-offload` on a physical NIC.
 
 ## 4 · Start an isolated candidate
 
@@ -63,51 +85,70 @@ target/release/httpjet --root /abs/copied-root serve \
   --metrics-addr 127.0.0.1:19090
 ```
 
-Never bind the incumbent ports for the first run. Use loopback/alternate ports, a separate LSAPI socket (or an explicitly selected external test pool), distinct logs and a separate cache path. If PHP is out of scope use `--no-php` — and do not read that static fallback as PHP parity. Never point two supervisors at one LSAPI socket or process family.
+Never bind the incumbent ports for the first run. Use loopback or alternate ports. Use a separate LSAPI socket. Use distinct logs and a separate cache path. Use `--no-php` only when PHP stays out of scope. Never point two supervisors at one LSAPI socket.
 
 ## 5 · Prove behavior, not only startup
 
 ### Routing & transport
 
-- exact / default / foreign Host routing, HTTP→HTTPS behavior
-- SNI, chain validation, ALPN, client certificates, CRL rejection
-- h1 keep-alive and chunking, h2 multiplexing, h3 over UDP, large files, ranges, conditional requests, compression, HEAD
+- Test exact, default and foreign Host routing. Check HTTP→HTTPS behavior.
+- Test SNI, chains and ALPN. Test client certificates and CRL rejection.
+- Test h1 keep-alive and chunking. Test h2 multiplexing and h3 over UDP.
+- Test large files and ranges. Test conditional requests, compression and HEAD.
 
 ### Application
 
-- rewrite/redirect loops, front controllers, PATH_INFO, per-directory access, Basic auth, custom headers, error documents
-- PHP/FastCGI environment, uploads, streaming, timeouts, worker recycling, source-disclosure failure cases
-- proxy/WebSocket/SSE, upstream TLS identity, load distribution, all-backends-down, active-health recovery
-- logs, request ids, metrics, readiness, graceful shutdown, restart, reload
+- Test rewrites and front controllers. Test PATH_INFO and per-directory access.
+- Test Basic auth and custom headers. Test error documents.
+- Test PHP/FastCGI environment and uploads. Test streaming, timeouts and worker recycling.
+- Test source-disclosure failure cases. Test proxy, WebSocket and SSE behavior.
+- Test upstream TLS and load distribution. Test all-backends-down and health recovery.
+- Check logs, request ids and metrics. Test readiness, shutdown, restart and reload.
 
-Compare status, headers and body bytes with the incumbent where compatibility is required. Normalize inherently variable fields (Date, generated request ids) explicitly — do not discard all headers to make a comparison pass.
+Compare status, headers and body bytes with the incumbent. Normalize only variable fields such as Date and request ids. Keep your comparison commands in the acceptance record. Repeat each failed case after every fix. Do not discard headers to force a pass.
 
 ## 6 · Introduce caching separately
 
-Leave `--page-cache` off until uncached parity is established. Then, with an isolated cache and conservative caps, prove that distinct paths, hosts, schemes, queries, cookies, sessions and encodings cannot replay one another; public responses never store private cookies or authenticated data; private entries are session-bound; purge tags invalidate every tier; stale-if-error and stale-while-revalidate obey their windows; restart scanning, integrity failures, missing files and capacity eviction are fail-safe; and the upstream CDN does not retain redirects or errors longer than intended. The repository's cache gates are the executable form of this list. A cache that looks fast but is keyed wrongly is a data-isolation defect, not a performance win.
+Leave `--page-cache` off until you prove uncached parity. Then prove each item below:
+
+- Distinct paths, hosts and schemes never replay each other.
+
+- Distinct queries, cookies and encodings never replay each other.
+
+- Public responses never store private or authenticated data.
+
+- Private entries stay bound to their session.
+
+- Purge tags invalidate every tier.
+
+- Stale windows, restart scan and eviction fail safe.
+
+Run the executable checks in page-cache deploy gates .
 
 ## 7 · Stage traffic and retain rollback
 
-Package the exact tested binary at a stable path. Prefer a service manager that can hold listener ownership (socket activation), apply non-root permissions, set limits and restart on failure — validate the systemd or OCI example against your environment rather than copying it. Canary through an existing load balancer or CDN, or a dedicated address, before a full listener handoff. Monitor status classes, backend latency and errors, cache dispositions, active connections, memory, file descriptors, PHP/upstream health and h1/h2/h3 traffic independently.
+Package the exact tested binary at a stable path. Prefer socket activation with non-root permissions. Validate the systemd or OCI example for your environment. Canary through a load balancer, CDN or dedicated address first. Monitor status, latency, cache, connections and memory separately. Monitor file descriptors and PHP/upstream health too.
 
-Write and *drill* the rollback before cutover: the prior binary, configuration, unit, certificate ownership, application socket and cache/CDN purge procedure. A binary rollback does not remove bad objects already stored in origin or edge caches.
+Write and drill the rollback before cutover. Include the prior binary, config and unit. Include certificate, socket and cache/CDN purge steps. A binary rollback does not remove bad cached objects.
 
 ## 8 · Reload only what is reloadable
 
-Validate before SIGHUP or an API submission. Application-compatible state publishes while existing requests finish on the old generation; listener/QUIC/Unix-socket topology, PHP topology, cache-store identity, process privileges and other boot-owned resources need a restart. An API `restart_required` result is a safety boundary, not a suggestion to force the transaction. See Admin API & reload .
+Validate before SIGHUP or an API submission. See Admin API & reload and the acceptance record below.
 
 ## Minimum acceptance record
 
-- Source commit and build features.
+Reloadable state publishes without dropping in-flight requests. Listener, QUIC, PHP, cache-store and privilege changes need a restart. An API `restart_required` result blocks the transaction.
 
-- Sanitized configuration fingerprint (`vhost-map-fingerprint`) and validation output.
+- Record the source commit and build features.
 
-- Service identity, kernel/runtime, resource limits.
+- Save the sanitized `vhost-map-fingerprint` and validation output.
 
-- Exact test commands, protocol clients, pass/fail counts.
+- Record service identity, kernel/runtime and resource limits.
 
-- Canary window and the observed error/cache/backend deltas.
+- Record exact test commands, clients and pass/fail counts.
 
-- The rollback command and a successful rollback drill.
+- Record the canary window and observed deltas.
 
-Do not claim completion from source inspection, a successful compile or one HTTP 200. The migration is complete when the intended workload, failure modes, operations and rollback have been exercised in the target environment.
+- Record the rollback command and a successful drill.
+
+Do not claim completion from one HTTP 200. Prove the workload, failure modes, operations and rollback.

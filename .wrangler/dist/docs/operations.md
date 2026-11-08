@@ -1,6 +1,6 @@
 # Operations — httpjet Documentation
 
-> Systemd socket activation, the persistent PHP pool, safe changes, deploy gates, rollback, kill switches, and the hardened OCI example.
+> Deploy, upgrade, roll back, and recover safely.
 
 - **Canonical URL:** https://httpjet.net/docs/operations
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -13,7 +13,11 @@ A fresh packaged installation runs a static service as a dedicated account. The 
 
 ## Installation
 
+### Fresh installer
+
 For a fresh Linux server, use the signed installer . It selects the native package or portable archive, starts the welcome page on ports 80 and 443, and creates a unique self-signed certificate. A browser warning is expected until a trusted certificate is configured. io_uring must be available.
+
+### Source build
 
 To build and deploy from source instead, install the binary at a stable path *outside* Cargo's `target/` so a later `cargo clean` cannot delete what a running unit depends on:
 
@@ -50,13 +54,15 @@ The following reference topology is optional. The fresh installer uses a single 
 
 | `httpjet-boot-ready.service` | Boot-only oneshot gate, availability-first: the `Type=notify` LSAPI pool is the one hard dependency; databases/caches are ordered but not required — it waits up to 300 s, then proceeds with a loud warning so a cold boot with a slow database still serves static + warm cache + stale-if-error. Later backend maintenance cannot tear down the sockets. |
 
-| `httpjet.service` | The web tier: `httpjet --root … serve --lsphp-external … --lsphp-generation-file …` under a dedicated user, `Restart=always`, `OOMScoreAdjust=-500`, `LimitNOFILE=1048576`, `TimeoutStopSec=20`, `Conflicts=lshttpd.service`. Effective flags come from drop-ins in `httpjet.service.d/` — check `systemctl show -p ExecStart --value httpjet.service` before reasoning about them. The repository ships a validated **hardening drop-in** (`systemd/httpjet.service.d/zz-hardening.conf`: `ProtectSystem=strict` with logs-only `ReadWritePaths`, `PrivateTmp/PrivateDevices`, `ProtectProc=invisible`, empty capability set, `MemoryDenyWriteExecute`, `RestrictAddressFamilies`, and a **log-only seccomp stage** that filters the dangerous syscall groups while logging — enforce `@system-service` only after a clean soak), measured `systemd-analyze security` 9.0 → 1.9; it is the reference copy, not applied by the checked-in unit. |
+| `httpjet.service` | The web tier under a dedicated user. Limit: you check drop-ins before reasoning about flags. |
 
 | `httpjet-lsphp.socket` | Owns the LSAPI Unix listener (mode 0600, backlog 8192, `RemoveOnStop`). Never restart it during a reload or supervisor deploy. |
 
 | `httpjet-lsphp.service` | `httpjet lsphp …`, `Type=notify` (active only after a marker-attributed LSAPI response), `ExecReload=httpjet lsphp-reload …`, its own identity, `RuntimeDirectory=httpjet` for the control socket and generation file. |
 
 | `httpjet-edge-firewall.service` | Optional oneshot edge firewall (`scripts/httpjet-edge-firewall.sh`) for origins without a cloud firewall: restricts new `:80`/`:443` connections to Cloudflare IPv4 + private ranges (keep its list in step with the XML `T` entries). |
+
+**Hardening:** You apply `systemd/httpjet.service.d/zz-hardening.conf` as reference only. It sets `ProtectSystem=strict`, private tmp/devices, and empty capabilities. You enforce `@system-service` seccomp only after a clean soak. Measured score: 9.0 → 1.9.
 
         i   Scope of the zero-loss guarantee
 Socket activation eliminates RSTs of *new and queued* connections across a deploy. Requests the old process has already accepted — h1/h2 mid-serve and especially h3/QUIC streams — still drain under `TimeoutStopSec`. "Never drops a connection" means never RSTs a new or queued one.
@@ -111,16 +117,11 @@ Vhost maps, rewrites, document roots, contexts, access/expires/tuning settings, 
 
 ## Observability checklist
 
-           the loopback-only surfaces
-```
-curl -s http://127.0.0.1:9090/metrics | grep '^httpjet_'          # Prometheus text
-curl -s -H "Authorization: Bearer $(cat /etc/httpjet/profile.token)" http://127.0.0.1:9090/cache-entries   # cache totals, budgets, health line
-curl -s http://127.0.0.1:9091/v1/status | jq .                     # with --admin-addr: generation, fingerprint, upstream health
-curl -sk https://127.0.0.1/__hj_cache_ready -o /dev/null -w '%{http_code}\n'
-journalctl -u httpjet -n 100
-```
+See Observability for metrics and logs.
 
-Metric families, log formats, the request-id header, telemetry TSV, PHP slow log, OpenTelemetry and profiling are all on Observability . Pair the counters with a process monitor (the tree ships a `monit` check whose start timeout stays above the boot gate's worst case).
+You check loopback surfaces first.
+
+You pair counters with a process monitor.
 
 ## Container deployment
 
@@ -153,4 +154,4 @@ A seccomp denial is a startup/test failure — do not work around it with `--pri
 
 ## Release and upgrade discipline
 
-A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through `scripts/update-deps.sh` and the full suite (the 0.1.x sweeps refreshed tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3 and brotli 9.1 / brotli-decompressor 6.2; a daily dependency-advisory job fails the build on any RustSec finding).
+A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through `scripts/update-deps.sh` and the full suite. See the changelog/release page for current dependency versions.

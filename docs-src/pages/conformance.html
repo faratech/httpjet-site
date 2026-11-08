@@ -1,33 +1,34 @@
     <h1>Conformance &amp; testing</h1>
-    <p class="lede">Two axes define httpjet's posture: <strong>LiteSpeed compatibility</strong> on the same configuration tree (LSWS 6.3.5 target — XML model, LSAPI, ETags, LSCache protocol, <code>.htaccess</code>), and <strong>standards conformance</strong> on the wire. Where they agree there is one right answer; where LiteSpeed made a deliberate choice a strict reading would call optional, httpjet matches LiteSpeed. Everything is held in place by ~3,000 tests, h2spec, fuzzing, CI interoperability jobs and the production deploy gates.</p>
+    <p class="lede">Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result: <strong>146 / 146</strong> h2spec 2.6.0 over TLS. Later sections reference this score, not repeat it.</p>
 
     <section>
       <h2 id="matrix">Conformance matrix</h2>
       <div class="tablewrap"><table>
-        <thead><tr><th>Area</th><th>Standard / reference</th><th>Status</th></tr></thead>
+        <thead><tr><th>Area</th><th>Standard / reference</th><th>Status</th><th>Notes</th></tr></thead>
         <tbody>
-          <tr><td>HTTP/1.1</td><td>RFC 9110 · RFC 9111 · RFC 9112</td><td>Strict framing, conditional requests, single + multipart ranges (RFC 9110 §14), <code>Vary</code>, 103 Early Hints (RFC 8297); RFC 9112 request-target forms enforced at intake (origin-form; <code>*</code> OPTIONS-only; absolute-form reduced with its authority replacing Host), 405 for CONNECT, 400 for authority-form/raw <code>#</code>/bare-LF lines, Host required on HTTP/1.1 and validated by the h2 authority rule</td></tr>
-          <tr><td>HTTP/2</td><td>RFC 9113 (native <code>hj-h2</code>)</td><td><strong>146 / 146</strong> h2spec 2.6.0 over TLS; h2c informative 145/146 (documented dual-protocol exception)</td></tr>
-          <tr><td>HPACK</td><td>RFC 7541</td><td>Zero-allocation codec; two fuzz targets</td></tr>
-          <tr><td>HTTP/3 / QUIC</td><td>RFC 9114 over RFC 9000 (quinn-proto), QPACK RFC 9204</td><td>aioquic transfer and OTel trace fixtures in CI; migration disabled</td></tr>
-          <tr><td>TLS</td><td>rustls + aws-lc-rs · RFC 8446 mandatory suite</td><td>SNI mirrors OpenLiteSpeed; mTLS with CRLs; single-use tickets, 0-RTT off</td></tr>
-          <tr><td>ACME</td><td>RFC 8555 §8.1 / §8.3 (Pebble v2.10.1 fixtures)</td><td>HTTP-01 and DNS-01 behind <code>--features acme</code></td></tr>
-          <tr><td>OCSP</td><td>RFC 6960 with the lightweight-profile conventions (SHA-256 issuer identity, bounded fetch — not full client conformance)</td><td>Behind <code>--features ocsp</code></td></tr>
-          <tr><td>PROXY protocol</td><td>v2 binary + v1 text</td><td>Per-listener, fail-closed, pre-TLS/pre-sniff; loopback claims refused</td></tr>
-          <tr><td>LSAPI</td><td>Native wire codec (vendored php-src <code>lsapidef.h</code>)</td><td>Parity with <code>lsphp</code>; fuzzed response-header parser</td></tr>
-          <tr><td>FastCGI</td><td>FastCGI 1.0 (65,535-byte records, application record types)</td><td>Synthetic responder interoperability</td></tr>
-          <tr><td>ETag</td><td>LiteSpeed <code>fileETag=28</code></td><td><code>"&lt;size&gt;-&lt;mtime&gt;-&lt;inode&gt;;;;"</code>, byte-for-byte</td></tr>
-          <tr><td><code>.htaccess</code></td><td>Apache mod_rewrite / mod_access / mod_auth_basic / mod_headers / mod_expires subset</td><td>Directive and flag parity for the common core (including <code>Expires*</code>, <code>Header merge</code> and APR1/MD5-crypt htpasswd); <code>Header</code> boundary characterized by fixtures</td></tr>
-          <tr><td>OpenTelemetry</td><td>OTLP HTTP/protobuf, W3C traceparent (version 00)</td><td>Behind <code>--features otel</code>; decoded-protobuf tests</td></tr>
-          <tr><td>LiteSpeed parity</td><td>Retired differential matrix vs LSWS 6.3.5</td><td>11 / 11 on the retained behaviors; now exercised continuously by production</td></tr>
+          <tr><td>HTTP/1.1</td><td>RFC 9110 · RFC 9111 · RFC 9112</td><td>Strict framing, conditionals, ranges, <code>Vary</code>, 103.</td><td>Targets below.</td></tr>
+          <tr><td>HTTP/2</td><td>RFC 9113 (native <code>hj-h2</code>)</td><td>Full TLS pass. Limit: see lede.</td><td>h2c 145/146, one exception.</td></tr>
+          <tr><td>HPACK</td><td>RFC 7541</td><td>Zero-allocation codec.</td><td>Two fuzz targets.</td></tr>
+          <tr><td>HTTP/3 / QUIC</td><td>RFC 9114 over RFC 9000 (quinn-proto), QPACK RFC 9204</td><td>aioquic + OTel fixtures in CI.</td><td>Migration disabled.</td></tr>
+          <tr><td>TLS</td><td>rustls + aws-lc-rs · RFC 8446 mandatory suite</td><td>SNI mirrors OLS; mTLS + CRLs.</td><td>Single-use tickets; 0-RTT off.</td></tr>
+          <tr><td>ACME</td><td>RFC 8555 §8.1 / §8.3 (Pebble v2.10.1 fixtures)</td><td>HTTP-01, DNS-01.</td><td>Behind <code>--features acme</code>.</td></tr>
+          <tr><td>OCSP</td><td>RFC 6960 with the lightweight-profile conventions (SHA-256 issuer identity, bounded fetch — not full client conformance)</td><td>Bounded fetch.</td><td>Behind <code>--features ocsp</code>.</td></tr>
+          <tr><td>PROXY protocol</td><td>v2 binary + v1 text</td><td>Per-listener, fail-closed.</td><td>Pre-TLS; loopback refused.</td></tr>
+          <tr><td>LSAPI</td><td>Native wire codec (vendored php-src <code>lsapidef.h</code>)</td><td><code>lsphp</code> parity.</td><td>Header parser fuzzed.</td></tr>
+          <tr><td>FastCGI</td><td>FastCGI 1.0 (65,535-byte records, application record types)</td><td>Synthetic responder interop.</td><td>65,535-byte records.</td></tr>
+          <tr><td>ETag</td><td>LiteSpeed <code>fileETag=28</code></td><td>Byte-for-byte.</td><td><code>"&lt;size&gt;-&lt;mtime&gt;-&lt;inode&gt;;;;"</code></td></tr>
+          <tr><td><code>.htaccess</code></td><td>Apache mod_rewrite / mod_access / mod_auth_basic / mod_headers / mod_expires subset</td><td>Common-core parity.</td><td><code>Expires*</code>, <code>Header merge</code>, APR1 htpasswd.</td></tr>
+          <tr><td>OpenTelemetry</td><td>OTLP HTTP/protobuf, W3C traceparent (version 00)</td><td>Protobuf tests pass.</td><td>Behind <code>--features otel</code>.</td></tr>
+          <tr><td>LiteSpeed parity</td><td>Retired differential matrix vs LSWS 6.3.5</td><td>11 / 11 retained.</td><td>Production exercises continuously.</td></tr>
         </tbody></table></div>
+      <p>Intake: origin-form; <code>*</code> OPTIONS-only; absolute-form authority replaces Host. CONNECT: 405. Authority-form, raw <code>#</code>, bare-LF: 400. HTTP/1.1 requires Host, h2-validated. Target: LSWS 6.3.5, same tree. LiteSpeed choices beat strict readings.</p>
     </section>
 
     <section>
       <h2 id="parity">LiteSpeed parity and the clean-room boundary</h2>
-      <p>Differential testing against a live LiteSpeed reached 11/11 on ETag format, <code>.html</code>→PHP dispatch, LSAPI encoding and rewrite-flag semantics before the apparatus was retired: httpjet <em>is</em> now the same-config drop-in serving the live tree. The authoritative reference for LiteSpeed's exact behavior was the GPL OpenLiteSpeed source, read to extract <em>behavior</em> and then reimplemented from scratch — no OpenLiteSpeed code was copied. httpjet itself is licensed <strong>GPL-3.0-only</strong>, with no paid edition or license key, and is independent of and not endorsed by LiteSpeed Technologies.</p>
+      <p>Differential testing hit 11/11 pre-retirement: ETag, <code>.html</code>→PHP, LSAPI encoding, rewrite flags. httpjet now serves the live tree as drop-in. Reference: GPL OpenLiteSpeed source, behavior only. Reimplemented from scratch. No OLS code copied. License: <strong>GPL-3.0-only</strong>. No paid edition, no key. Independent, not endorsed by LiteSpeed Technologies.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>fileETag=28</b> · byte-for-byte</span></div><pre><code>ETag: "4096-1718800000-1572934;;;"     <span class="t-c"># size-mtime-inode, three trailing semicolons — strict validators compare bytes</span></code></pre></div>
-      <p>Suffix routing and the <code>.html</code>→PHP decision follow OpenLiteSpeed's order, including the source-disclosure guard: a script whose handler has no pool is a 503 and never falls through to static.</p>
+      <p>Suffix routing follows OLS order, including disclosure guard. Pool-less script handlers return 503. Never serve statically instead.</p>
     </section>
 
     <section>
@@ -36,22 +37,23 @@
         <thead><tr><th>Layer</th><th>What it covers</th><th>Run</th></tr></thead>
         <tbody>
           <tr><td><span class="crate">unit</span></td><td>Pure logic per crate: config parsing, rewrite evaluation, HPACK, ETags, cache keys, ACME snapshots, OCSP profiles, FastCGI records.</td><td><code>cargo test -p &lt;crate&gt;</code></td></tr>
-          <tr><td><span class="crate">integration</span></td><td>Crate boundaries: real <code>.htaccess</code> files through the engine (<code>redirect_repro</code>, <code>header_compat</code>), upstream groups on ephemeral ports, page-cache expiry/race tests, full-pipeline e2e and security regressions in the binary, the H1 corpus replay (2,333 seed/truncation/mutation cases).</td><td><code>cargo test --workspace</code></td></tr>
+          <tr><td><span class="crate">integration</span></td><td>Crate boundaries: <code>.htaccess</code> engine (<code>redirect_repro</code>, <code>header_compat</code>), upstreams, cache races, pipeline e2e, H1 corpus (2,333 cases).</td><td><code>cargo test --workspace</code></td></tr>
           <tr><td><span class="crate">live (<code>#[ignore]</code>)</span></td><td>Spawn <code>lsphp</code>, read real certificates, bind ports, QUIC round-trips, Pebble issuance. Run individually with their prerequisites; never as one batch.</td><td><code>cargo test -- --ignored &lt;name&gt;</code></td></tr>
           <tr><td><span class="crate">scripts</span></td><td>Real-server fixtures on isolated loopback listeners: h2spec, ACME/OCSP/admin runtime tests, the cache gates, memo parity, OCI smoke.</td><td>see each page</td></tr>
         </tbody></table></div>
-      <p>The last full runs: the whole workspace suite green at the 0.1.10 release (3,068 passed / 0 failed; 3,019 at 0.1.5); 2,028 at 0.0.5. The 0.1.11 defaults change added its own gates before the flip: 40 response-memo tests, a pipeline test proving a real memo hit with immediate purge revocation, and 24 H1/H2 plus 4 H3 smoke arms that must record actual memo hits. A failure is a regression, not "pre-existing." Timing-flaky meta-assertions were deleted in June 2026 so the concurrency tests are deterministic.</p>
-      <!--diagram:verification-pyramid|<strong>Four-layer verification stack.</strong> Every change passes ~3,068 unit and integration tests, bounded corpus and ASan fuzz targets, protocol interoperability suites (<code>h2spec</code> 146/146, <code>aioquic</code>, Pebble ACME, OTel), and live loopback deploy gates before cutover.-->
+      <p>Last runs: 0.1.10 green (3,068 passed / 0 failed; 3,019 at 0.1.5; 2,028 at 0.0.5). Before flipping 0.1.11 defaults: 40 memo tests, purge-revocation pipeline test, 24 H1/H2 + 4 H3 arms recording real hits. Failures count as regressions. Flaky meta-assertions removed June 2026. Tests stay deterministic.</p>
+      <!--diagram:verification-pyramid|<strong>Four-layer verification stack.</strong> Every change passes ~3,068 unit and integration tests, bounded corpus and ASan fuzz targets, protocol interoperability suites (<code>h2spec</code>, <code>aioquic</code>, Pebble ACME, OTel), and live loopback deploy gates before cutover.-->
+      <p><strong>Production gates.</strong> Deploys run cache gates (cross-URL/scheme/host, private, persistence), memo parity, capsule purge, h2spec. Failure classes: <a href="page-cache.html#gates">Page cache → deploy gates</a>. Flow: <a href="operations.html#deploy">Operations → deploy</a>.</p>
     </section>
 
     <section>
       <h2 id="ci">CI and interoperability jobs</h2>
       <ul>
-        <li><strong>Ubuntu 24.04 x86_64</strong>: formatting, default and profiling builds, strict example-config validation, dependency-license and DCO checks, workspace tests, H1 corpus replay.</li>
-        <li><strong>Ubuntu 22.04 x86_64 and Ubuntu 24.04 ARM64</strong>: compile all features, replay H1, run the real io_uring UDS H1/H2 test — selected compatibility probes on GitHub-hosted runners, not a full kernel matrix.</li>
-        <li><strong>Protocol interoperability</strong>: an OTel-enabled binary, h2spec 2.6.0 over TLS against a fresh example configuration (archive SHA-256 pinned, exactly 146/146 required), H1 WebSocket / H2 dispatch tracing, and the aioquic 1.3.0 QUIC test in an isolated venv.</li>
-        <li><strong>Dependency advisories</strong>: a daily job fails on any RustSec finding and on a newer compatible transport-critical crate (quinn, rustls, aws-lc-rs, tokio, httparse, io-uring, zstd, brotli, h2, hyper, http, mio, socket2, openssl, bcrypt, libc).</li>
-        <li><strong>Weekly/manual fuzz</strong>: all eight parser targets with bounded time, input size, memory and artifact retention.</li>
+        <li><strong>Ubuntu 24.04 x86_64</strong>: fmt, builds, config validation, license/DCO, workspace tests, H1 replay.</li>
+        <li><strong>Ubuntu 22.04 x86_64, 24.04 ARM64</strong>: all-features compile, H1 replay, io_uring UDS test. Selected probes only, no kernel matrix.</li>
+        <li><strong>Protocol interoperability</strong>: OTel binary, h2spec 2.6.0 TLS (SHA-256 pinned, exact pass — see lede), WebSocket/H2 tracing, aioquic 1.3.0 venv test.</li>
+        <li><strong>Dependency advisories</strong>: daily RustSec failures, plus newer transport-critical crates (quinn, rustls, aws-lc-rs, tokio, httparse, io-uring, zstd, brotli, h2, hyper, http, mio, socket2, openssl, bcrypt, libc).</li>
+        <li><strong>Weekly/manual fuzz</strong>: eight targets, bounded time/size/memory/retention.</li>
       </ul>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>local reproduction</b></span></div><pre><code>cargo test --locked -p httpjet --test h1_corpus -- --nocapture
 cargo build --locked -p httpjet --features otel --bin httpjet
@@ -63,12 +65,12 @@ cargo test --locked -p httpjet --features otel traced_quic_roundtrip -- --ignore
 
     <section>
       <h2 id="fuzz">Fuzzing</h2>
-      <p>Eight <code>cargo-fuzz</code> targets share one invariant (never panic, never allocate unboundedly, agree with the reference decoder where one exists): <code>h1_chunked_decode</code>, <code>h1_request_framing</code>, <code>hpack_decode</code>, <code>hpack_roundtrip</code>, <code>lsapi_resp_header</code>, and — added in the 2026-10-06 review — <code>qpack_decode</code>, <code>proxy_protocol_parse</code> and <code>lscache_control</code>. Short ASan smoke runs of the original five covered 164,558 chunked, 739,373 framing, 452,899 HPACK-decode, 58,082 HPACK-roundtrip and 438,582 LSAPI-header executions without a finding.</p>
+      <p>Eight <code>cargo-fuzz</code> targets share one invariant: never panic, never allocate unboundedly, agree with reference decoders. Targets: <code>h1_chunked_decode</code>, <code>h1_request_framing</code>, <code>hpack_decode</code>, <code>hpack_roundtrip</code>, <code>lsapi_resp_header</code>. Added 2026-10-06: <code>qpack_decode</code>, <code>proxy_protocol_parse</code>, <code>lscache_control</code>. ASan smokes (original five): 164,558 chunked, 739,373 framing, 452,899 HPACK-decode, 58,082 roundtrip, 438,582 LSAPI-header executions. No findings.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>bounded fuzz</b></span></div><pre><code>FUZZ_TOOLCHAIN=nightly FUZZ_SECONDS=5 bash scripts/fuzz-bounded.sh h1_request_framing
 python3 scripts/fuzz-seeds.py     <span class="t-c"># regenerate the shared seed corpus</span></code></pre></div>
     </section>
 
     <section>
       <h2 id="gates">Production gates</h2>
-      <p>Beyond the suites, a deploy runs the cache-correctness gates (cross-URL, cross-scheme, cross-host, private tier, persistence), the fast-memo parity gate, the capsule purge gate and the h2spec gate. They are described with their failure classes on <a href="page-cache.html#gates">Page cache → deploy gates</a> and <a href="operations.html#deploy">Operations → deploy</a>.</p>
+      <p>See <a href="#testing">Test layers</a> footer. Gates listed once there.</p>
     </section>

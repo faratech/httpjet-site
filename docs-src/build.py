@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261108f'
+VERSION = '20261108g'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -51,32 +51,34 @@ CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' ajax.cloudflare.co
 
 # (eyebrow, [(slug, nav title, page <title> suffix, description)])
 NAV = [
-  ('Guide', [
-    ('index', 'Overview', 'documentation', 'httpjet is a from-scratch Rust web server and drop-in LiteSpeed replacement: the same XML configuration, native HTTP/2 and HTTP/3, LSAPI PHP, .htaccess rewriting, reverse proxy and FastCGI gateways, and an opt-in origin page cache.'),
-    ('quickstart', 'Quickstart', 'quickstart', 'Install a signed Linux release with HTTP and HTTPS, or build httpjet from source and serve it on loopback.'),
-    ('architecture', 'Architecture', 'architecture', 'The httpjet workspace: 19 hj-* library crates under one binary, the frozen hj-core contract, the io_uring transport bridge, the request pipeline, and configuration generations.'),
-    ('capabilities', 'Capabilities &amp; limits', 'capabilities and limits', 'What httpjet supports today, what is optional behind build features, what is deliberately unsupported, and the fixed operational bounds.'),
+  ('START HERE', [
+    ('index', 'Overview', 'documentation', 'Start here for what httpjet is.'),
+    ('quickstart', 'Quickstart', 'quickstart', 'Install httpjet and serve your first page.'),
+    ('migration', 'Migrating from LiteSpeed', 'migrating from LiteSpeed', 'Move an existing LiteSpeed site step by step.'),
+    ('capabilities', 'Capabilities &amp; limits', 'capabilities and limits', 'See what is supported, optional, or unsupported.'),
   ]),
-  ('Internals', [
-    ('protocols', 'Protocol stacks', 'protocol stacks', 'HTTP/1.1, native HTTP/2 with zero-allocation HPACK, HTTP/3 over QUIC, sendfile and kTLS egress, PROXY protocol, and Unix-socket listeners on one io_uring transport.'),
-    ('certificates', 'TLS, ACME &amp; OCSP', 'TLS, ACME and OCSP', 'Certificate selection, mutual TLS with CRLs, resumption policy, opt-in ACME HTTP-01 and DNS-01 issuance, and opt-in OCSP stapling.'),
-    ('lsapi', 'LSAPI &amp; PHP', 'LSAPI and PHP', 'The native LSAPI wire codec, the lsphp supervisor, the zero-downtime external pool with generation tracking, the CGI environment, and the fail-closed jail.'),
-    ('gateways', 'Proxy &amp; gateways', 'reverse proxy, upstream groups and FastCGI', 'Reverse proxy over h1/h2/h2s, weighted upstream groups with active health checks, WebSocket and SSE relay, and the opt-in FastCGI gateway.'),
-    ('rewrite', 'Rewrite &amp; .htaccess', 'rewrite engine and .htaccess', 'The Apache mod_rewrite engine: per-directory loading, the dense-DFA prefilter, directives and flags, access control, Basic auth, header operations, and the fast-path memo.'),
-    ('security', 'Security &amp; access control', 'security and access control', 'Client identity, network ACLs, throttling, GeoIP/ASN rules, PROXY protocol trust, request decompression limits, the body budget, the WAF sidecar, and the PHP jail.'),
-    ('page-cache', 'Page cache', 'origin page cache', 'The opt-in LSCache-protocol origin page cache: keys, tiers, admission, purge, the file tier, dictionaries, stale policies, capsules, and generation-scoped namespaces.'),
-    ('compression', 'Compression', 'compression', 'Response compression with gzip, brotli and zstd, server-priority negotiation, streaming encoders, precompressed siblings, and bounded request decompression.'),
+  ('CONFIGURE &amp; OPERATE', [
+    ('configuration', 'Configuration', 'configuration reference', 'Look up every setting in the XML reference.'),
+    ('certificates', 'TLS, ACME &amp; OCSP', 'TLS, ACME and OCSP', 'Set up certificates, ACME issuance, and OCSP.'),
+    ('security', 'Security &amp; access control', 'security and access control', 'Control who can reach your sites.'),
+    ('operations', 'Operations', 'operations and deployment', 'Deploy, upgrade, roll back, and recover safely.'),
+    ('observability', 'Observability', 'observability', 'Read metrics, logs, and request traces.'),
+    ('admin-api', 'Admin API &amp; reload', 'admin API and reload', 'Check status and reload configuration safely.'),
   ]),
-  ('Running it', [
-    ('configuration', 'Configuration', 'configuration reference', 'The LiteSpeed-compatible XML reference: server, tuning, security, listeners, external processors, upstream groups, virtual hosts, contexts, and httpjet-native extensions.'),
-    ('cli', 'CLI reference', 'CLI reference', 'Every httpjet subcommand and serve flag, grouped and filterable, plus the environment variables the binary reads.'),
-    ('operations', 'Operations', 'operations and deployment', 'Systemd socket activation, the persistent PHP pool, safe changes, deploy gates, rollback, kill switches, and the hardened OCI example.'),
-    ('observability', 'Observability', 'observability', 'Prometheus metrics, the cache-entries report, access and error logs in text or JSON, syslog, request ids, telemetry, the PHP slow log, OpenTelemetry, and profiling.'),
-    ('admin-api', 'Admin API &amp; reload', 'admin API and reload', 'SIGHUP reload semantics, the read-only status API, the transactional configuration API, revisions, and the restart-required boundary.'),
-    ('extensions', 'Extending httpjet', 'extending httpjet', 'Compile-time extension hooks, the bounded WAF sidecar contract, and why there is no dynamic plugin ABI.'),
-    ('performance', 'Performance', 'performance', 'Measured throughput by regime: three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.'),
-    ('conformance', 'Conformance &amp; testing', 'conformance and testing', 'h2spec 146/146, RFC coverage, LiteSpeed parity, the test layers, CI interoperability jobs, fuzzing, and the deploy gates.'),
-    ('migration', 'Migrating from LiteSpeed', 'migrating from LiteSpeed', 'A validation-first migration path from LiteSpeed or OpenLiteSpeed: inventory, check --strict, isolated candidate, behavioral proof, caching, cutover and rollback.'),
+  ('HOW IT WORKS', [
+    ('architecture', 'Architecture', 'architecture', 'See how the server fits together.'),
+    ('protocols', 'Protocol stacks', 'protocol stacks', 'How HTTP versions and listeners work.'),
+    ('rewrite', 'Rewrite &amp; .htaccess', 'rewrite engine and .htaccess', 'How .htaccess rules rewrite and protect requests.'),
+    ('page-cache', 'Page cache', 'origin page cache', 'How full pages are cached and cleared.'),
+    ('lsapi', 'LSAPI &amp; PHP', 'LSAPI and PHP', 'How httpjet runs PHP through lsphp.'),
+    ('gateways', 'Proxy &amp; gateways', 'reverse proxy, upstream groups and FastCGI', 'Proxy traffic to other servers and services.'),
+    ('compression', 'Compression', 'compression', 'How responses shrink for faster delivery.'),
+    ('extensions', 'Extending httpjet', 'extending httpjet', 'Add trusted code and sidecar checks.'),
+  ]),
+  ('REFERENCE &amp; EVIDENCE', [
+    ('cli', 'CLI reference', 'CLI reference', 'Every command, flag, and environment variable.'),
+    ('performance', 'Performance', 'performance', 'Measured speed and how it was measured.'),
+    ('conformance', 'Conformance &amp; testing', 'conformance and testing', 'Test results, protocol coverage, and parity checks.'),
   ]),
 ]
 ORDER = [p for _, ps in NAV for p in ps]

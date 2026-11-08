@@ -1,9 +1,9 @@
     <h1>Architecture</h1>
-    <p class="lede">httpjet is a Cargo workspace: <strong>one binary crate</strong> (<code>httpjet</code>) over <strong>nineteen <code>hj-*</code> library crates</strong>. The graph is acyclic, <code>hj-config</code> is the root, and <code>hj-core</code> is the small frozen seam every handler programs against. Two crates (<code>hj-acme</code>, <code>hj-ocsp</code>) only link in behind build features. Roughly 3,100 test functions span the workspace (3,068 green at v0.1.10).</p>
+    <p class="lede">httpjet is a Cargo workspace with <strong>one binary crate</strong> and <strong>nineteen <code>hj-*</code> library crates</strong>. Roughly 3,100 test functions span the workspace (3,068 green at v0.1.10).</p>
 
     <section>
       <h2 id="workspace">Workspace shape</h2>
-      <p>Responsibilities are split so the contract a handler depends on stays tiny while transports, protocols, gateways and the cache evolve behind it. Two libraries are completely isolated — <code>hj-log</code> and <code>hj-geo</code> take no <code>hj-*</code> dependency (nor do the root <code>hj-config</code> and the feature-gated <code>hj-acme</code>/<code>hj-ocsp</code>); <code>hj-cache</code> depends only on <code>hj-config</code> for its <code>&lt;tuning&gt;</code> sizing — while <code>hj-rewrite</code> depends only on <code>hj-compress</code> so <code>.htaccess</code> and XML expiry directives share one <code>A/M</code> time grammar. <code>hj-pagecache</code> is transport-agnostic and builds on <code>hj-cache</code>'s sharded LRU; its request-aware glue lives in the binary.</p>
+      <p>The graph is acyclic and <code>hj-config</code> sits at the root. <code>hj-core</code> is the small frozen seam for every handler. Two crates, <code>hj-acme</code> and <code>hj-ocsp</code>, link only behind build features. The binary is the only crate that sees everything. Transports, protocols, gateways and the cache evolve behind <code>hj-core</code>. Request-aware page-cache glue also lives in the binary.</p>
       <div class="chips">
         <a class="chip ok" href="https://github.com/faratech/httpjet"><span class="dot"></span>Browse workspace on GitHub ↗</a>
         <span class="chip"><span class="dot"></span>1 binary + 19 libraries</span>
@@ -16,7 +16,7 @@
 
     <section>
       <h2 id="dag">Crate dependency graph</h2>
-      <p><code>hj-config</code> parses the LiteSpeed XML tree into one normalized model; <code>hj-core</code> re-exports it so every downstream crate imports the configuration model <em>through</em> core — one import surface, never inverted. The binary is the only crate that sees everything.</p>
+      <p><code>hj-config</code> parses LiteSpeed XML into one normalized model. <code>hj-core</code> re-exports that model for every downstream crate.</p>
       <figure class="figure">
         <svg viewBox="0 0 880 600" role="img" aria-label="Crate dependency graph: hj-config feeds hj-core, which feeds the handler and transport crates; isolated crates and optional feature crates converge on the httpjet binary.">
           <defs>
@@ -44,7 +44,7 @@
           <g><rect class="node-box" x="700" y="200" width="150" height="130" rx="10"/><text class="node-d" x="775" y="220" text-anchor="middle" fill="#8b95ad">no direct hj-core dep</text><text class="node-t" x="775" y="244" text-anchor="middle" font-size="11.5">hj-rewrite</text><text class="node-t" x="775" y="266" text-anchor="middle" font-size="11.5">hj-log</text><text class="node-t" x="775" y="288" text-anchor="middle" font-size="11.5">hj-geo</text><text class="node-t" x="775" y="310" text-anchor="middle" font-size="11.5">hj-cache</text></g>
           <g><rect x="300" y="504" width="280" height="62" rx="10" fill="#13203a" stroke="url(#brandgrad)" stroke-width="1.6"/><text class="node-t" x="440" y="526" text-anchor="middle" fill="#fff" font-size="13">httpjet</text><text class="node-d" x="440" y="541" text-anchor="middle">uring transport · pipeline · lscache glue · admin</text><text class="node-d" x="440" y="555" text-anchor="middle">config_transaction · resource_generation · waf · otel</text></g>
         </svg>
-        <figcaption>hj-config → hj-core → handlers/transports → the httpjet binary. Isolated crates converge at the binary; <code>hj-geo</code> feeds <code>hj-acl</code>'s <code>GeoRules</code>; the two feature-gated crates hang off <code>hj-tls</code>'s resolver handles.</figcaption>
+        <figcaption>hj-config → hj-core → handlers and transports → the httpjet binary.</figcaption>
       </figure>
     </section>
 
@@ -54,36 +54,37 @@
         <table>
           <thead><tr><th>Crate</th><th>Role</th></tr></thead>
           <tbody>
-            <tr><td><span class="crate">hj-core</span></td><td>Protocol-agnostic <code>Request</code>/<code>Response</code>/<code>Body</code>, <code>ReqCtx</code>, the vhost <code>Router</code>, shared budgets (<code>BodyBufferBudget</code> leases, <code>BandwidthThrottle</code>, <code>ResponseCompletion</code>, <code>body_deadline</code>), and <code>recycle</code> (<code>TieredPool</code> transient buffer and task pooling) — the seam every handler programs against.</td></tr>
-            <tr><td><span class="crate">hj-config</span></td><td>LiteSpeed XML → one normalized model (<code>$VAR</code> substitution, OLS-faithful value semantics, fail-closed defaults). <code>parse_bundle</code> is the in-memory variant used by the <a href="admin-api.html#write">transactional API</a>.</td></tr>
-            <tr><td><span class="crate">hj-tls</span></td><td>One rustls <code>ServerConfig</code> for TCP + QUIC: SNI resolver (no cert-name-match, like OLS), dual ECDSA/RSA chains, mTLS verifier with CRLs, generation-bound staple slots, certificate reload handles.</td></tr>
-            <tr><td><span class="crate">hj-acme</span> <span class="badge opt">feature</span></td><td>RFC 8555 HTTP-01/DNS-01 issuance and renewal (instant-acme), the 0700 <code>PrivateStore</code> with atomic snapshots, challenge registry, DNS webhook adapter with durable cleanup journal.</td></tr>
-            <tr><td><span class="crate">hj-ocsp</span> <span class="badge opt">feature</span></td><td>Bounded OCSP fetch + OpenSSL 3.x signature/issuer/freshness validation; status lifecycle with revocation enforcement.</td></tr>
-            <tr><td><span class="crate">hj-http</span></td><td>The shared <code>ServeConfig</code> connection-tuning struct derived from <code>&lt;tuning&gt;</code>. Its old hyper-H1/quinn-H3 adapters were removed when io_uring became the only transport.</td></tr>
-            <tr><td><span class="crate">hj-h2</span></td><td>The <strong>native HTTP/2 server</strong>: one task per connection, send flow control, streaming bodies, one vectored write per wake, RFC 9113 validation, and the zero-allocation HPACK codec (<code>hj_h2::hpack</code>).</td></tr>
-            <tr><td><span class="crate">hj-lsapi</span></td><td>Native LSAPI wire codec (vendored <code>lsapidef.h</code> constants), UDS client pool with generation epochs, the <code>lsphp</code> supervisor and subreaper, the CGI env builder, and the fail-closed jail.</td></tr>
-            <tr><td><span class="crate">hj-fastcgi</span></td><td>Bounded FastCGI record codec, connection pool (poison-by-default), strict CGI response parser and streaming handler for explicit <code>fcgi</code>/<code>fastcgi</code> processors.</td></tr>
-            <tr><td><span class="crate">hj-static</span></td><td>Static files: <code>openat2(RESOLVE_BENEATH)</code> resolution, <code>fileETag</code> ETags, conditional requests, single + multipart ranges, precompressed <code>.br</code>/<code>.gz</code> siblings, <code>Body::File</code> with pinned inodes for sendfile.</td></tr>
-            <tr><td><span class="crate">hj-cache</span></td><td>The shared <code>ShardedCache</code> byte-weighted LRU primitive and <code>CacheCaps</code> sizing (the former mmap file cache was removed — it had no consumers).</td></tr>
-            <tr><td><span class="crate">hj-pagecache</span></td><td>The <strong>origin page store</strong>: sharded byte-LRU index with W-TinyLFU admission, keys + vary + tags + TTL/stale windows, the LSCache header classifier, the HJPC file tier with boot scan, dictionary recompression, single teardown path.</td></tr>
-            <tr><td><span class="crate">hj-compress</span></td><td>gzip/brotli/zstd response encoders, server-priority negotiation, streaming <code>CompressStream</code>, per-thread zstd contexts, and the per-vhost <code>PageDictRegistry</code> the page cache uses for internal dedup.</td></tr>
-            <tr><td><span class="crate">hj-rewrite</span></td><td>Apache mod_rewrite / <code>.htaccess</code>: dense-DFA prefilter, linear-first regex with <code>fancy-regex</code> fallback, access control, scoped Basic auth, header ops, LSCache directives, memo-eligibility classification.</td></tr>
-            <tr><td><span class="crate">hj-proxy</span></td><td>Reverse proxy (h1, <code>h2://</code>, <code>h2s://</code>), upstream groups with weighted selection and active health checks, passive circuit breaker, WebSocket relay, SSE streaming, upstream mTLS.</td></tr>
-            <tr><td><span class="crate">hj-acl</span></td><td>Allow/deny ACLs with trusted-proxy (<code>T</code>) marking, real-IP resolution and anti-spoofing, the sharded per-IP throttle, and <code>GeoRules</code> (geo/ASN resolved to CIDR sets at state build).</td></tr>
-            <tr><td><span class="crate">hj-geo</span></td><td>Offline GeoIP/ASN sources: the CidrList text format and binary-search interval sets. No runtime fetches.</td></tr>
-            <tr><td><span class="crate">hj-log</span></td><td>Non-blocking access + error logging: common/combined/JSON access lines, text or JSON error events with redaction, size rolling with day pruning, the syslog tap.</td></tr>
-            <tr><td><span class="crate">hj-extension</span></td><td><code>ExtensionRegistry</code> for compile-time pre-handlers and response transforms (the shipped registry is empty).</td></tr>
-            <tr><td><span class="crate">httpjet</span></td><td>The binary: listener planning and adoption, the <code>uring/</code> transport, <code>pipeline/</code>, <code>lscache/</code> glue, the fast-path memo, metrics, admin listeners, config transactions and resource generations, WAF client, OTel, PHP slow log, memory trim.</td></tr>
+            <tr><td><span class="crate">hj-core</span></td><td>The frozen handler seam. Limit: changing its types requires updating every dependent.</td></tr>
+            <tr><td><span class="crate">hj-config</span></td><td>LiteSpeed XML to one normalized model. Limit: defaults fail closed.</td></tr>
+            <tr><td><span class="crate">hj-tls</span></td><td>One rustls config for TCP and QUIC. Limit: SNI uses no cert-name-match, like OLS.</td></tr>
+            <tr><td><span class="crate">hj-acme</span> <span class="badge opt">feature</span></td><td>HTTP-01 and DNS-01 issuance and renewal. Limit: links only behind <code>acme</code>.</td></tr>
+            <tr><td><span class="crate">hj-ocsp</span> <span class="badge opt">feature</span></td><td>Bounded OCSP fetch and validation. Limit: needs OpenSSL 3.x and the <code>ocsp</code> feature.</td></tr>
+            <tr><td><span class="crate">hj-http</span></td><td>Shared connection-tuning from <code>&lt;tuning&gt;</code>. Limit: it holds no transport.</td></tr>
+            <tr><td><span class="crate">hj-h2</span></td><td>The native HTTP/2 server and HPACK codec. Limit: one task serves each connection.</td></tr>
+            <tr><td><span class="crate">hj-lsapi</span></td><td>LSAPI codec, pool and <code>lsphp</code> supervisor. Limit: the jail fails closed.</td></tr>
+            <tr><td><span class="crate">hj-fastcgi</span></td><td>FastCGI codec, pool and handler. Limit: use only explicit <code>fcgi</code>/<code>fastcgi</code> processors.</td></tr>
+            <tr><td><span class="crate">hj-static</span></td><td>Static files with ranges and conditionals. Limit: opens stay beneath the docroot.</td></tr>
+            <tr><td><span class="crate">hj-cache</span></td><td>Shared sharded byte-LRU primitive. Limit: sizing comes from <code>CacheCaps</code>.</td></tr>
+            <tr><td><span class="crate">hj-pagecache</span></td><td>The origin page store. Limit: request-aware glue lives in the binary.</td></tr>
+            <tr><td><span class="crate">hj-compress</span></td><td>gzip, brotli and zstd response encoding. Limit: negotiation follows server priority.</td></tr>
+            <tr><td><span class="crate">hj-rewrite</span></td><td>mod_rewrite and <code>.htaccess</code> evaluation. Limit: lookahead uses <code>fancy-regex</code> fallback.</td></tr>
+            <tr><td><span class="crate">hj-proxy</span></td><td>Reverse proxy, WebSocket and SSE relay. Limit: upstreams use h1, <code>h2://</code> or <code>h2s://</code>.</td></tr>
+            <tr><td><span class="crate">hj-acl</span></td><td>ACLs, real-IP, throttle and geo rules. Limit: geo resolves to CIDR sets at build.</td></tr>
+            <tr><td><span class="crate">hj-geo</span></td><td>Offline GeoIP and ASN sources. Limit: it makes no runtime fetches.</td></tr>
+            <tr><td><span class="crate">hj-log</span></td><td>Non-blocking access and error logging. Limit: the syslog tap is optional.</td></tr>
+            <tr><td><span class="crate">hj-extension</span></td><td>Compile-time handlers and transforms. Limit: the shipped registry is empty.</td></tr>
+            <tr><td><span class="crate">httpjet</span></td><td>The binary with transport and pipeline. Limit: it alone sees every crate. Path: see the note below this table.</td></tr>
           </tbody>
         </table>
       </div>
+      <p>Path: transport lives in <code>crates/httpjet/src/uring/</code>. Path: pipeline lives in <code>crates/httpjet/src/pipeline/</code>. Path: cache glue lives in <code>crates/httpjet/src/lscache/</code>. Path: HTTP/2 lives in <code>crates/hj-h2/src/server/</code>. Path: rewrite lives in <code>crates/hj-rewrite/src/</code>. Path: LSAPI lives in <code>crates/hj-lsapi/src/</code>.</p>
     </section>
 
     <section>
       <h2 id="transport-paths">Transport paths</h2>
-      <p>The pure io_uring transport is the only serving transport. There is no runtime switch and no <code>URING=0</code> rollback build; reverting is a rebuild from an older revision. One monoio runtime runs per inherited or self-bound <code>SO_REUSEPORT</code> listener fd, pinned to its core when the worker count equals the CPU count (<code>--no-core-pinning</code> is the kill switch).</p>
+      <p>The pure io_uring transport is the only serving transport. You get no runtime switch and no <code>URING=0</code> rollback build. One monoio runtime runs per listener fd. It pins to its core when workers equal CPU count. Use <code>--no-core-pinning</code> to disable pinning.</p>
       <!--diagram:transport|<strong>One transport, three protocols, one pipeline.</strong> Cheap work stays on the monoio core: the H1 codec, the native h2 task, the QUIC driver, and the on-core fast path (finished-response memo, static files, page-cache hits). Anything else crosses <code>uring::bridge</code> into the tokio runtime that owns <code>ServerState</code>, the LSAPI pool, the page cache and reload state, then returns to the monoio core for framing and writes. Bodies ≤ 256 KiB are buffered; larger ones stream on H1, H2 and H3 alike.-->
-      <p>Ring setup is tunable but deliberately plain: <code>--uring-ring legacy</code> (default) uses flagless rings because the measured <code>coop</code> and <code>defer</code> variants were noise or a ~2% loss on the virtualized production guest; ring size stays at the default because ring memory is memlock-charged. Multishot accept is on by default (<code>--no-multishot-accept</code> reverts to one SQE per connection).</p>
+      <p><code>--uring-ring coop</code> is the default since 2026-11-07. It measured +28% RPS and -27% CPU per cookieless H2 cache hit on x86. <code>legacy</code> uses flagless rings. <code>defer</code> measured ~-2% on the GCE guest. Ring size stays at the default. Ring memory is memlock-charged. Multishot accept is on by default. Use <code>--no-multishot-accept</code> for one SQE per connection. Bodies ≤ 256 KiB are buffered. Larger bodies stream on H1, H2 and H3.</p>
     </section>
 
     <section>
@@ -101,13 +102,13 @@
 <span class="t-c">// every post-handler munger (promote → expires → sub_filter → compress → deny-CDN-cache → Alt-Svc)</span>
 <span class="t-k">trait</span> <span class="t-f">ResponseTransform</span> { <span class="t-k">async fn</span> transform(&amp;<span class="t-k">self</span>, &amp;ReqCtx, &amp;<span class="t-k">mut</span> Response); }</code></pre>
       </div>
-      <p><code>FileBody</code> may carry an open descriptor that pins the selected inode across a concurrent cache version swap, recompression or unlink — that is what lets sendfile and the file tier coexist safely. <code>ReqCtx</code> carries the per-request state: <code>server</code>/<code>vhost</code> (Arcs of the pinned generation), <code>peer_ip</code>/<code>client_ip</code> (post-forwarding, or <code>peer_unix</code>), <code>is_tls</code>, <code>protocol</code>, <code>trusted_proxy</code>, and an <code>env</code> vec that holds rewrite <code>[E=]</code> sets <em>and</em> CGI overrides. <code>Router::resolve(listener, key)</code> maps SNI/Host to a vhost.</p>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Extending without touching handle()</span><p>New terminal handlers <code>impl Handler</code> and register in <code>pipeline/mod.rs::dispatch()</code>; new response munging <code>impl ResponseTransform</code> and is pushed into <code>state.rs::build_transforms</code>. Out-of-tree code uses the same traits through the <a href="extensions.html">compile-time extension registry</a>.</p></div></div>
+      <p><code>FileBody</code> can pin an open inode across cache swaps. <code>ReqCtx</code> carries <code>server</code>/<code>vhost</code> and client state. It also carries <code>is_tls</code>, <code>protocol</code> and <code>trusted_proxy</code>. Its <code>env</code> vec holds rewrite <code>[E=]</code> sets and CGI overrides. <code>Router::resolve(listener, key)</code> maps SNI/Host to a vhost.</p>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Extending</span><p>Register new handlers in <code>pipeline/mod.rs::dispatch()</code>. Register new transforms in <code>state.rs::build_transforms</code>. Out-of-tree code uses the <a href="extensions.html">extension registry</a>.</p></div></div>
     </section>
 
     <section>
       <h2 id="pipeline">The request pipeline</h2>
-      <p><code>pipeline::handle()</code> is the integration point: vhost resolution → mTLS trust boundary → client-IP/ACL/geo/throttle → optional WAF inspection → extension pre-handlers → <code>dispatch()</code> → response transforms → access log, metrics and spans. <code>dispatch()</code> mirrors OpenLiteSpeed's ordering with the page-cache seams inserted once rewrite and access state are known:</p>
+      <p><code>pipeline::handle()</code> is the integration point. It resolves the vhost first. It then applies trust, ACL, geo and throttle checks. It runs optional WAF and extension pre-handlers. It then calls <code>dispatch()</code> and applies transforms. It finally writes logs, metrics and spans. <code>dispatch()</code> mirrors OpenLiteSpeed ordering. It inserts page-cache seams after rewrite and access resolve. The pinned <code>LsapiScript</code> extension keeps the resolved script separate. It pushes <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> into <code>ctx.env</code> for front controllers.</p>
       <div class="rail" role="img" aria-label="Dispatch order: htaccess and rewrite, access enforcement, page-cache lookup, WebSocket, proxy, suffix routing, finalize, cache store.">
         <div class="rail__track">
           <span class="stage"><span class="k">resolve</span><span class="d">SNI/Host → vhost</span></span>
@@ -119,30 +120,19 @@
           <span class="stage"><span class="k">store</span><span class="d">cache write · transforms</span></span>
         </div>
       </div>
-      <p>The terminals are intentionally <em>not</em> a uniform matcher registry. Their predicates differ (request headers for WebSocket, URI prefix for proxy contexts, script-path split for suffix routing), their fall-through rules differ, and their post-processing differs, so an explicit <code>if/return</code> chain keeps the security-relevant ordering legible. Two fall-throughs matter: a proxy context that cannot resolve its ext-processor falls through to static, while a script whose handler has no pool <strong>hard-fails 503 and must never fall through</strong> — falling through would serve the raw PHP source.</p>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Load-bearing detail</span><p>A rewrite to <code>index.php</code> keeps the <strong>original</strong> <code>REQUEST_URI</code>: the resolved script is pinned separately via the <code>LsapiScript</code> request extension, with <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> pushed into <code>ctx.env</code>. That is what makes XenForo-style front-controller routing correct — and why the page cache must key by the <em>original</em> URI, never the rewrite-resolved path.</p></div></div>
-      <p>The cache seams are inert unless <code>serve</code> runs with <code>--page-cache</code>: <code>lscache::cache_lookup</code> runs after rewrite/ACL but before any backend (a hit short-circuits dispatch), and <code>lscache::cache_store</code> runs after <code>finalize_response</code> at each terminal return. Both key off a single <code>CacheCtx</code> built once per dispatch.</p>
+      <p>Terminals use an explicit <code>if/return</code> chain, not a uniform registry. A failed proxy context falls through to static. A script with no pool <strong>hard-fails 503</strong>. It must never fall through to source.</p>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Load-bearing detail</span><p>A rewrite to <code>index.php</code> keeps the original <code>REQUEST_URI</code>. The cache must key by that original URI. Never key by the rewrite-resolved path.</p></div></div>
+      <p>Cache seams stay inert without <code>--page-cache</code>. <code>lscache::cache_lookup</code> runs before any backend. <code>lscache::cache_store</code> runs after <code>finalize_response</code>.</p>
     </section>
 
     <section>
       <h2 id="modules">Module organization</h2>
-      <div class="tablewrap"><table>
-        <thead><tr><th>Path</th><th>Contents</th></tr></thead>
-        <tbody>
-          <tr><td><code>crates/httpjet/src/uring/</code></td><td>The transport: <code>mod.rs</code> (accept loops, sniff, TLS), <code>codec.rs</code> (H1), <code>h3.rs</code> (QUIC driver), <code>bridge.rs</code>, <code>ktls.rs</code> + <code>ktls_policy.rs</code>, <code>proxy_protocol.rs</code>, <code>request_body.rs</code> (decompression), <code>worker_group.rs</code> (listener generations).</td></tr>
-          <tr><td><code>crates/httpjet/src/pipeline/</code></td><td><code>mod.rs</code> (<code>handle</code>/<code>dispatch</code>/<code>finalize_response</code>), <code>rewrite_glue</code>, <code>proxy_glue</code> (incl. <code>ProxyHandler</code>), <code>htaccess_apply</code>, <code>suffix_routing</code>, <code>scoped_auth</code>, <code>fast_memo</code>, <code>response_util</code>, and the in-file e2e/security regression tests.</td></tr>
-          <tr><td><code>crates/httpjet/src/lscache/</code></td><td><code>mod.rs</code> (<code>CacheCtx</code>, <code>cache_lookup</code>/<code>cache_store</code>), <code>hit.rs</code> (hit-response construction + precompress), <code>singleflight.rs</code>.</td></tr>
-          <tr><td><code>crates/httpjet/src/{admin*,config_transaction,resource_generation,serving_generation,listener_plan,tcp_candidate}.rs</code></td><td>The read-only status API, the authenticated write API, the publication coordinator, and the listener/resource generation model behind SIGHUP and transactional reloads.</td></tr>
-          <tr><td><code>crates/httpjet/src/{acme_runtime,ocsp_runtime,otel,waf,extensions,metrics,telemetry,phpslow,memtrim}.rs</code></td><td>Feature runtimes and observability.</td></tr>
-          <tr><td><code>crates/hj-h2/src/server/</code></td><td><code>state</code>/<code>recv</code>/<code>send</code> + <code>serve()</code>; HPACK is the <code>hpack</code> submodule.</td></tr>
-          <tr><td><code>crates/hj-rewrite/src/</code></td><td><code>rules/{parse,eval}</code>, <code>htaccess/{parse,mod_access,auth_scope,cache,php,scope_index}</code>, <code>auth.rs</code> (htpasswd).</td></tr>
-          <tr><td><code>crates/hj-lsapi/src/</code></td><td><code>proto/{frame,builder}</code>, <code>pool.rs</code>, <code>supervisor</code>, and the security-critical <code>jail</code>.</td></tr>
-        </tbody></table></div>
+      <p>See the Path note under <a href="#crate-map">Crate map</a>.</p>
     </section>
 
     <section>
       <h2 id="generations">Configuration generations</h2>
-      <p>Live state is published as immutable <em>generations</em> behind an <code>ArcSwap</code>. A SIGHUP or an <a href="admin-api.html#write">API transaction</a> builds a complete candidate (config, rewrite caches, health schedulers) with background work inactive, validates it, then publishes it atomically under one coordinator; requests already in flight finish on the generation they pinned at acceptance.</p>
+      <p>Live state publishes as immutable <em>generations</em> behind an <code>ArcSwap</code>. A SIGHUP or <a href="admin-api.html#write">API transaction</a> builds a complete candidate first. It validates the candidate before publishing. In-flight requests finish on their pinned generation.</p>
       <!--diagram:generations|<strong>Candidate → published → retired.</strong> A rejected candidate never touches the serving generation. Trust changes (TLS material, mTLS policy, PROXY protocol) retire the old listener group and drain its connections under their pinned policy; boot-owned resources (listener topology, PHP pools, cache stores, privileges) are <code>restart_required</code>.-->
       <p>The full ownership inventory and the transactional replacement sequence are on <a href="admin-api.html#reload">Admin API &amp; reload</a>.</p>
     </section>
@@ -152,10 +142,10 @@
       <ul>
         <li><strong>Formatting:</strong> rustfmt-clean (default settings, edition 2024); <code>cargo fmt --all --check</code> is a CI gate.</li>
         <li><strong>Errors:</strong> <code>thiserror</code> types at system boundaries; internal invariant violations panic with a message rather than pretending to recover.</li>
-        <li><strong>unsafe:</strong> rare, and never in HPACK. The real sites are <code>hj-h2</code>'s pin projection and writev/iovec plumbing, the validated fixed-size mmaps in <code>hj-pagecache/diskstore.rs</code> and <code>hj-lsapi/pool.rs</code>, and small libc shims — each with its safety invariant documented above the block.</li>
+        <li><strong>unsafe:</strong> Keep <code>unsafe</code> rare and never in HPACK. Document the safety invariant above each block.</li>
         <li><strong>Async:</strong> tokio tasks for independent work, <code>FuturesUnordered</code> for multiplexing with coordinated shutdown, no per-stream spawn on hot paths.</li>
-        <li><strong>Hashing:</strong> <code>rustc-hash</code> only where keys are trusted (h2 stream ids, page-cache hot-tier body ids, configured vhost names) or the map is hard-capped (the per-<code>.htaccess</code> access-match memo: 16 shards × 512 entries, keys ≤ 1 KiB); unbounded maps keyed by untrusted input keep SipHash.</li>
-        <li><strong>Allocator &amp; pooling:</strong> mimalloc globally, with a background <code>mi_collect</code> trim that only runs above an RSS threshold (<code>--mimalloc-trim-*</code>). Because production sets <code>MIMALLOC_PURGE_DELAY=0</code> so freed pages return to the OS immediately, transient per-request buffers and task boxes are pooled in <code>hj_core::recycle</code> (<code>Recycled&lt;T&gt;</code> and <code>BODY_BUFS</code> <code>TieredPool&lt;Vec&lt;u8&gt;&gt;</code>) and per-core TLS write pools to keep steady-state page faults at zero.</li>
+        <li><strong>Hashing:</strong> Use <code>rustc-hash</code> only for trusted or hard-capped keys. Limit: the <code>.htaccess</code> memo caps at 16 shards × 512 entries, keys ≤ 1 KiB. Untrusted unbounded maps keep SipHash.</li>
+        <li><strong>Allocator:</strong> Use mimalloc globally with threshold-gated trim (<code>--mimalloc-trim-*</code>). Limit: production sets <code>MIMALLOC_PURGE_DELAY=0</code>, so you pool transient buffers in <code>hj_core::recycle</code>.</li>
       </ul>
       <!--diagram:recycle-pools|<strong>Zero-fault buffer and task recycling (v0.1.2–v0.1.5).</strong> Under <code>MIMALLOC_PURGE_DELAY=0</code>, unpooled transient allocations in sparse size classes fault back in on every request. <code>hj_core::recycle</code> pools H2 stream futures, bridge futures, tiered body buffers (frozen into ref-counted <code>Bytes</code> via <code>Bytes::from_owner</code> and returned when the last slice drops), LSAPI read/BEGIN buffers, and per-core 64 KiB TLS record buffers.-->
     </section>

@@ -1,6 +1,6 @@
 # Admin API & reload — httpjet Documentation
 
-> SIGHUP reload semantics, the read-only status API, the transactional configuration API, revisions, and the restart-required boundary.
+> Check status and reload configuration safely.
 
 - **Canonical URL:** https://httpjet.net/docs/admin-api
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -9,11 +9,19 @@
 
 # Admin API & reload
 
-Three ways to change or inspect a running httpjet: **SIGHUP**, the opt-in **read-only status API**, and the separately authenticated **transactional configuration API**. All writers — including SIGHUP — go through one publication coordinator, so a change is either fully published as a new generation or not applied at all, and anything the process cannot safely replace at runtime is reported as `restart_required` rather than half-done.
+You change a running httpjet three ways: SIGHUP, read-only status API, transactional write API. One publication coordinator serves all writers. Each change publishes fully, or not at all.
+
+| Way | Does | Limit |
+
+| **SIGHUP** | Republish on-disk tree | Needs shell/systemd access |
+
+| **Read API** | Status only | Changes nothing; loopback only |
+
+| **Write API** | Publish memory bundle | Volatile; token required |
 
 ## SIGHUP
 
-`systemctl reload httpjet` (or `kill -HUP`) re-parses the tree, builds application state *before* touching certificate resolvers, and publishes through `config_transaction::Coordinator`. Preserved from the command line: `--no-mtls` and `--per-ip-rate` overrides. Outcomes, in the journal:
+Run `systemctl reload httpjet` (or `kill -HUP`). Re-parse, build, publish via `config_transaction::Coordinator`. Builds precede certificate reload. Preserves `--no-mtls`, `--per-ip-rate`. Journal outcomes:
 
 - **published**: New generation serving; in-flight requests finish on the old one; certificate handles reloaded for the unchanged listener topology.
 
@@ -27,7 +35,7 @@ Three ways to change or inspect a running httpjet: **SIGHUP**, the opt-in **read
 
 ## Read-only status API
 
-Opt in with `serve --admin-addr 127.0.0.1:9091`. Non-loopback addresses are rejected at argument parsing; a bind failure aborts startup. It is a separate listener from metrics, changes nothing, and exposes no profiling, allocation or purge operations.
+Opt in: `serve --admin-addr 127.0.0.1:9091`. Non-loopback rejected. Bind failure aborts startup. Separate from metrics. Changes nothing. No profiling or purge.
 
            **GET** /v1/status · schema_version 1
 ```
@@ -44,11 +52,11 @@ $ curl -s http://127.0.0.1:9091/v1/status | jq .
 }
 ```
 
-No configuration values, paths, credentials, request headers, session keys or cached URLs are returned. Names are limited to 256 characters and each collection to 256 rows; the response is capped at 1 MiB (503 beyond). Only GET at the exact path (405/404 otherwise); Host must be a loopback socket authority or `localhost`; Origin headers and request bodies are rejected; `Cache-Control: no-store`; every connection closes; 4 KiB/32 header fields; four concurrent tasks with five-second deadlines. Local users are trusted — this is not an authentication boundary between users on the same host, and it must never be reverse-proxied.
+Returns no values, paths, credentials, headers, keys, URLs. Limits: names 256 chars, rows 256, response 1 MiB (503 beyond). GET only, exact path (405/404 otherwise). Host: loopback or `localhost`. Rejects Origin, bodies. Sends `Cache-Control: no-store`, closes connections. Caps: 4 KiB / 32 fields, four tasks, 5 s deadlines. Local users trusted. Never proxy it.
 
 ## Transactional configuration API
 
-Writable access is a separate, explicit opt-in that never becomes available merely because the read-only listener is on. Three options are required together:
+Writes need separate opt-in. Read listener never enables them. Set all three:
 
            **serve** · enabling writes
 ```
@@ -71,7 +79,17 @@ httpjet --root /abs/root serve … \
 
 | `PUT /v1/config` | Builds, rechecks the exact revision under the publication boundary, publishes, transfers health-check ownership, notifies bridge admission. Returns the next revision and `persistence: volatile`. An interrupted response after publication does not roll back — re-read the revision to reconcile. |
 
-Framing: `Authorization: Bearer ` (missing/duplicate/malformed → 401 without reading the body; constant-time digest compare; nothing about the token in Debug, logs or responses), exact quoted `If-Match` (missing → 428; stale → conflict), `Content-Type: application/json`, one positive `Content-Length` ≤ 1 MiB, headers ≤ 8 KiB/32 fields, five-second combined deadline, Host equal to the bound loopback address or `localhost: `; transfer/content encodings, Origin, Expect, Upgrade and Trailer are rejected; one request per connection, never pipelined. At most four connections and one candidate build; writer-lock acquisition is bounded at 5 s and candidate waiting at 10 s — a timed-out build keeps its admission permit until it exits and can never publish after its caller stopped waiting.
+Frame each write exactly:
+
+- `Authorization: Bearer `: missing/duplicate/malformed → 401, body unread, constant-time compare, token never logged.
+
+- Exact quoted `If-Match`: missing → 428, stale → conflict.
+
+- `Content-Type: application/json`, one `Content-Length` ≤ 1 MiB, headers ≤ 8 KiB / 32, deadline 5 s.
+
+- Host: bound loopback, or `localhost: `. Rejected: encodings, Origin, Expect, Upgrade, Trailer.
+
+- One request per connection, never pipelined. Max four connections, one build. Lock ≤ 5 s, candidate ≤ 10 s. Late builds never publish.
 
            **body** · the in-memory bundle (exactly three fields)
 ```
@@ -82,9 +100,11 @@ Framing: `Authorization: Bearer ` (missing/duplicate/malformed → 401 without r
 }
 ```
 
-`hj-config::parse_bundle` normalizes the bundle without ever reading the submitted `configFile` paths: 1 MiB aggregate, ≤128 vhosts, one root element per document, no DTD, ≤64 nesting levels, missing/extra/duplicate declarations fatal, diagnostics suppressed, errors carry no submitted data. The server root always comes from startup.
+`hj-config::parse_bundle` normalizes bundles. Never reads `configFile` paths. Limits: 1 MiB, ≤128 vhosts, one root, no DTD, ≤64 nesting. Bad declarations fail. Errors carry no submitted data. Root from startup.
 
 ### What a transaction may change
+
+Boundary, stated once for this page: reloadable publishes live, boot-owned returns `restart_required`, nothing half-applies.
 
 #### Reloadable (application)
 
@@ -109,39 +129,41 @@ Framing: `Authorization: Bearer ` (missing/duplicate/malformed → 401 without r
 - User/group, namespace and isolation settings, per-vhost log resources
 - `useIpInProxyHeader` and the whole ` ` block
 
-**Resource policy.** Every filesystem reference in a candidate (vhost roots, docroots, static contexts, GeoIP file, upstream client certs, TCP certificate/key/CA/CRL paths) must resolve inside one of the operator's `--admin-resource-root` directories: parent traversal, relative paths, missing resources and symlinks resolving outside the roots are rejected at submission time. This is authorization, not a sandbox — roots and their symlinks stay operator-controlled. Failures return bounded categories, never configuration values.
+**Resource policy.** Keep candidate files inside an `--admin-resource-root`: docroots, contexts, GeoIP, certs, TLS paths. Rejects traversal, relative, missing, escaping links. Authorization, not sandbox. Failures return categories only.
 
-**Cache namespaces.** The first successful publication introduces a response-cache epoch; every later generation keys page-cache and memo entries by epoch + generation, so a late render from an old generation cannot overwrite a new entry and a previous document root's memoized response cannot replay. See Page cache → generations .
+**Cache namespaces.** First publication creates an epoch. Keys use epoch + generation. Old renders cannot overwrite. Old roots cannot replay. See Page cache → generations .
 
-**Shutdown.** Closing the coordinator precedes cancelling serving; a prepared candidate receives `Closed` and cannot reactivate probes; the write listener drops its connection tasks. Blocking candidate work cannot be forcibly stopped by tokio, so use responsive local resource files — the ten-second deadline bounds the caller's wait, not an uninterruptible filesystem call.
+**Shutdown.** Coordinator closes first. Candidates get `Closed`. Listener drops tasks. Blocking work resists forced stop. Deadline bounds waiting only.
 
 ## The reload boundary in depth
 
-Live state is a *resource generation*: application state plus references to listener generations, each with immutable bind, PROXY-protocol and TLS-verification policy, a resource identity, and separately owned accept/drain control. Connections pin their trust generation at acceptance (`CoreHandler` reads a trust-epoch-aware `ServingView`, pinned again at TCP/UDS accept and per QUIC connection). Compatible application reloads stay visible to existing connections; an incompatible trust change retires the old listener group — H2 gets GOAWAY, H1 closes after its current response, H3 stops admitting streams while preserving connection IDs through a bounded drain — rather than letting an old unauthenticated connection reach newly protected routes.
+Live state: one generation — application state plus listener generations. Each listener pins bind, PROXY, TLS, identity, drain control. Connections pin trust at acceptance (`ServingView` via `CoreHandler`). Compatible reloads stay visible live. Incompatible trust retires the group: H2 GOAWAY, H1 close-after-response, H3 bounded drain. Old connections never reach new routes.
+
+         Owner table: resource, owner, replacement rule
 
 | Resource | Owner | Replacement rule |
 
-| TCP addresses, worker count, inherited fds | listener plan + `uring` worker groups | Prepared successors on the same sockets behind an activation barrier; kernel socket identities verified; raced accepts transferred to the successor. |
+| TCP addresses, workers, fds | listener plan + `uring` groups | Same-socket successors behind barrier; identities verified. |
 
-| UDS path and permissions | listener adoption | Stage a distinct owned path; never unlink an inherited or unrelated socket; retain the old inode until retirement. |
+| UDS path, permissions | listener adoption | Distinct owned path; never unlink inherited sockets. |
 
-| TLS acceptor, mTLS requirement, PROXY binding | per-core TLS bridge | Pinned to one listener generation per connection. |
+| TLS acceptor, mTLS, PROXY | per-core TLS bridge | Pinned per connection, per generation. |
 
-| Certificates / SNI map | `CertReloadHandle` | Validated snapshots published as one trust-generation handle; multi-resource swaps are not advertised as atomic. |
+| Certificates / SNI map | `CertReloadHandle` | One validated snapshot per generation; swaps not atomic. |
 
-| QUIC endpoint / UDP fds | process-persistent `QuicResources` | UDP ownership stable; a shared policy handle replaces quinn's server config for future handshakes; a stale policy rejects new handshakes once its epoch is no longer current. |
+| QUIC endpoint / UDP fds | `QuicResources` | Stable UDP; policy handle for future handshakes. |
 
-| kTLS template | TLS worker | New templates apply to new handshakes; existing key schedules are connection-owned. |
+| kTLS template | TLS worker | New handshakes only; keys connection-owned. |
 
-| ACME overlays, OCSP staple slots | feature runtimes | Certificate targets owned by resource generation; refresh leases retained through retirement. |
+| ACME overlays, OCSP slots | feature runtimes | Generation-owned targets; leases retained. |
 
 | PHP supervisor / external worker registry | startup | Restart-required. |
 
-| Log writers, cache budgets, body budget, metrics, bridge admission | process-owned Arcs | Retained across reloads; outstanding reservations preserved. |
+| Log writers, budgets, metrics, admission | process-owned Arcs | Retained; reservations preserved. |
 
-| User/group, privileges, namespaces, systemd topology | startup | Never acquired at runtime; rejected before any resource acquisition. |
+| User/group, privileges, namespaces | startup | Never runtime-acquired; rejected first. |
 
-Acquisition order for a TCP trust transaction: authenticate and check the revision → derive the resource diff with unchanged resources retained by identity → acquire candidate-only resources with every descriptor, thread and pending side effect owned on creation → start candidate workers behind an activation barrier (readiness proves adoption, not permission to serve) → validate the complete bundle (failure drops and joins everything) → recheck the revision under the coordinator's publication/close boundary and publish atomically — no fallible resource creation after that point → activate and stop old acceptors → retire old generations outside the publication lock, bounded.
+TCP trust order: authenticate → check revision → diff (retain unchanged) → acquire owned candidates → start behind barrier (readiness ≠ permission) → validate (failure drops all) → recheck + publish atomically → activate/stop acceptors → retire old, bounded, outside lock.
 
 ## Reproducible checks
 

@@ -1,6 +1,6 @@
 # TLS, ACME & OCSP — httpjet Documentation
 
-> Certificate selection, mutual TLS with CRLs, resumption policy, opt-in ACME HTTP-01 and DNS-01 issuance, and opt-in OCSP stapling.
+> Set up certificates, ACME issuance, and OCSP.
 
 - **Canonical URL:** https://httpjet.net/docs/certificates
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -9,44 +9,60 @@
 
 # TLS, ACME & OCSP
 
-How httpjet selects certificates, verifies clients, and resumes sessions — plus the two opt-in certificate services: **ACME** issuance and renewal (HTTP-01 and DNS-01, `--features acme`) and **OCSP stapling** (`--features ocsp`). Both are default-off at build *and* runtime, and both publish into the same generation-bound resolver slots that file-based certificates and SIGHUP use.
+You configure certificates, client verification, and session resumption here. ACME and OCSP stapling are opt-in services on the same resolver.
 
         resolve    acl    rewrite    cache    dispatch    finalize    store
 
+| Choice | Use it when. Gate: |
+
+| File certificates | You already own PEM chains. Gate: none; reload via SIGHUP. |
+
+| ACME ( below ) | You want issuance and renewal in-process. Gate: `--features acme` plus four CLI flags. |
+
+| OCSP stapling ( below ) | Your CA still runs a responder. Gate: `--features ocsp` plus `--ocsp-responder`. |
+
+ACME and OCSP are default-off at build and runtime. Both publish into the same generation-bound resolver slots as file certificates.
+
 ## TLS configuration
 
-`hj-tls` builds **one** `rustls::ServerConfig` for TCP *and* QUIC via `build_server_config_alpn(cfg, listener, alpn)`, on the aws-lc-rs provider. A certificate rotation, verifier change or CRL update therefore lands on both transports at once.
+`hj-tls` builds one `rustls::ServerConfig` for TCP and QUIC via `build_server_config_alpn(cfg, listener, alpn)`. You land rotations on both transports at once.
 
-| Listener XML | Meaning |
+| Listener XML | Meaning. Limit: |
 
-| `secure`, `keyFile`, `certFile` | The listener's default identity (PEM). `certChain=1` appends `CACertFile` as the served chain. |
+| `secure`, `keyFile`, `certFile` | Listener default identity (PEM). Limit: `certChain=1` appends `CACertFile` as served chain. |
 
-| per-vhost ` ` | The SNI identity for that vhost's domains — server *chain* material, never a client-verify root. Configure an ECDSA and an RSA pair for the same names to serve modern clients the smaller chain (ECDSA is chosen when the client offers ECDSA signature algorithms). |
+| Per-vhost ` ` | SNI identity for that vhost. Limit: chain material only, never a client-verify root; pair ECDSA+RSA for smaller modern chains. |
 
-| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | Mutual TLS: 0 none · 1 optional · 2 required · 3 optional, treated like 1 (a presented certificate is still validated against the listener CA). The verifier is built from the **listener** CA only. Positive chain verdicts are memoized off the hot path. |
+| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | mTLS: 0 none, 1 optional, 2 required, 3 as 1. Limit: verifier uses the listener CA only; verdicts memoized off the hot path. |
 
-| `crlFile` httpjet | PEM CRL or bundle enforced by the webpki verifier. Absent = no revocation checking. Loaded at config build; rotating means a reload of the trust generation. |
+| `crlFile` httpjet | PEM CRL or bundle for the webpki verifier. Limit: absent means no revocation checking; rotate via trust-generation reload. |
 
-| `enableStapling` | Parsed for compatibility; OCSP fetching needs the `ocsp` feature and `--ocsp-responder` (see below). `check` says so. |
+| `enableStapling` | Parsed for compatibility only. Limit: fetching needs the `ocsp` feature and `--ocsp-responder`; `check` says so. |
+
+| `--ktls` (feature `ktls`) | Kernel TLS for TLS 1.3 H1 file egress. Limit: see the kTLS stub and File egress . |
 
 ### Handshake posture
 
-- **SNI without cert-name-match** — the SNI name maps directly to configured material, mirroring OpenLiteSpeed; there is no re-validation that the leaf's SANs match the SNI. Managed ACME identities are exact-SNI overlays and do not replace the no-SNI listener fallback.
+- **SNI without cert-name-match.** SNI maps directly to configured material, mirroring OpenLiteSpeed. Limit: ACME identities are exact-SNI overlays; the no-SNI fallback stays.
 
-- **TLS 1.3 offers exactly `TLS_AES_128_GCM_SHA256`** (the RFC 8446 mandatory suite); TLS 1.2 keeps its full set. rustls negotiates by client order, and without this pin OpenSSL-family clients pick slower suites; the transcript moves to hardware SHA-NI.
+- **TLS 1.3 suite.** TLS 1.3 offers exactly `TLS_AES_128_GCM_SHA256`; TLS 1.2 keeps its full set. Limit: rustls negotiates by client order; the pin moves transcripts to hardware SHA-NI.
 
-- **Resumption & certified-peer idle window** — 0-RTT is off everywhere. Listeners without client verification (`clientVerify` 0) issue single-use, stateful TLS 1.3 tickets — `--tls-session-tickets` sets how many per full handshake (rustls default 2; 0 also shrinks the session cache from 32,768 entries to 256 TLS 1.2 session IDs). Listeners with `clientVerify` 1–3 issue no tickets and keep no session cache, so every connection is a full handshake that re-runs the client-certificate verifier (an abbreviated handshake would restore an old identity without re-verifying it); `httpjet_tls_handshakes_resumed_total` stays 0 there. Instead, `--trusted-proxy-idle-secs` extends the idle window for connections that presented a verified client certificate (reducing full handshakes by 28% per second, about 30% per request, on x86 and by 78% per request on ARM in production). Resumption is *disabled* whenever OCSP is enabled (status must be enforced per handshake).
+- **Tickets.** Listeners without client verification (`clientVerify` 0) issue single-use, stateful TLS 1.3 tickets. Limit: `--tls-session-tickets` per full handshake (default 2; 0 shrinks the cache from 32,768 to 256 TLS 1.2 IDs); 0-RTT off everywhere.
 
-- **mTLS trust boundary** — on a listener with `clientVerify=2`, a plaintext request for an mTLS-protected vhost is refused from the request head unless it arrives from loopback; `--no-mtls` relaxes the requirement for local testing only.
+- **Verified-client listeners.** `clientVerify` 1–3 issues no tickets and keeps no session cache. Limit: every connection full-handshakes and re-verifies; resumption stays 0 there.
 
-- **Reload** — file-based certificates reload through `CertReloadHandle` on SIGHUP or via the write API ; a failed reload keeps the certificates whose reload failed. kTLS templates apply to new handshakes only.
+- **Certified-peer idle window.** `--trusted-proxy-idle-secs` extends idle for verified-certificate connections. Limit: OCSP disables resumption; full handshakes fell 28%/s (about 30%/request x86, 78%/request ARM).
+
+- **mTLS boundary.** On `clientVerify=2`, plaintext for an mTLS vhost is refused unless from loopback. Limit: `--no-mtls` relaxes this for local testing only.
+
+- **Reload.** File certificates reload via `CertReloadHandle` on SIGHUP or the write API . Limit: a failed reload keeps prior certificates; kTLS templates apply to new handshakes only.
 
         !   Two CAs, two roles
-A per-vhost `CACertFile` is chain material sent *to* clients. The listener `CACertFile` is the root that verifies *client* certificates. Treating the vhost chain CA as a client-verify root would silently widen the mTLS trust boundary; httpjet keeps them distinct.
+A per-vhost `CACertFile` goes to clients as chain material. The listener `CACertFile` verifies client certificates; never merge the roles.
 
 ## ACME certificate automation --features acme
 
-Build with `cargo build --locked -p httpjet --features acme`. The manager is *native CLI*, not pretend LiteSpeed XML: nothing happens unless all four required flags are present. One manager, account and identifier set is supported per process; its domain and TLS/HTTP vhost mappings are boot-frozen.
+Build with `cargo build --locked -p httpjet --features acme`. You need all four required flags; one manager/account/identifier set runs per process, boot-frozen.
 
           HTTP-01  DNS-01 / wildcard  Local test CA
 
@@ -60,7 +76,9 @@ httpjet --root /abs/root serve … \
   --acme-bootstrap                      # only for first issuance without a configured certificate
 ```
 
-Requires public TCP port 80 and an enabled TLS listener. The raw challenge route `/.well-known/acme-challenge/ ` runs before URI normalization, redirects, rewrites, auth, cache and backends; only plaintext GET on the validated authority answers (404 for unknown tokens, 405 otherwise, always `Cache-Control: no-store`); tokens are redacted in the access log. No exemption is granted for forwarded-scheme headers, and the historical path-prefix bypass (#259) stays closed.
+You need public TCP port 80 and an enabled TLS listener. The route `/.well-known/acme-challenge/ ` runs before normalization, redirects, rewrites, auth, cache, and backends.
+
+Only plaintext GET on the validated authority answers. Limit: 404 unknown, 405 other, `no-store`; tokens redacted; #259 bypass closed.
 
                **serve** · DNS-01
 ```
@@ -73,18 +91,21 @@ httpjet --root /abs/root serve … \
   --acme-dns-token-file /abs/private/dns-controller.token   # regular file, 0600, 16..4096 printable chars
 ```
 
-No port 80 requirement and no HTTP challenge exemption. There is **no built-in Cloudflare or provider integration**: you run a controller that implements the webhook contract below with a credential scoped to the listed zones. A managed wildcard matches exactly one leftmost label — request the apex separately.
+You need no port 80 and no HTTP exemption here. Run your own controller; no Cloudflare or provider integration ships.
 
-               **controller contract** · POST, Bearer token, application/json
-```
-{"version":1,"operation":"present","name":"_acme-challenge.example.test","value":" "}
-{"version":1,"operation":"ready",  "name":"…","value":"…"}   → {"ok":true,"ready":true|false}
-{"version":1,"operation":"cleanup","name":"…","value":"…"}   → {"ok":true}
-```
+A wildcard matches exactly one leftmost label. Limit: request the apex separately; scope the credential to the listed zones.
 
-Operations must be idempotent: `present` adds the exact value without replacing the RRset; `cleanup` removes only that value and succeeds if it is already absent (apex and wildcard share one owner name). Replies over 16 KiB, redirects, non-2xx and unexpected fields are rejected; each call has a 5 s deadline; a `ready:true` returned without real DNS visibility is not a valid production implementation.
+| Webhook operation | Contract. Limit: |
 
-`--acme-test-mode` permits literal-loopback HTTP directories and alternate HTTP ports and requires loopback serving addresses. `--acme-test-ca-root` and `--acme-test-issuer-root` replace trust roots without disabling verification; `--acme-dns-test-root` does the same for the DNS controller. These are for the Pebble fixture only:
+| `present` | POST JSON `{"version":1,"operation":"present","name":"_acme-challenge.example.test","value":" "}`, Bearer [REDACTED]. Limit: adds that value only, never replaces the RRset. |
+
+| `ready` | Same `name`/`value` fields. Limit: reply `{"ok":true,"ready":true|false}`; false means not yet visible. |
+
+| `cleanup` | Same fields; reply `{"ok":true}`. Limit: removes only that value; succeeds if already absent (apex/wildcard share one owner). |
+
+All operations are idempotent, with a 5 s deadline per call. Limit: replies over 16 KiB, redirects, non-2xx, and unexpected fields are rejected; `ready:true` without real DNS visibility is invalid in production.
+
+`--acme-test-mode` permits literal-loopback HTTP directories and alternate ports. Limit: it requires loopback serving addresses; `--acme-test-ca-root`, `--acme-test-issuer-root`, and `--acme-dns-test-root` replace roots without disabling verification (Pebble only).
 
                **acceptance** · Pebble v2.10.1
 ```
@@ -97,40 +118,42 @@ python3 -B scripts/acme-pebble-test.py --binary target/debug/httpjet \
 
 ### Issuance, recovery and activation
 
-> [Diagram: acme-http01] HTTP-01 issuance. Every durable step precedes the network step that depends on it: the account key before registration, the certificate key and CSR before finalize, and the issued pair in the same atomic snapshot as account/order state. Only a fully validated pair is published to the TLS resolvers.
+> [Diagram: acme-http01] HTTP-01 issuance. Each durable step precedes its network step: account key before registration, certificate key and CSR before finalize, issued pair in the same atomic snapshot. Only a validated pair publishes.
 
-- **Durable before network.** A lost `newOrder` response is intrinsically ambiguous, so a marker stops automatic reissuance: recover the order URL from the CA's account records and restart once with `--acme-reconcile-order `. Never delete the store as a generic retry.
+- **Durable before network.** A lost `newOrder` response is ambiguous; a marker stops reissuance. Limit: restart once with `--acme-reconcile-order `; never delete the store.
 
-- **Bounded CA traffic.** Only GET/HEAD/POST at the directory's origin, no redirects, no environment proxies, 1 MiB bodies, 5 s connect / 10 s request, 120 s per attempt, persisted exponential backoff with account jitter plus `Retry-After`.
+- **Bounded CA traffic.** Only GET/HEAD/POST at the directory origin. Limit: no redirects/proxies; 1 MiB bodies; 5 s connect / 10 s request; 120 s per attempt; backoff plus `Retry-After`.
 
-- **Private store.** An operator-provisioned 0700 directory owned by the effective uid; every ancestor is checked with pinned no-follow descriptors; an exclusive lock prevents two managers sharing a store; snapshots are 0600 single-link regular files written pending→fsync→rename→dirsync, capped at 1 MiB; an unfinished pending file is discarded on reopen, never promoted.
+- **Private store.** Pre-create a 0700 directory owned by the effective uid. Limit: no-follow ancestors, exclusive lock, 0600 snapshots (pending→fsync→rename→dirsync, 1 MiB cap); pending files discarded.
 
-- **Activation.** The validated `CertifiedKey` is published to the TCP, kTLS and QUIC resolver overlays as an exact-SNI identity. File-based SIGHUP updates a separate slot and cannot erase or mix managed generations. Boot revalidates the persisted pair; an expired one is rejected and needs operator recovery.
+- **Activation.** The validated `CertifiedKey` publishes as exact-SNI to TCP, kTLS, and QUIC. Limit: SIGHUP uses a separate slot; boot rejects an expired pair.
 
-- **Bootstrap.** With `--acme-bootstrap` the default TLS identity starts *absent*: handshakes for hosts without a configured certificate fail until issuance succeeds. No self-signed placeholder is generated; client-auth policy is unchanged.
+- **Bootstrap.** With `--acme-bootstrap`, the default identity starts absent. Limit: no self-signed placeholder; handshakes fail until issuance.
 
-- **Renewal** is scheduled with one third of the remaining lifetime in reserve plus jitter.
+- **Renewal.** Renewal keeps one third of lifetime in reserve, plus jitter.
 
-> [Diagram: acme-dns01] DNS-01 with durable cleanup. The exact owner/value cleanup intent is journaled before any DNS mutation, so a failed, cancelled or timed-out presentation is always recoverable; cleanup replays after attempts, at shutdown and at startup, and blocks new issuance until it succeeds. Snapshots bind cleanup to the provider endpoint and sorted zone scope — changing those while reusing the store fails closed.
+> [Diagram: acme-dns01] DNS-01 cleanup. Cleanup intent journals before any DNS mutation; cleanup replays after attempts, at shutdown and startup, and blocks new issuance until it succeeds. Changing endpoint or zone scope on a reused store fails closed.
 
-Scope today: DNS identifiers only (ASCII A-labels), one account/group per process, same-origin ACME endpoints, no EAB, contact management or ARI. Production at windowsforum.com still renews through certbot; the manager is an adoption path, not a forced replacement.
+Scope: DNS identifiers only (ASCII A-labels), one account/group per process, same-origin endpoints, no EAB, contact management, or ARI. Production at windowsforum.com still renews through certbot.
 
 ## OCSP stapling --features ocsp
 
-Build with `--features ocsp` (OpenSSL 3.x development headers and pkg-config at build time, the shared libraries at runtime). Pass `--ocsp-responder https://ocsp.example.net/status` to `serve`, optionally with `--ocsp-required`. The explicit CLI opt-in applies to every certificate on the process's TLS listeners regardless of the XML `enableStapling` boolean, and the one responder must serve every enabled issuer (per-issuer routing is not implemented).
+Build with `--features ocsp` (OpenSSL 3.x headers and pkg-config at build; shared libraries at runtime). Pass `--ocsp-responder https://ocsp.example.net/status`, optionally `--ocsp-required`.
+
+The CLI opt-in covers every certificate on your TLS listeners. Limit: `enableStapling` alone does nothing; one responder must serve every issuer.
 
         !   Not for Let's Encrypt
-Let's Encrypt retired its OCSP service on 2025-08-06 and publishes CRLs instead. There is no responder to fetch from — do not enable this manager for current Let's Encrypt certificates. It exists for other CAs.
+Let's Encrypt retired OCSP on 2025-08-06 and publishes CRLs instead. Do not enable this manager for current Let's Encrypt certificates.
 
-> [Diagram: ocsp-policy] Status lifecycle. Fetching never happens during a handshake. A verified GOOD response fills a generation-bound staple slot and is refreshed before expiry with jitter; a verified REVOKED result suppresses that leaf's handshakes even across a same-leaf reload; malformed or transient failures preserve a still-valid staple and otherwise fall to the optional/required policy.
+> [Diagram: ocsp-policy] Status lifecycle. Fetching never happens during a handshake. Verified GOOD fills a generation-bound slot; verified REVOKED suppresses that leaf even across reload; failures preserve a still-valid staple or fall to policy.
 
-- **Trust.** Each managed leaf must include its immediate issuer in the configured chain; responses must be signed by that issuer or a responder it directly authorizes for OCSP signing. Arbitrary trusted-root responders, unsigned responses, AIA fetching, redirects, encoded bodies and verification-bypass flags are all refused. SHA-256 CertIDs; RSA PKCS#1 v1.5 and ECDSA signatures with SHA-256/384/512.
+- **Trust.** Each leaf includes its immediate issuer. Limit: issuer/authorized-signer signatures only; no AIA, redirects, encoded bodies, or bypass; SHA-256 CertIDs; RSA PKCS#1 v1.5, ECDSA SHA-256/384/512.
 
-- **Freshness.** `thisUpdate`, `producedAt` and `nextUpdate` are required; a staple is never valid past seven days from `thisUpdate` or the leaf/issuer/responder validity; expiry uses wall *and* monotonic time so a clock step back cannot extend a staple.
+- **Freshness.** `thisUpdate`, `producedAt`, `nextUpdate` required. Limit: never past seven days from `thisUpdate`; wall and monotonic time both apply.
 
-- **Transport.** Percent-encoded GET when the full URL is ≤ 255 bytes, else binary POST; DNS pinned per fetch; private destinations rejected except literal loopback under `--ocsp-test-mode`.
+- **Transport.** Percent-encoded GET at ≤ 255 bytes, else binary POST. Limit: DNS pinned; private destinations rejected except loopback under `--ocsp-test-mode`.
 
-- **Policy.** Optional (default): cold or expired status serves without a staple unless the certificate has Must-Staple. Required: new handshakes are rejected until a valid response arrives — including at startup and for new certificate generations, so plan availability. Status is memory-only and resets on restart.
+- **Policy.** Optional (default) serves without a staple, unless Must-Staple. Limit: required rejects handshakes until valid, even at startup; memory-only, resets on restart.
 
            **acceptance** · real-server fixtures on isolated listeners
 ```
@@ -144,4 +167,4 @@ python3 -B scripts/ocsp-runtime-test.py --binary target/debug/httpjet --optional
 
 ## Kernel TLS
 
-The staged `--ktls` path (feature `ktls`) upgrades a completed TLS 1.3 rustls handshake to kernel TLS so H1 file bodies leave through `sendfile(2)`. It is hardware-aware and off on virtual NICs by default; see Protocol stacks → File egress for the policy and the measured (negative-on-GVE) receipt.
+kTLS now lives inside TLS configuration as one table row. See File egress for policy and receipts; this stub keeps old links working.

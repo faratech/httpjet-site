@@ -1,6 +1,6 @@
 # Observability — httpjet Documentation
 
-> Prometheus metrics, the cache-entries report, access and error logs in text or JSON, syslog, request ids, telemetry, the PHP slow log, OpenTelemetry, and profiling.
+> Read metrics, logs, and request traces.
 
 - **Canonical URL:** https://httpjet.net/docs/observability
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -13,7 +13,12 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 ## Prometheus metrics
 
-`--metrics-addr` (default `127.0.0.1:9090`; empty disables) serves `/metrics` in the Prometheus text format. Over 180 metric families today; the families that matter, grouped:
+`--metrics-addr` (default `127.0.0.1:9090`; empty disables) serves `/metrics` in Prometheus text format. You watch the families below first:
+
+| Family | Meaning. Limit: |
+| `httpjet_requests_total` | Served requests. Limit: pair with 5xx counters. |
+| `httpjet_pagecache_*` | Cache activity. Limit: watch hit ratio first. |
+| `httpjet_lsapi_*` | PHP pool health. Limit: watch TTFB next. |
 
 | Metric | Type | Meaning |
 
@@ -83,7 +88,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 ## The cache-entries report
 
-`GET /cache-entries` on the metrics listener (not the main port — there it hits the vhost and 301s) renders a throttled text report: total entries and bytes, per-URL-class counts, top-N by size, a `ram: entries=… disk: bytes=…/max evictions=… swept_expired=…` line (live index count vs charged tmpfs footprint), and a health line (hits/misses/stores/purges/disk_{read,write}_err/poisoned_locks). `/__mimalloc-stats` beside it prints allocator statistics; `/debug/pprof/profile` (build feature `profiling`) returns a CPU profile — the release binary keeps its symbol table and frame pointers for exactly this. Whereas `/metrics` is open on loopback, `/cache-entries`, `/__mimalloc-stats`, `/__alloc-count` and `/debug/pprof/profile` all require `Authorization: Bearer ` matching `--profile-token-file` (returning 403 when unset or mismatched).
+You fetch `GET /cache-entries` on the metrics listener. It reports entries, bytes, and health. Limit: diagnostic routes require your Bearer [REDACTED]; missing tokens return 403.
 
 ## Logs
 
@@ -114,7 +119,7 @@ Every request gets a 64-bit correlation id (a per-process seed mixed into a lock
 
 - **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — the per-URL / user-class attribution behind `httpjet_lsapi_ttfb_seconds`. Rolls at 64 MiB, gzip archives, 7-day prune.
 
-These two files are what produced the production attribution on the Performance page: mean request 9.99 ms, of which 8.96 ms is inside PHP.
+These files produced the 2026-08-30 sample on Performance : mean request 9.99 ms, of which 8.96 ms is inside PHP.
 
 ## OpenTelemetry --features otel
 
@@ -126,9 +131,9 @@ Build with `--features otel`, then set `HTTPJET_OTEL=1`; without it no provider 
 
 - **Propagation.** Named configured proxy targets and WebSocket maps receive the generated traceparent; LSAPI receives it as `HTTP_TRACEPARENT`; ad-hoc targets get nothing.
 
-- **Completion.** H1 spans end when the transport's write returns (including sendfile bodies); H2 spans ride the `ResponseCompletion` extension through flow control and the final flush; H3 spans complete when QUIC accepts the FIN. `httpjet.body.outcome` is `complete`/`error`/`cancelled` (`upgraded` for WebSocket). This is local write completion, not peer receipt.
+- **Completion.** Spans end at local write completion. Limit: peer receipt stays unproven.
 
-- **Bounds.** Dedicated export thread, 2048 queued spans + one 256-span batch, 1 s interval, 2 s request timeout, 64 KiB response cap, no redirects or environment proxies, 3 s provider shutdown. Saturation drops telemetry rather than blocking serving; drops are counted on both the OTLP and Prometheus sides.
+- **Bounds.** You queue 2048 spans in 256-span batches. Limit: saturation drops telemetry, never serving.
 
 - **Metrics instruments.** `httpjet.pipeline.requests.completed` and `httpjet.pipeline.response_head.duration` (seconds, bounded status labels), plus `httpjet.otel.http.exports`.
 

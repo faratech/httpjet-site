@@ -1,6 +1,6 @@
 # Rewrite & .htaccess — httpjet Documentation
 
-> The Apache mod_rewrite engine: per-directory loading, the dense-DFA prefilter, directives and flags, access control, Basic auth, header operations, and the fast-path memo.
+> How .htaccess rules rewrite and protect requests.
 
 - **Canonical URL:** https://httpjet.net/docs/rewrite
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -9,25 +9,29 @@
 
 # Rewrite engine & .htaccess
 
-`hj-rewrite` is httpjet's Apache **mod_rewrite** / `.htaccess` engine — depending only on `hj-compress` so `.htaccess` and XML expiry directives share one `A/M` time grammar. It prefers a linear-time regex engine and falls back to **`fancy-regex`** only for the lookaround and backreferences real `.htaccess` files use. The same crate enforces per-directory access control, scoped Basic auth, header operations, expiry rules and the LSCache directives.
+`hj-rewrite` is httpjet's Apache **mod_rewrite** / `.htaccess` engine. It depends only on `hj-compress`, so `.htaccess` and XML expiry share one `A/M` time grammar.
 
         resolve    acl    rewrite    cache    dispatch    finalize    store
 
 ## Overview
 
-The rewrite stage runs the vhost's inline ` ` rules first, then the `.htaccess` chain for the resolved directory — OpenLiteSpeed's order. One entry point, `evaluate()`, returns exactly one outcome per pass: `Rewritten`, `Redirect`, `Proxy`, `Forbidden`, `Gone` or `Unchanged`.
+Run inline ` ` rules first, then the `.htaccess` chain (OpenLiteSpeed order). `evaluate()` returns one outcome per pass: `Rewritten`, `Redirect`, `Proxy`, `Forbidden`, `Gone` or `Unchanged`.
 
 > [Diagram: rewrite-eval] One evaluation pass. A rewrite that crosses into another directory reloads the destination chain and evaluates again; a terminal flag stops the walk; an exhausted chain returns Unchanged and dispatch falls through to suffix routing.
 
 ## Per-directory loading
 
-An `HtaccessCache` loads each directory's file (name from `accessFileName`, default `.htaccess`; bare file names only — `/` and `..` are rejected) with **mtime invalidation** (each file is re-`stat`ed at most once a second), so an edit takes effect within about a second, without a reload. The parsed form holds the directive list, compiled regexes, scoping blocks, a per-file memo of which access rules match, the auth realm map and the memo-eligibility verdict. The chain from docroot to the request's directory is bounded at **64** levels; past that a deny-all sentinel applies. Since 2026-09-16 an **unreadable `.htaccess` (or one that fails to parse or exceeds 16 MiB) also fails closed** to that sentinel rather than being skipped. A non-UTF-8 byte is decoded lossily, so a legacy-encoded comment cannot downgrade a protected directory to "no rules".
+`HtaccessCache` loads each directory's file (`accessFileName`, default `.htaccess`; bare names only). **mtime invalidation** re-stats at most once a second, so edits land within a second. The parsed form holds directives, regexes, scopes, the auth map and the memo verdict. The chain caps at **64** levels, then a deny-all sentinel applies.
 
-Vhost-level switches: ` 0` disables the whole chain (even with `autoLoadHtaccess`), while `autoLoadHtaccess` alone loads files without enabling general overrides. Candidate configuration generations own their own htaccess, rewrite-outcome and UA caches, so a reload never reintroduces stale results.
+Since 2026-09-16 an unreadable, unparseable or over-16 MiB `.htaccess` fails closed to that sentinel. Non-UTF-8 bytes decode lossily. Set ` 0` to disable the chain; `autoLoadHtaccess` alone loads without overrides. Each generation owns its caches, so reloads never revive stale results.
 
 ## The dense-DFA prefilter
 
-Rather than test every rule's regex per request, the eligible patterns compile once into **one fully-determinized dense DFA** (`regex_automata::dfa::dense`) searched a single time to learn *which* rules could match. Only those run for real. A dense DFA holds no lazy transition state, so the search is **cacheless**: no per-search cache allocation and no cross-thread pool lock — one mutex fewer on the request path at high concurrency.
+See Matching . The prefilter now lives there.
+
+## Matching
+
+Compile eligible patterns once into **one dense DFA** (`regex_automata::dfa::dense`). Search it once to learn which rules could match. Run only those rules for real. A dense DFA holds no lazy state, so the search is **cacheless**. You pay no per-search allocation and no cross-thread pool lock.
 
            **hot path** · prefilter, then evaluate
 ```
@@ -38,36 +42,38 @@ for rule in hits {
 Outcome::Unchanged
 ```
 
-## Linear vs backtracking matching
-
-A flagged rule runs through a `CompiledRegex` that prefers `regex_automata::meta::Regex` with an explicit thread-local cache keyed per pattern, and falls back to `fancy-regex` only for constructs the linear engine cannot express. The split is exact, not approximate: a pattern the linear engine accepts has identical match semantics under both, so the choice is invisible.
+Each flagged rule runs through `CompiledRegex`. Prefer `regex_automata::meta::Regex` (per-pattern thread-local cache). Fall back to `fancy-regex` only where the linear engine cannot express a construct. Accepted patterns match identically under both.
 
 | Pattern shape | Engine | Why |
 
-| Anchors, classes, alternation, repetition | `regex_automata::meta` | Linear time; per-pattern thread-local cache, no shared lock. |
+| Anchors, classes, alternation, repetition | `regex_automata::meta` | Linear time. Limit: per-pattern thread-local cache, no shared lock. |
 
-| Lookahead `(?=…)` / `(?!…)`, lookbehind | `fancy-regex` | Not expressible as a finite automaton. |
+| Lookahead `(?=…)` / `(?!…)`, lookbehind | `fancy-regex` | Not a finite automaton. Limit: backtracking only here. |
 
-| In-pattern backreference `\1` | `fancy-regex` | Requires backtracking. |
+| In-pattern backreference `\1` | `fancy-regex` | Requires backtracking. Limit: backtracking only here. |
 
-| Pure lookahead conjunction `^(?=.*A)(?=.*B)…` | `regex_automata::meta` per part | Each lookahead runs as one linear search; `fancy-regex` is kept only for captures (0.1.10: a cookie `SetEnvIf` fell from 29 to 1 µs). |
+| Pure lookahead conjunction `^(?=.*A)(?=.*B)…` | `regex_automata::meta` per part | One linear search per part. Limit: `fancy-regex` only for captures (0.1.10: 29 → 1 µs). |
 
-A regex that errors at match time **fails closed toward the rule's polarity**: a deny that cannot evaluate counts as matched; an allow that cannot evaluate is withheld (hardened 2026-09-06 alongside the spoofing checks).
+A regex error at match time **fails closed toward the rule's polarity**. A failing deny counts as matched; a failing allow is withheld (hardened 2026-09-06).
 
 ## Rewrite-outcome cache & UA classification
 
-For chains whose inputs are *path-cacheable*, the whole rewrite decision is memoized for `--rewrite-outcome-ttl-ms` (default 1000 ms — which also bounds `-f`/`-d` filesystem staleness and lets `.htaccess` edits land within a second; 0 disables). The key is vhost/scheme/method/host/path/query plus any keyable header variables the chain reads. Counters: `httpjet_rewrite_outcome_{hits,misses,uncacheable}_total`.
+See Two caches . Outcome caching now lives there.
 
-`--rewrite-ua-classify` (default off, a deploy-time decision) keys User-Agent-reading chains by the *bitmap of matching UA RewriteConds* instead of the raw UA string, when parse-time analysis proves the outcome depends on the UA only through those matches. Real-world UA diversity collapses onto a handful of entries (`httpjet_rewrite_ua_classify_entries`). Since 2026-09-06 header-dependency collection continues past the UA classification so a chain that also reads Origin or Accept keys correctly.
+## Two caches
 
-## The fast-path memo and chain eligibility
+**Outcome cache.** Memoize the rewrite decision for path-cacheable chains (`--rewrite-outcome-ttl-ms`, default 1000 ms; 0 disables). Key on vhost, scheme, method, host, path, query and keyable headers. Count with `httpjet_rewrite_outcome_{hits,misses,uncacheable}_total`.
 
-The on-core **finished-response memo** (default on; `--no-fast-memo` / `HJ_FAST_MEMO=0`) serves repeat cookieless static GETs without running the pipeline at all — per thread, 1 s TTL, 64 MiB/worker, only for 200 full bodies without `Set-Cookie`, and only after each distinct key has passed the full pipeline once. Whether a docroot's chain is eligible is a **parse-time verdict** (`MemoClass`, fail-closed) that `httpjet check` prints per vhost.
+**UA classification.** Enable `--rewrite-ua-classify` (default off) to key UA chains by RewriteCond bitmap, when analysis proves that dependence. Since 2026-09-06 header collection continues past it, so Origin/Accept chains still key correctly (`httpjet_rewrite_ua_classify_entries`).
+
+**Finished-response memo.** Serve repeat cookieless static GETs without the pipeline (default on; `--no-fast-memo` / `HJ_FAST_MEMO=0`). Per thread, 1 s TTL, 64 MiB/worker. Store only 200 full bodies without `Set-Cookie`, after one full pass per key.
+
+Eligibility is a **parse-time verdict** (`MemoClass`, fail-closed) that `httpjet check` prints per vhost. Note: `%{TIME*}` evaluates to the empty string, and chains reading it are ineligible for this memo.
 
 > [Diagram: memo-eligibility] Memo eligibility. A chain that reads anything the memo key cannot carry — client/server addresses, protocol, IP/env/host access operands, REDIRECT_STATUS, %{HTTP_COOKIE}, %{TIME*} — is ineligible and pays the full pipeline every time. Eligible chains memoize with a VARY-SET of every header the chain reads (raw Origin, UA bitmap …), so an 800-line forum chain still memoizes.
 
         ⎁   Measured
-Same-binary A/B on the forum's 806-line docroot chain (`/robots.txt`, c=100): **h2 137k → 248k req/s (+81%)**, **h1 107k → 153k (+43%)**. The byte-identity gate `scripts/fast_memo_parity_test.sh` diffs a UA × Origin × Accept-Encoding × scheme matrix memo-on vs memo-off (192 cells, zero differences at the last three review rounds).
+Same-binary A/B on the forum's 806-line chain (`/robots.txt`, c=100): **h2 137k → 248k req/s (+81%)**, **h1 107k → 153k (+43%)**. Gate `scripts/fast_memo_parity_test.sh` diffs UA × Origin × Accept-Encoding × scheme (192 cells, zero differences).
  PGO · 2026-08-28 · parity re-run 2026-09-16
 
 Interactive · `.htaccess` & `fast_memo` readiness inspector
@@ -91,7 +97,7 @@ Mirrors the parse-time `MemoClass` analysis printed by `httpjet --root /usr/loca
 
 ## SetEnvIf & lazy headers
 
-`SetEnvIf` / `SetEnvIfNoCase` evaluate with **lazy header access**: the engine hands each rule a callback that materializes headers only if the rule references one, and the attribute compare is case-insensitive without allocating a lowercased copy. A request matching no rule pays nothing. Since 2026-09-16, `SetEnvIf`/`[E=]` cannot set server-computed CGI names (`REMOTE_ADDR`, `HTTPS`, `CONTENT_LENGTH`, …) — those writes are denied.
+Evaluate `SetEnvIf`/`SetEnvIfNoCase` with **lazy header access**: materialize only referenced headers, compare case-insensitively. No match costs nothing. Since 2026-09-16 you cannot set server-computed CGI names (`REMOTE_ADDR`, `HTTPS`, `CONTENT_LENGTH`, …) this way.
 
            **.htaccess** · SetEnvIf
 ```
@@ -103,15 +109,21 @@ RewriteRule ^/expensive/ - [E=no-cache:1]      # [E=no-cache] also bypasses the 
 
 ## Front-controller routing
 
-XenForo, WordPress and most PHP frameworks rewrite *every* URL to `/index.php`. The engine keeps the **original `REQUEST_URI`** and pins the resolved script separately (`SCRIPT_FILENAME` via the `LsapiScript` extension, `SCRIPT_NAME`/`QUERY_STRING` into the env). PHP sees the front controller; everything downstream still sees the URL the visitor asked for — which is why the page cache keys by the original URI .
+XenForo and WordPress rewrite every URL to `/index.php`. Keep the **original `REQUEST_URI`**; pin `SCRIPT_FILENAME` via `LsapiScript` and `SCRIPT_NAME`/`QUERY_STRING` via env. Hence the page-cache original-URI key .
 
 ## Access control
 
-` ` / ` ` / ` ` / ` ` / ` ` scoping carries `Order` / `Allow from` / `Deny from` and `Require`, ANDed across every enclosing block. A ` ` deny applies to the directory **and everything beneath it**. `Require all granted` grants; `Require all denied` and every other predicate (`ip`, `host`, `env`, `expr`, `method`, …) **fails closed to deny** rather than being approximated — a shipped auth file that httpjet cannot honor 403s rather than opening up. Directory patterns accept mapped filesystem paths as well as the docroot-relative convention.
+` `/` `/` `/` `/` ` carry `Order`/`Allow from`/`Deny from`/`Require`, ANDed across blocks. A ` ` deny covers everything beneath it. Only `Require all granted` grants; other predicates (`ip`, `host`, `env`, `expr`, `method`, …) **fail closed to deny** (403). Directory patterns accept mapped or docroot-relative paths.
 
 ## HTTP Basic auth
 
-`AuthType Basic` + `AuthName` + `AuthUserFile` + `Require valid-user | user …` protect a subtree. Since the 2026-09-06 review the model separates parsed policy from the effective realm: requirements resolve in order across scopes, a metadata-only section cannot erase an inherited requirement, an explicit `Require` replaces it, exact usernames are preserved, and the realm is enforced against the original, rewritten, index, script/PATH_INFO and canonical filesystem targets **before cache lookup**, with a served-target backstop. Unsupported or incomplete active auth fails closed. Valid credentials set `REMOTE_USER`; failures return 401 with the challenge.
+Protect a subtree with `AuthType Basic` + `AuthName` + `AuthUserFile` + `Require valid-user | user …`:
+
+- Resolve requirements in scope order. Limit: metadata-only sections cannot erase inherited requirements; explicit `Require` replaces them.
+
+- Enforce before cache lookup, on original/rewritten/index/script targets. Limit: valid credentials set `REMOTE_USER`; failures return 401.
+
+- Fail closed on unsupported auth. Limit: exact usernames stay preserved.
 
            **.htaccess** · a protected subtree
 ```
@@ -121,7 +133,19 @@ AuthUserFile /srv/example.test/conf/htpasswd
 Require valid-user
 ```
 
-htpasswd hashes: **bcrypt** (`$2y$`/`$2b$`/`$2a$`, `htpasswd -B`, cost capped at 14 — a higher cost is refused before hashing), **APR1-MD5** (`$apr1$`), **MD5-crypt** (`$1$`) and `{SHA}`, verified in constant time; an unknown user pays dummy bcrypt/MD5 work at the file's recorded cost, so user enumeration costs nothing, and Basic-auth attempts are charged per client before hashing (repeated `Authorization` headers are refused). Plaintext entries and traditional DES / `$5$` / `$6$` `crypt()` hashes verify *false* with a parse-time warning. The `AuthUserFile` must resolve **inside the vhost docroot** — or a directory listed in `--auth-user-file-roots` — checked on the opened descriptor's real path (symlinks followed, `.`/`..` rejected in relative paths, read capped at 1 MiB, a planted FIFO cannot block the open); an unreadable or out-of-root file is a 500 with an error-log entry, never a silent 401, and `check` warns about out-of-root paths. Authenticated static responses get `Cache-Control: private, no-store` from automatic expiry when no explicit policy exists (#414).
+Accepted htpasswd hashes — verify each in constant time:
+
+- **bcrypt** (`$2y$`/`$2b$`/`$2a$`, `htpasswd -B`). Limit: cost capped at 14; higher is refused before hashing.
+
+- **APR1-MD5** (`$apr1$`), **MD5-crypt** (`$1$`) and `{SHA}`.
+
+- Plaintext, DES, `$5$` and `$6$` `crypt()`. Limit: these verify *false* with a parse-time warning.
+
+An unknown user pays dummy bcrypt/MD5 work at the file's recorded cost. Charge Basic-auth attempts per client before hashing. Refuse repeated `Authorization` headers.
+
+Resolve `AuthUserFile` **inside the docroot**, or under `--auth-user-file-roots`. Check the descriptor's real path; cap reads at 1 MiB. An unreadable or out-of-root file returns 500, never a silent 401; `check` warns. Authenticated statics get `Cache-Control: private, no-store` without an explicit policy (#414).
+
+Note: the 2026-09-06 review split parsed policy from the effective realm; the rules above carry its outcome.
 
 ## Directives reference
 
@@ -129,51 +153,45 @@ htpasswd hashes: **bcrypt** (`$2y$`/`$2b$`/`$2a$`, `htpasswd -B`, cost capped at
 
 | RewriteEngine · RewriteBase | supported | Toggle and base-path resolution. |
 
-| RewriteCond · RewriteRule | supported | Flags: `L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F`, `OR` on conditions; `-f/-F -d -e -l/-L/-h -s -x` file tests (`-U` always matches). Variables: `REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME`, `%{HTTP:Name}`, `%{ENV:NAME}`, `%{LA-U:…}`/`%{LA-F:…}`. `%{TIME*}` yields the empty string. `RewriteMap`, `${map:key}` lookups and the forced type/handler flags `T=`/`H=` are refused at parse time, so an `.htaccess` carrying one fails closed. Other unrecognized flags (e.g. `DPI`, `CO=`) are ignored. |
+| RewriteCond · RewriteRule | supported | - Flags: `L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F`; `OR` on conditions. - File tests: `-f/-F -d -e -l/-L/-h -s -x` (`-U` always matches). - Variables: `REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME`, `%{HTTP:Name}`, `%{ENV:NAME}`, `%{LA-U:…}`/`%{LA-F:…}`. - `%{TIME*}` yields the empty string. - `RewriteMap`, `${map:key}`, `T=`/`H=` fail closed at parse time. Limit: other flags (e.g. `DPI`, `CO=`) are ignored. |
 
-| SetEnvIf · SetEnvIfNoCase | supported | Lazy header access; server-computed CGI names are protected. |
+| SetEnvIf · SetEnvIfNoCase | supported | Lazy header access. Limit: server-computed CGI names stay protected. |
 
-| Order · Allow from · Deny from | supported | Apache accumulation per scope; `env=`, host and CIDR operands (host/env/IP operands make the chain memo-ineligible). |
+| Order · Allow from · Deny from | supported | Apache accumulation per scope. Limit: `env=`, host and CIDR operands make the chain memo-ineligible. |
 
-| Require | partial | `all granted`, `valid-user`, `user …`. Everything else fails closed to deny. |
+| Require | partial | `all granted`, `valid-user`, `user …`. Limit: everything else fails closed to deny. |
 
-| AuthType · AuthName · AuthUserFile | supported | Basic only; bcrypt, APR1 (`$apr1$`), MD5-crypt (`$1$`) and `{SHA}` hashes. |
+| AuthType · AuthName · AuthUserFile | supported | Basic only. Limit: bcrypt, APR1 (`$apr1$`), MD5-crypt (`$1$`) and `{SHA}` only. |
 
-| Header set / add / append / merge / unset | supported | `always`/`onsuccess`, case-insensitive `env=`/`env=!` guards, `%{NAME}e` interpolation, ` `/` `/` ` scopes (merged in Apache order: directory-level across the chain, then ` ` against the resolved target file, then ` `). `merge` deduplicates trimmed comma-separated values. Applied in `finalize`, before cache storage and compression. CR/LF rejected. |
+| Header set / add / append / merge / unset | supported | - Guards: `always`/`onsuccess`, `env=`/`env=!`, `%{NAME}e`. - Scopes merge directory, then ` `, then ` `. Limit: applied in `finalize`; CR/LF rejected. |
 
-| Header echo | partial | Parses without error; emits nothing. |
+| Header echo | partial | Parses without error. Limit: emits nothing. |
 
-| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. See the header-directive compatibility inventory in the source tree (`docs/header-directive-compatibility.md`) for the exact boundary and the executable fixtures. |
+| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. Limit: see `docs/header-directive-compatibility.md` for the exact boundary. |
 
-| Header condition expr= / value expr= | partial | Only a conjunction of `%{REQUEST_URI} =~ / !~` is evaluated; other expressions are not. Value expressions are not implemented. |
+| Header condition expr= / value expr= | partial | Only `%{REQUEST_URI} =~ / !~` conjunctions evaluate. Limit: value expressions are not implemented. |
 
-| ErrorDocument | supported | Path, inline and external forms; never clobbers an application's own JSON error body. |
+| ErrorDocument | supported | Path, inline and external forms. Limit: never clobbers an app's own JSON error body. |
 
 | DirectoryIndex | supported | Including the `Disabled` form. |
 
-| SetHandler · AddHandler · AddType · ForceType · RemoveHandler · RemoveType | supported | `application/x-httpd-php` forces PHP handling / records the mapping; other handlers and `Remove*` record a non-PHP reset; `AddType`/`ForceType` override response `Content-Type`. |
+| SetHandler · AddHandler · AddType · ForceType · RemoveHandler · RemoveType | supported | `application/x-httpd-php` forces PHP. Limit: other handlers and `Remove*` record a non-PHP reset; `AddType`/`ForceType` override `Content-Type`. |
 
-| CacheLookup · CacheEnable · CacheDisable · CacheKeyModify | supported | The LSCache directives driving the page cache ; `CacheKeyModify` strips query parameters from the key. |
+| CacheLookup · CacheEnable · CacheDisable · CacheKeyModify | supported | LSCache directives for the page cache . Limit: `CacheKeyModify` strips query parameters from the key. |
 
-| php_value · php_admin_value · php_flag · php_admin_flag | supported | Per-request PHP ini overrides on the LSAPI special-env path. |
+| php_value · php_admin_value · php_flag · php_admin_flag | supported | Per-request PHP ini overrides. Limit: LSAPI special-env path only. |
 
-|             | partial | Common scopes honored; ` ` only for the modeled REQUEST_URI shape; ` ` bodies are evaluated. |
+|             | partial | Common scopes honored. Limit: ` ` only for the modeled REQUEST_URI shape; ` ` bodies evaluate. |
 
 | FileETag · H2EarlyHints · esi · AddOutputFilterByType · AllowOverride · Options | no-op | Recognized and dropped. |
 
-| ExpiresActive · ExpiresDefault · ExpiresByType | supported | Scoped across directory, ` ` and ` ` blocks; shares `hj-compress`'s `A/M` time grammar and overrides the vhost XML ` ` defaults when active. |
+| ExpiresActive · ExpiresDefault · ExpiresByType | supported | Scoped across directory, ` ` and ` `. Limit: shares the `A/M` grammar; overrides vhost XML ` ` when active. |
 
-Unrecognized directives are ignored leniently so vendor `.htaccess` files remain loadable. The planned first step for the header family is making unsupported forms visible in `check --strict` before adding more mutation behavior.
+Unrecognized directives are ignored, so vendor files stay loadable.
 
 ## Per-context overrides & sub_filter
 
-Alongside the per-directory chain, XML contexts rewrite *responses* and override limits for a URI prefix (reference: Configuration → Contexts ):
-
-- **`subFilter`** — literal `SEARCH => REPLACEMENT` substitution between the expires and compress stages, 200 responses only, un-encoded bodies of matching `subFilterTypes` (default `text/html`). Buffered bodies and streams both cap filtered output at `subFilterMaxBody` (4 MiB default); a stream past the cap passes through raw, never half-filtered. `Content-Length` is recomputed, ETag dropped, Last-Modified off unless kept. sub_filter paths bypass the page cache (whose hits re-enter transforms), while eligible static responses may use the fast-path memo (which stores and replays finalized bytes without re-filtering).
-
-- **`maxReqBodySize`** — per-context body cap enforced at dispatch for all terminals (413).
-
-- **`responseTimeout`** (proxy paths) and **`bandwidthLimit`** — override the backend deadline and the server-wide egress rate.
+See Configuration → Contexts . Per-context overrides and `sub_filter` now live there.
 
 ## Reproducible checks
 

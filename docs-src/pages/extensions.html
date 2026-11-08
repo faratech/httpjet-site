@@ -1,27 +1,38 @@
     <h1>Extending httpjet</h1>
-    <p class="lede">Two extension points, each with a deliberately narrow contract: <strong>compile-time extensions</strong> — trusted Rust crates linked into a custom build that register read-only pre-handlers and response transforms — and the <strong>WAF sidecar</strong>, a bounded loopback HTTP inspection call for an independently deployed engine. There is no dynamic plugin ABI and no in-process sandbox, on purpose.</p>
+    <p class="lede">Extend httpjet two ways: linked Rust crates, or a WAF sidecar. No dynamic plugin ABI exists. No in-process sandbox exists. This page states that once.</p>
+    <p>Rust offers no stable trait-object ABI across shared libraries. Native modules would share allocator, signals, threads anyway. No workload needs untrusted in-process code. No WASM runtime ships. Route untrusted inspection via the sidecar. Future untrusted designs must define capabilities, memory, fuel, deadlines, cancellation, body access, state, network access, versioning, fail semantics first.</p>
+
+    <div class="tablewrap"><table>
+      <thead><tr><th>Need</th><th>Hooks</th><th>Sidecar</th></tr></thead>
+      <tbody>
+        <tr><td>Custom headers/policy</td><td>Yes. Limit: rebuild + restart.</td><td>No. Limit: inspection only.</td></tr>
+        <tr><td>Blocking rules</td><td>Yes, in Rust. Limit: in-process.</td><td>Yes. Limit: external engine.</td></tr>
+        <tr><td>Independent deploy</td><td>No. Limit: linked build.</td><td>Yes. Limit: call per request.</td></tr>
+        <tr><td>Untrusted code</td><td>No. Limit: trusted only.</td><td>Outside process. Limit: bounded document.</td></tr>
+      </tbody></table></div>
 
     <section>
       <h2 id="registry">Compile-time extensions</h2>
-      <p><code>hj-extension::ExtensionRegistry</code> is assembled at the binary's registration point, <code>crates/httpjet/src/extensions.rs</code>. The distributed binary registers nothing, so the facility is inert unless an operator maintains a custom build. It is a <em>source-level</em> compatibility contract over the frozen <code>hj-core</code> types, not a stable native ABI.</p>
+      <p>Assemble <code>hj-extension::ExtensionRegistry</code> at <code>crates/httpjet/src/extensions.rs</code>. Shipped binary registers nothing. Facility stays inert without your build. Contract: source-level, over frozen <code>hj-core</code> types. No stable native ABI.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>extensions.rs</b> · registration</span></div><pre><code><span class="t-k">pub</span>(<span class="t-k">crate</span>) <span class="t-k">fn</span> compiled_registry() -&gt; hj_extension::ExtensionRegistry {
     <span class="t-k">let mut</span> registry = hj_extension::ExtensionRegistry::new();
     registry.register_pre_handler(<span class="t-s">"company.request-policy"</span>, company_policy::hook()).expect(<span class="t-s">"unique"</span>);
     registry.register_response_transform(<span class="t-s">"company.headers"</span>, company_headers::transform()).expect(<span class="t-s">"unique"</span>);
     registry
 }</code></pre></div>
-      <p>Registration order is execution order. Names are globally unique, 1–64 bytes of lowercase ASCII letters, digits, <code>.</code>, <code>-</code> and <code>_</code>. Registered extensions are logged once at boot; changing them means rebuilding and restarting, and SIGHUP carries the same linked registry into the next generation. Extension settings belong to the extension crate — the registry does not reinterpret LiteSpeed XML and exposes no runtime loader.</p>
+      <p>Registration order = execution order. Names: unique, 1–64 bytes, lowercase ASCII, digits, <code>.</code>, <code>-</code>, <code>_</code>. Logged once at boot. Changes need rebuild + restart. SIGHUP carries registry forward. Settings belong to your crate. No XML reinterpretation. No runtime loader.</p>
       <!--diagram:extension-hooks|<strong>Where hooks run.</strong> Pre-handlers run after trust and access resolution but before everything that could serve a byte; response transforms run after dispatch (and after page-cache storage) but before httpjet's own transforms, so an extension changes egress, not the canonical cached object, and is re-applied on hits.-->
       <h3 id="pre">Pre-handler contract</h3>
-      <p>A <code>PreHandler</code> receives an immutable <code>ReqCtx</code> and a <code>RequestView</code> exposing only method, URI and headers — no body, no mutable parts. It returns <code>Continue</code> (next hook, then built-in dispatch), <code>Respond(response)</code> (skip remaining hooks and dispatch; normal transforms, metrics, request-id handling and access logging still run), or <code>Err(HandlerError)</code> (fail closed to that status and log the named failure). Pre-handlers never see reserved operational routes intercepted before vhost dispatch (ACME challenges, loopback cache endpoints) or requests rejected before the hook boundary. <strong>Any registered pre-handler disables the on-core memo/cache/static fast path</strong>, because that synchronous path cannot run async hooks; response-only extensions keep it.</p>
+      <p><code>PreHandler</code> gets immutable <code>ReqCtx</code> plus <code>RequestView</code>. View exposes method, URI, headers only. No body, no mutable parts. Return <code>Continue</code> (next hook, then dispatch), <code>Respond(response)</code> (skip dispatch; transforms/metrics/logging still run), or <code>Err(HandlerError)</code> (fail closed, log failure). Never sees reserved routes (ACME, cache endpoints) or earlier rejections.</p>
+      <p><strong>Any pre-handler disables the fast path.</strong> Memo/cache/static fast path cannot run async hooks. Response-only extensions keep it.</p>
       <h3 id="transform">Response-transform contract</h3>
-      <p>Registered <code>ResponseTransform</code>s run in order on every full-pipeline response and every on-core cache/static response, before the host's static promotion, expires, sub_filter, compression, redirect-cache guard and Alt-Svc transforms — so an extension sees the origin representation before compression and cannot bypass the final transport-header policy by ordering. There is no error return: keep work bounded and express fallible initialization at registration.</p>
+      <p><code>ResponseTransform</code>s run in order, on full-pipeline and on-core responses. Run before host transforms: promotion, expires, sub_filter, compression, redirect guard, Alt-Svc. See origin form, pre-compression. Cannot bypass final header policy. No error return. Keep work bounded. Fail setup at registration.</p>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">In-process means full authority</span><p>Extension code runs with httpjet's memory and filesystem authority. A panic, deadlock, unbounded allocation or blocking call affects the server. Only trusted, reviewed crates belong in the registry.</p></div></div>
     </section>
 
     <section>
       <h2 id="waf">WAF sidecar</h2>
-      <p>httpjet embeds no rules engine and the ignored LiteSpeed <code>lsrecaptcha</code>/<code>censorshipControl</code> elements stay inactive. Instead, <code>--waf-sidecar-addr</code> turns on a bounded inspection call to a local HTTP service over a Unix socket (<code>unix:/path</code>, peer UID verified via <code>SO_PEERCRED</code> against <code>--waf-sidecar-uid</code>) or loopback TCP (<code>ip:port</code>) — the integration point for an existing maintained engine such as a Coraza/OWASP CRS adapter. httpjet does not claim CRS compatibility; the adapter owns the translation from the stable inspection document to its engine's model.</p>
+      <p>httpjet embeds no rules engine. Ignored <code>lsrecaptcha</code>/<code>censorshipControl</code> stay inactive. Enable <code>--waf-sidecar-addr</code> for loopback inspection instead. Transport: Unix socket (<code>unix:/path</code>, peer UID via <code>SO_PEERCRED</code> vs <code>--waf-sidecar-uid</code>) or loopback TCP (<code>ip:port</code>). Fits Coraza/OWASP CRS adapters. httpjet claims no CRS compatibility. Adapter owns engine translation.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · sidecar flags</span></div><pre><code>--waf-sidecar-addr unix:/run/waf/inspect.sock   <span class="t-c"># or loopback 127.0.0.1:19090; absent = seam inert</span>
 --waf-sidecar-uid 0                   <span class="t-c"># uid a unix: sidecar must run as (default: root or serving uid)</span>
 --waf-sidecar-path /inspect           <span class="t-c"># absolute, no control characters</span>
@@ -30,12 +41,14 @@
 --waf-concurrency 128                 <span class="t-c"># ≤ 4096</span>
 --waf-fail-open                       <span class="t-c"># weaker policy: continue on sidecar failure (every bypass is logged; 403 still blocks)</span></code></pre></div>
       <!--diagram:waf-sidecar|<strong>One inspection per request.</strong> Inspection runs after URI decoding/normalization and body-limit enforcement but before rewrite, cache lookup and any backend — background cache refreshes go through the same dispatch and are inspected too. Only two replies are valid; everything else is a sidecar failure.-->
-      <ul>
-        <li><strong>Document.</strong> <code>version: 1</code>, method, normalized path, query, resolved vhost, resolved client IP, protocol, effective TLS state, all request headers. Header values and the body are lowercase hexadecimal so raw bytes are lossless and cannot inject log or protocol controls; adapters must reject unsupported versions.</li>
-        <li><strong>Bodies.</strong> ≤ <code>--waf-body-max</code> → <code>body_hex</code>, restored byte-identically for downstream processing; larger → <code>body_omitted: true</code> and the sidecar must decide that shape explicitly. The global request limit stays authoritative.</li>
-        <li><strong>Memory.</strong> Beyond the concurrency cap, all generations share a 64 MiB serialization budget; each inspection reserves a byte-weighted allowance before creating hex/JSON copies, so stalled inspections cannot multiply temporary heap up to the concurrency limit. Waiting for the allowance is inside the deadline and follows the fail policy.</li>
-        <li><strong>Transport.</strong> One close-delimited HTTP/1.1 POST per inspection, never reused (no response-boundary ambiguity); response head ≤ 4 KiB; duplicate/nonzero Content-Length, Transfer-Encoding, malformed status, EOF and any status other than 204/403 are failures.</li>
-      </ul>
+      <h3>Document</h3>
+      <p>Sends <code>version: 1</code>, method, normalized path, query, vhost, client IP, protocol, TLS state, all headers. Headers and body use lowercase hex. Hex stays lossless, injection-safe. Adapters reject unsupported versions.</p>
+      <h3>Bodies</h3>
+      <p>≤ <code>--waf-body-max</code>: <code>body_hex</code>, restored byte-identically. Larger: <code>body_omitted: true</code>, sidecar decides explicitly. Global request limit stays authoritative.</p>
+      <h3>Limits</h3>
+      <p>Concurrency cap plus shared 64 MiB serialization budget. Each inspection reserves byte-weighted allowance before copying. Waiting counts inside deadline, follows fail policy. Stalled calls cannot multiply heap.</p>
+      <h3>Transport</h3>
+      <p>One close-delimited HTTP/1.1 POST per inspection. Never reused. Response head ≤ 4 KiB. Only 204/403 valid. Failures: duplicate/nonzero Content-Length, Transfer-Encoding, malformed status, EOF, other statuses.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>tests</b></span></div><pre><code>cargo test -p httpjet --bin httpjet pipeline::e2e::waf_runs_before_static_cache_and_can_block_a_previously_allowed_path
 cargo test -p httpjet --bin httpjet pipeline::e2e::waf_sidecar_failure_policy_is_closed_unless_explicitly_opened
 cargo test -p hj-extension</code></pre></div>
@@ -43,5 +56,5 @@ cargo test -p hj-extension</code></pre></div>
 
     <section>
       <h2 id="why">Why there is no dynamic or sandboxed plugin ABI</h2>
-      <p>httpjet does not <code>dlopen</code> third-party trait objects: Rust promises no stable trait-object ABI across independently built shared libraries, and a native module would share allocator, signal, thread and process authority with the server. There is no current requirement to execute untrusted third-party code, so a WASM runtime and its dependency and attack surface are not included. Untrusted or independently deployed inspection belongs behind the bounded sidecar contract above. If an untrusted-plugin workload appears, it must first define capabilities, memory and fuel limits, deadline and cancellation behavior, body access, state and network permissions, version negotiation, and fail-open/closed semantics — only then would an isolation mechanism be selected.</p>
+      <p>See lede note. Choice stated once there. Untrusted inspection: <a href="#waf">WAF sidecar</a>.</p>
     </section>

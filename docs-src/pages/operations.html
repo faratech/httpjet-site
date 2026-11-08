@@ -3,7 +3,9 @@
 
     <section>
       <h2 id="install">Installation</h2>
+      <h3>Fresh installer</h3>
       <p>For a fresh Linux server, use the <a href="quickstart.html#install">signed installer</a>. It selects the native package or portable archive, starts the welcome page on ports 80 and 443, and creates a unique self-signed certificate. A browser warning is expected until a trusted certificate is configured. io_uring must be available.</p>
+      <h3>Source build</h3>
       <p>To build and deploy from source instead, install the binary at a stable path <em>outside</em> Cargo's <code>target/</code> so a later <code>cargo clean</code> cannot delete what a running unit depends on:</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">source install</span></div><pre><code>cargo build --locked --release -p httpjet
 sudo useradd --system --home-dir /var/lib/httpjet --no-create-home --shell /usr/sbin/nologin httpjet
@@ -31,11 +33,12 @@ sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now httpjet-exam
         <tbody>
           <tr><td><code>httpjet.socket</code></td><td>N× <code>:80</code> TCP, N× <code>:443</code> TCP, N× <code>:443</code> UDP with <code>ReusePort=yes</code>, <code>Backlog=8192</code>. The multiplicity reproduces the per-worker SO_REUSEPORT fan-out, so N must equal <code>serve --workers</code>. Static (not enabled under <code>sockets.target</code>); pulled in by the service after the gate to avoid a cold-boot ordering cycle.</td></tr>
           <tr><td><code>httpjet-boot-ready.service</code></td><td>Boot-only oneshot gate, availability-first: the <code>Type=notify</code> LSAPI pool is the one hard dependency; databases/caches are ordered but not required — it waits up to 300 s, then proceeds with a loud warning so a cold boot with a slow database still serves static + warm cache + stale-if-error. Later backend maintenance cannot tear down the sockets.</td></tr>
-          <tr><td><code>httpjet.service</code></td><td>The web tier: <code>httpjet --root … serve --lsphp-external … --lsphp-generation-file …</code> under a dedicated user, <code>Restart=always</code>, <code>OOMScoreAdjust=-500</code>, <code>LimitNOFILE=1048576</code>, <code>TimeoutStopSec=20</code>, <code>Conflicts=lshttpd.service</code>. Effective flags come from drop-ins in <code>httpjet.service.d/</code> — check <code>systemctl show -p ExecStart --value httpjet.service</code> before reasoning about them. The repository ships a validated <strong>hardening drop-in</strong> (<code>systemd/httpjet.service.d/zz-hardening.conf</code>: <code>ProtectSystem=strict</code> with logs-only <code>ReadWritePaths</code>, <code>PrivateTmp/PrivateDevices</code>, <code>ProtectProc=invisible</code>, empty capability set, <code>MemoryDenyWriteExecute</code>, <code>RestrictAddressFamilies</code>, and a <strong>log-only seccomp stage</strong> that filters the dangerous syscall groups while logging — enforce <code>@system-service</code> only after a clean soak), measured <code>systemd-analyze security</code> 9.0 → 1.9; it is the reference copy, not applied by the checked-in unit.</td></tr>
+          <tr><td><code>httpjet.service</code></td><td>The web tier under a dedicated user. Limit: you check drop-ins before reasoning about flags.</td></tr>
           <tr><td><code>httpjet-lsphp.socket</code></td><td>Owns the LSAPI Unix listener (mode 0600, backlog 8192, <code>RemoveOnStop</code>). Never restart it during a reload or supervisor deploy.</td></tr>
           <tr><td><code>httpjet-lsphp.service</code></td><td><code>httpjet lsphp …</code>, <code>Type=notify</code> (active only after a marker-attributed LSAPI response), <code>ExecReload=httpjet lsphp-reload …</code>, its own identity, <code>RuntimeDirectory=httpjet</code> for the control socket and generation file.</td></tr>
           <tr><td><code>httpjet-edge-firewall.service</code></td><td>Optional oneshot edge firewall (<code>scripts/httpjet-edge-firewall.sh</code>) for origins without a cloud firewall: restricts new <code>:80</code>/<code>:443</code> connections to Cloudflare IPv4 + private ranges (keep its list in step with the XML <code>T</code> entries).</td></tr>
         </tbody></table></div>
+      <p><strong>Hardening:</strong> You apply <code>systemd/httpjet.service.d/zz-hardening.conf</code> as reference only. It sets <code>ProtectSystem=strict</code>, private tmp/devices, and empty capabilities. You enforce <code>@system-service</code> seccomp only after a clean soak. Measured score: 9.0 → 1.9.</p>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Scope of the zero-loss guarantee</span><p>Socket activation eliminates RSTs of <em>new and queued</em> connections across a deploy. Requests the old process has already accepted — h1/h2 mid-serve and especially h3/QUIC streams — still drain under <code>TimeoutStopSec</code>. "Never drops a connection" means never RSTs a new or queued one.</p></div></div>
     </section>
 
@@ -82,12 +85,9 @@ ss -xlnH | awk '$5 == "/run/httpjet/php.sock" {print $4}'    <span class="t-c">#
 
     <section>
       <h2 id="observability">Observability checklist</h2>
-      <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">the loopback-only surfaces</span></div><pre><code>curl -s http://127.0.0.1:9090/metrics | grep '^httpjet_'          <span class="t-c"># Prometheus text</span>
-curl -s -H "Authorization: Bearer $(cat /etc/httpjet/profile.token)" http://127.0.0.1:9090/cache-entries   <span class="t-c"># cache totals, budgets, health line</span>
-curl -s http://127.0.0.1:9091/v1/status | jq .                     <span class="t-c"># with --admin-addr: generation, fingerprint, upstream health</span>
-curl -sk https://127.0.0.1/__hj_cache_ready -o /dev/null -w '%{http_code}\n'
-journalctl -u httpjet -n 100</code></pre></div>
-      <p>Metric families, log formats, the request-id header, telemetry TSV, PHP slow log, OpenTelemetry and profiling are all on <a href="observability.html">Observability</a>. Pair the counters with a process monitor (the tree ships a <code>monit</code> check whose start timeout stays above the boot gate's worst case).</p>
+      <p>See <a href="observability.html">Observability</a> for metrics and logs.</p>
+      <p>You check loopback surfaces first.</p>
+      <p>You pair counters with a process monitor.</p>
     </section>
 
     <section>
@@ -112,5 +112,5 @@ bash scripts/oci-smoke.sh                                    <span class="t-c">#
 
     <section>
       <h2 id="release">Release and upgrade discipline</h2>
-      <p>A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through <code>scripts/update-deps.sh</code> and the full suite (the 0.1.x sweeps refreshed tokio 1.54, rustls 0.23.46, rustls-webpki 0.103.16 + webpki-roots 1.0.11, fancy-regex 0.20, parking_lot 0.13, zstd 0.14.3 and brotli 9.1 / brotli-decompressor 6.2; a daily dependency-advisory job fails the build on any RustSec finding).</p>
+      <p>A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through <code>scripts/update-deps.sh</code> and the full suite. See the changelog/release page for current dependency versions.</p>
     </section>

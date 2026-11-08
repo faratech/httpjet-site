@@ -1,6 +1,6 @@
 # Capabilities & limits — httpjet Documentation
 
-> What httpjet supports today, what is optional behind build features, what is deliberately unsupported, and the fixed operational bounds.
+> See what is supported, optional, or unsupported.
 
 - **Canonical URL:** https://httpjet.net/docs/capabilities
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -9,7 +9,7 @@
 
 # Capabilities & limits
 
-What the current source tree does, what it does only behind a build feature, what is a tested subset, and what is deliberately unsupported. **Supported** means an implemented, tested code path — not directive-for-directive parity with LiteSpeed, NGINX, Apache or Caddy. Optional features stay off unless explicitly enabled at build *and* at runtime.
+This page lists 25 capabilities, 6 build features and 14 operational bounds. **Supported** means an implemented, tested code path, not parity with another server.
 
         supported  implemented + tested
         optional  build feature + runtime opt-in
@@ -20,67 +20,67 @@ What the current source tree does, what it does only behind a build feature, wha
 
 | Area | Status | Scope and important limits |
 
-| HTTP/1.1 | supported | Keep-alive, pipelining, chunked bodies; strict framing; configured header/URL/body/timeout/request-count limits; 103 Early Hints; single + multipart ranges; `CONNECT` answered 405. → |
+| HTTP/1.1 | supported | Keep-alive, pipelining, chunked bodies and 103 Early Hints. Limit: `CONNECT` gets 405; limits configure headers, URL, body and timeouts. → |
 
-| HTTP/2 | supported | Native TLS h2 and h2c prior knowledge; flow-controlled buffered, file and streaming responses; h2spec 146/146. No server push; no `Upgrade: h2c`. → |
+| HTTP/2 | supported | Native TLS h2 and h2c prior knowledge with h2spec 146/146. Limit: no server push and no `Upgrade: h2c`. → |
 
-| HTTP/3 | supported | QUIC over UDP through the same pipeline; TCP *and* UDP HTTPS ports must both be published. Connection migration disabled. → |
+| HTTP/3 | supported | QUIC over UDP through the same pipeline. Limit: publish TCP and UDP HTTPS ports; migration stays disabled. → |
 
-| TLS | supported | rustls (aws-lc-rs) TLS 1.2/1.3, SNI, ALPN, dual ECDSA+RSA chains, certificate reload, optional/required client certificates, CRLs. → |
+| TLS | supported | rustls (aws-lc-rs) TLS 1.2/1.3 with SNI and ALPN. Limit: dual ECDSA+RSA, reload, client certs and CRLs only as configured. → |
 
-| Automatic certificates | optional | HTTP-01 and DNS-01 behind `--features acme` + CLI opt-in. One managed account/identifier set per process; DNS-01 needs an operator-supplied webhook controller. → |
+| Automatic certificates | optional | HTTP-01 and DNS-01 behind `--features acme` plus CLI opt-in. Limit: one account/identifier set per process; DNS-01 needs your webhook. → |
 
-| OCSP stapling | optional | `--features ocsp`, OpenSSL 3.x, an explicit responder that covers every issuer. Not for CAs that retired OCSP (Let's Encrypt). → |
+| OCSP stapling | optional | Stapling behind `--features ocsp` with OpenSSL 3.x. Limit: your responder must cover every issuer; not for Let's Encrypt. → |
 
-| kTLS / sendfile | partial | Plain-TCP H1 file bodies use `sendfile(2)` always; a `--features ktls` build adds TLS 1.3 H1 sendfile only when `--ktls=auto` finds a physical NIC with active `tls-hw-tx-offload`. H2/H3/UDS/TLS 1.2 keep userspace paths. → |
+| kTLS / sendfile | partial | Plain-TCP H1 file bodies always use `sendfile(2)`. Limit: TLS 1.3 H1 sendfile needs `--features ktls`, `--ktls=auto` and `tls-hw-tx-offload`. → |
 
-| Virtual hosts | supported | Listener + exact Host/SNI maps, nearest-configured-parent-domain fallback (an unmapped `a.example.test` reaches the vhost that maps `example.test`), and a bare `*` fallback. Glob patterns such as `*.example.test` or `example.*` are not matched: `check` warns and those hosts fall to `*`. |
+| Virtual hosts | supported | Exact Host/SNI maps with parent-domain and bare `*` fallback. Limit: glob patterns like `*.example.test` never match; `check` warns. |
 
-| Static content | supported | Conditional requests, LiteSpeed ETags, ranges, in-memory small-file promotion, precompressed `.br`/`.gz` siblings, traversal-safe opens. → |
+| Static content | supported | Conditional requests, LiteSpeed ETags and ranges. Limit: precompressed `.br`/`.gz` siblings only; opens stay traversal-safe. → |
 
-| Reverse proxy | supported | HTTP/1 upstreams plus explicit `h2://`/`h2s://`; request/response streaming, SSE; upstream mTLS. → |
+| Reverse proxy | supported | HTTP/1 upstreams plus explicit `h2://`/`h2s://` with streaming and SSE. Limit: upstream mTLS only as configured. → |
 
-| WebSocket | partial | HTTP/1 upgrade and raw relay. Relay does not support TLS, H2 or Unix-socket upstreams. → |
+| WebSocket | partial | HTTP/1 upgrade and raw relay. Limit: relay excludes TLS, H2 and Unix-socket upstreams. → |
 
-| Upstream groups | supported | Primary-first, smooth weighted round-robin, weighted least-active, passive breaker, optional connect/GET/HEAD probes. No automatic replay of unsafe requests. → |
+| Upstream groups | supported | Primary-first, weighted selection and passive breaker. Limit: probes use connect/GET/HEAD only; unsafe requests never replay. → |
 
-| PHP / LSAPI | supported | Native LSAPI; owned pool or separately supervised external pool with generation tracking and candidate-first reload. → |
+| PHP / LSAPI | supported | Native LSAPI with owned or external pools. Limit: external pools need generation tracking and candidate-first reload. → |
 
-| FastCGI | supported opt-in | Explicit `fcgi`/`fastcgi` processor + suffix routing over TCP or Unix sockets; the app is externally supervised; bodies buffered. → |
+| FastCGI | supported opt-in | Explicit `fcgi`/`fastcgi` routing over TCP or Unix sockets. Limit: you supervise the app externally; bodies buffer. → |
 
-| CGI execution, uWSGI | unsupported | Design contracts exist; nothing is routable. A `cgi` handler without an explicit FastCGI processor fails closed (never serves source). → |
+| CGI execution, uWSGI | unsupported | Design contracts exist for both. Limit: nothing routes; a bare `cgi` handler fails closed. → |
 
-| Rewrites & `.htaccess` | partial | Common rewrite, access, auth, header (`set`/`append`/`add`/`merge`/`unset`), expiry (`ExpiresActive`/`ExpiresDefault`/`ExpiresByType`), cache and env directives. `Header edit`, `Header setifempty`, `Header echo` and `RequestHeader` are ignored. Run `check --strict`. → |
+| Rewrites & `.htaccess` | partial | Common rewrite, access, auth, header, expiry, cache and env directives. Limit: `Header edit`, `Header setifempty`, `Header echo` and `RequestHeader` are ignored. → |
 
-| Compression | supported | Dynamic gzip/brotli/zstd + precompressed siblings. Gzip *request* decoding on by default; brotli/zstd request decoding opt-in and bounded. → |
+| Compression | supported | Dynamic gzip/brotli/zstd plus precompressed siblings. Limit: gzip request decoding defaults on; brotli/zstd decoding is opt-in and bounded. → |
 
-| Origin page cache | supported opt-in | Public/private tiers, vary (including per-URL cookie vary), purge tags, stale policies, single flight, admission, RAM/file tiers, dictionaries, restart scan, generation-scoped keys. A first-class route-level *microcache policy* is specified, not implemented. → |
+| Origin page cache | supported opt-in | Public/private tiers, vary, purge tags, stale, single flight and file tiers. Limit: route-level *microcache policy* is specified, not implemented. → |
 
-| Access controls | supported | Peer ACLs, trusted-proxy client IP, GeoIP/ASN CIDR rules, per-IP rate limit, body limits, Basic auth (bcrypt, APR1 `$apr1$`, MD5-crypt `$1$` and `{SHA}` htpasswd in constant time; bcrypt cost capped at 14, files confined to the docroot or an operator-listed `--auth-user-file-roots` directory). → |
+| Access controls | supported | Peer ACLs, trusted-proxy IP, GeoIP/ASN rules, rate and body limits. Limit: bcrypt caps at 14; use bcrypt, `$apr1$`, `$1$` or `{SHA}`; files need docroot or `--auth-user-file-roots`. → |
 
-| WAF | external opt-in | Bounded request-inspection sidecar over Unix socket (peer-UID verified) or loopback TCP, fail-closed by default. No embedded ModSecurity/CRS engine. → |
+| WAF | external opt-in | Bounded sidecar inspection over Unix or loopback TCP. Limit: it fails closed by default; no embedded ModSecurity/CRS. → |
 
-| Logs and metrics | supported | Combined or JSON access logs, text or JSON error logs with redaction, syslog tap, Prometheus text metrics, request ids, telemetry TSV, PHP slow log. → |
+| Logs and metrics | supported | Combined or JSON access logs and Prometheus metrics. Limit: error logs redact; syslog and slow logs stay optional. → |
 
-| OpenTelemetry | optional | OTLP traces and metrics behind `--features otel` + `HTTPJET_OTEL=1`. Bounded queues; no payload export. → |
+| OpenTelemetry | optional | OTLP traces and metrics behind `--features otel` plus `HTTPJET_OTEL=1`. Limit: queues bound output; payloads never export. → |
 
-| Runtime APIs | opt-in | Loopback read-only status API; separately authenticated transactional config API. Boot-owned resources stay restart-required. → |
+| Runtime APIs | opt-in | Loopback status API and authenticated config API. Limit: boot-owned resources stay restart-required. → |
 
-| Extensions | compile-time only | Trusted Rust crates register read-only pre-handlers and response transforms. No dynamic ABI, no in-process sandbox. → |
+| Extensions | compile-time only | Trusted Rust crates register handlers and transforms. Limit: no dynamic ABI and no in-process sandbox. → |
 
-| Deployment | examples | Generic systemd units (socket activation, boot gate, PHP pool) and a hardened OCI example that still needs an io_uring-permitting runtime. → |
+| Deployment | examples | Generic systemd units and a hardened OCI example. Limit: your runtime must still permit io_uring. → |
 
 ## Deliberately unsupported or deferred
 
-- **Generic CGI process execution and uWSGI** are not routable; their fail-closed design gates are documented. FastCGI, LSAPI or HTTP proxying cover application paths.
+- **Generic CGI and uWSGI** never route. Use FastCGI, LSAPI or HTTP proxying instead.
 
-- **HTTP/2 server push** is not implemented — use `Link` preload plus 103 Early Hints.
+- **HTTP/2 server push** is not implemented. Use `Link` preload plus 103 Early Hints.
 
-- **HTTP trailers** (inbound h2/h3 trailing HEADERS, chunked trailers) are discarded and not forwarded through gateways. LSAPI has no trailer concept.
+- **HTTP trailers** are discarded, never forwarded. LSAPI has no trailer concept.
 
-- **h2c is prior-knowledge only**; the HTTP/1.1 `Upgrade: h2c` handshake was removed by RFC 9113 and is not implemented.
+- **h2c is prior-knowledge only**. The `Upgrade: h2c` handshake is not implemented.
 
-- **QUIC connection migration** is disabled: listener steering does not yet preserve connection ownership across an address change.
+- **QUIC connection migration** is disabled. Listener steering cannot preserve ownership across address changes.
 
 - **No epoll/tokio transport fallback**, no Windows/macOS. Linux io_uring is mandatory.
 
@@ -88,7 +88,7 @@ What the current source tree does, what it does only behind a build feature, wha
 
 - **LiteSpeed anti-abuse elements** (`lsrecaptcha`, `censorshipControl`, permission masks, `cgiRlimit`) are parsed and warned about, never enforced.
 
-- **Legacy crypt and plaintext htpasswd schemes** (traditional DES, `$5$`/`$6$` `crypt()`, and plaintext entries) verify *false* with a parse-time warning — use bcrypt (`htpasswd -B`), APR1 (`$apr1$`), MD5-crypt (`$1$`) or `{SHA}`.
+- **Legacy htpasswd** (DES, `$5$`/`$6$`, plaintext) verifies *false*. Use bcrypt, APR1 (`$apr1$`), MD5-crypt (`$1$`) or `{SHA}`.
 
 - **Cross-node cache peers** (`--cache-peer`, peer fill/purge fan-out) were removed in August 2026; the loopback purge and readiness endpoints remain.
 
@@ -96,7 +96,7 @@ What the current source tree does, what it does only behind a build feature, wha
 
 ## Build-time feature gates
 
-The default binary includes the serving engine, LSAPI, FastCGI, proxy, cache, logging, metrics, the WAF sidecar client and an empty extension registry. These features add dependencies and require an explicit build — and still nothing happens until the matching runtime switch is set:
+The default binary includes serving, LSAPI, FastCGI, proxy and cache. It also includes logging, metrics and the WAF client. Each feature below needs an explicit build plus its runtime switch.
 
 | Cargo feature | Adds | Runtime opt-in |
 
@@ -114,13 +114,13 @@ The default binary includes the serving engine, LSAPI, FastCGI, proxy, cache, lo
 
 ## Operational bounds
 
-Request limits come from the LiteSpeed ` ` block and per-context overrides; inspect the effective values with `check --strict` and `serve --help`. Fixed or separately configured bounds worth knowing:
+Request limits come from ` ` and per-context overrides. Inspect effective values with `check --strict` and `serve --help`.
 
 | Bound | Value |
 
 | Page-cache single object | 100 MiB — larger responses serve uncached |
 
-| Page-cache budgets | Independent index (`--page-cache-mem`), file tier (`--page-cache-disk-mem`), hot tier (`--page-cache-hot-mem`), object TTL and stale-window caps; persistent files need an integrity key (`--page-cache-integrity-key`; loaded through a private-file validator — single link, owner root or the serving uid, no group/other bits — with `--page-cache-integrity-required` to refuse booting the file tier without one) |
+| Page-cache budgets | Index `--page-cache-mem`; file `--page-cache-disk-mem`; hot `--page-cache-hot-mem`. Limit: files need `--page-cache-integrity-key` (single-link, root/serving uid, no group/other); `--page-cache-integrity-required` enforces it. |
 
 | Bridge buffering | Bodies ≤ 256 KiB buffered, larger streamed (H1/H2/H3) |
 
@@ -150,11 +150,11 @@ Request limits come from the LiteSpeed ` ` block and per-context overrides; insp
 
 | Loopback-only endpoints | `/__hj_cache_purge`, `/__hj_cache_ready` (raw loopback peer), metrics `:9090`, admin listeners |
 
-Defaults are starting points, not sizing recommendations. Worker count, open-file limit, body budget, cache caps, PHP/backend concurrency and health/WAF timeouts must be sized together for the deployment.
+Size workers, file limits, budgets, cache, PHP and timeouts together.
 
 ## Reload boundary (summary)
 
-SIGHUP and the transactional API replace application state without dropping in-flight requests: vhost maps, rewrites, document roots, contexts, reloadable request settings, TLS material on an unchanged listener topology, and the trust policy of an already-enabled QUIC endpoint. Listener addresses/roles, QUIC enablement, Unix-listener topology, PHP topology, cache-store identity, process user/namespace policy and other boot-owned resources are **restart-required**; the write API says so instead of partially applying. Details: Admin API & reload .
+SIGHUP and the API replace app state without dropping requests. Boot-owned resources stay **restart-required**. See Admin API & reload .
 
 ## Reproducible checks
 
@@ -166,4 +166,4 @@ cargo run --locked -p httpjet -- --root "$PWD/examples/litespeed" check --strict
 cargo test --locked --workspace
 ```
 
-Protocol, cache, ACME, OCSP, OTel, FastCGI, WAF, admin and OCI pages carry their narrower acceptance commands. Every test uses synthetic configuration, temporary files and ephemeral loopback ports.
+Topic pages carry narrower acceptance commands. Tests use synthetic config and ephemeral loopback ports.

@@ -1,55 +1,58 @@
     <h1>Rewrite engine &amp; <code>.htaccess</code></h1>
-    <p class="lede"><code>hj-rewrite</code> is httpjet's Apache <strong>mod_rewrite</strong> / <code>.htaccess</code> engine — depending only on <code>hj-compress</code> so <code>.htaccess</code> and XML expiry directives share one <code>A/M</code> time grammar. It prefers a linear-time regex engine and falls back to <strong><code>fancy-regex</code></strong> only for the lookaround and backreferences real <code>.htaccess</code> files use. The same crate enforces per-directory access control, scoped Basic auth, header operations, expiry rules and the LSCache directives.</p>
+    <p class="lede"><code>hj-rewrite</code> is httpjet's Apache <strong>mod_rewrite</strong> / <code>.htaccess</code> engine. It depends only on <code>hj-compress</code>, so <code>.htaccess</code> and XML expiry share one <code>A/M</code> time grammar.</p>
 
     <div class="rail locator" role="img" aria-label="You are here: the rewrite stage."><div class="rail__track"><span class="stage"><span class="k">resolve</span></span><span class="stage"><span class="k">acl</span></span><span class="stage on"><span class="k">rewrite</span></span><span class="stage"><span class="k">cache</span></span><span class="stage"><span class="k">dispatch</span></span><span class="stage on"><span class="k">finalize</span></span><span class="stage"><span class="k">store</span></span></div></div>
 
     <section>
       <h2 id="overview">Overview</h2>
-      <p>The rewrite stage runs the vhost's inline <code>&lt;rewrite&gt;</code> rules first, then the <code>.htaccess</code> chain for the resolved directory — OpenLiteSpeed's order. One entry point, <code>evaluate()</code>, returns exactly one outcome per pass: <code>Rewritten</code>, <code>Redirect</code>, <code>Proxy</code>, <code>Forbidden</code>, <code>Gone</code> or <code>Unchanged</code>.</p>
+      <p>Run inline <code>&lt;rewrite&gt;</code> rules first, then the <code>.htaccess</code> chain (OpenLiteSpeed order). <code>evaluate()</code> returns one outcome per pass: <code>Rewritten</code>, <code>Redirect</code>, <code>Proxy</code>, <code>Forbidden</code>, <code>Gone</code> or <code>Unchanged</code>.</p>
       <!--diagram:rewrite-eval|<strong>One evaluation pass.</strong> A rewrite that crosses into another directory reloads the destination chain and evaluates again; a terminal flag stops the walk; an exhausted chain returns <code>Unchanged</code> and dispatch falls through to suffix routing.-->
     </section>
 
     <section>
       <h2 id="loading">Per-directory loading</h2>
-      <p>An <code>HtaccessCache</code> loads each directory's file (name from <code>accessFileName</code>, default <code>.htaccess</code>; bare file names only — <code>/</code> and <code>..</code> are rejected) with <strong>mtime invalidation</strong> (each file is re-<code>stat</code>ed at most once a second), so an edit takes effect within about a second, without a reload. The parsed form holds the directive list, compiled regexes, scoping blocks, a per-file memo of which access rules match, the auth realm map and the memo-eligibility verdict. The chain from docroot to the request's directory is bounded at <strong>64</strong> levels; past that a deny-all sentinel applies. Since 2026-09-16 an <strong>unreadable <code>.htaccess</code> (or one that fails to parse or exceeds 16 MiB) also fails closed</strong> to that sentinel rather than being skipped. A non-UTF-8 byte is decoded lossily, so a legacy-encoded comment cannot downgrade a protected directory to "no rules".</p>
-      <p>Vhost-level switches: <code>&lt;htAccess&gt;&lt;allowOverride&gt;0</code> disables the whole chain (even with <code>autoLoadHtaccess</code>), while <code>autoLoadHtaccess</code> alone loads files without enabling general overrides. Candidate configuration generations own their own htaccess, rewrite-outcome and UA caches, so a reload never reintroduces stale results.</p>
+      <p><code>HtaccessCache</code> loads each directory's file (<code>accessFileName</code>, default <code>.htaccess</code>; bare names only). <strong>mtime invalidation</strong> re-stats at most once a second, so edits land within a second. The parsed form holds directives, regexes, scopes, the auth map and the memo verdict. The chain caps at <strong>64</strong> levels, then a deny-all sentinel applies.</p>
+      <p>Since 2026-09-16 an unreadable, unparseable or over-16 MiB <code>.htaccess</code> fails closed to that sentinel. Non-UTF-8 bytes decode lossily. Set <code>&lt;allowOverride&gt;0</code> to disable the chain; <code>autoLoadHtaccess</code> alone loads without overrides. Each generation owns its caches, so reloads never revive stale results.</p>
     </section>
 
     <section>
       <h2 id="prefilter">The dense-DFA prefilter</h2>
-      <p>Rather than test every rule's regex per request, the eligible patterns compile once into <strong>one fully-determinized dense DFA</strong> (<code>regex_automata::dfa::dense</code>) searched a single time to learn <em>which</em> rules could match. Only those run for real. A dense DFA holds no lazy transition state, so the search is <strong>cacheless</strong>: no per-search cache allocation and no cross-thread pool lock — one mutex fewer on the request path at high concurrency.</p>
+      <p>See <a href="#matching">Matching</a>. The prefilter now lives there.</p>
+    </section>
+
+    <section>
+      <h2 id="matching">Matching</h2>
+      <p>Compile eligible patterns once into <strong>one dense DFA</strong> (<code>regex_automata::dfa::dense</code>). Search it once to learn which rules could match. Run only those rules for real. A dense DFA holds no lazy state, so the search is <strong>cacheless</strong>. You pay no per-search allocation and no cross-thread pool lock.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>hot path</b> · prefilter, then evaluate</span></div><pre><code><span class="t-k">let</span> hits = prefilter.search(path);          <span class="t-c">// which rules *could* match — one DFA pass</span>
 <span class="t-k">for</span> rule <span class="t-k">in</span> hits {
     <span class="t-k">if let</span> Some(m) = rule.regex.find(path) { <span class="t-k">return</span> rule.apply(m); }   <span class="t-c">// substitute + flags</span>
 }
 Outcome::Unchanged</code></pre></div>
-    </section>
-
-    <section>
-      <h2 id="matching">Linear vs backtracking matching</h2>
-      <p>A flagged rule runs through a <code>CompiledRegex</code> that prefers <code>regex_automata::meta::Regex</code> with an explicit thread-local cache keyed per pattern, and falls back to <code>fancy-regex</code> only for constructs the linear engine cannot express. The split is exact, not approximate: a pattern the linear engine accepts has identical match semantics under both, so the choice is invisible.</p>
+      <p>Each flagged rule runs through <code>CompiledRegex</code>. Prefer <code>regex_automata::meta::Regex</code> (per-pattern thread-local cache). Fall back to <code>fancy-regex</code> only where the linear engine cannot express a construct. Accepted patterns match identically under both.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>Pattern shape</th><th>Engine</th><th>Why</th></tr></thead>
         <tbody>
-          <tr><td>Anchors, classes, alternation, repetition</td><td><code>regex_automata::meta</code></td><td>Linear time; per-pattern thread-local cache, no shared lock.</td></tr>
-          <tr><td>Lookahead <code>(?=…)</code> / <code>(?!…)</code>, lookbehind</td><td><code>fancy-regex</code></td><td>Not expressible as a finite automaton.</td></tr>
-          <tr><td>In-pattern backreference <code>\1</code></td><td><code>fancy-regex</code></td><td>Requires backtracking.</td></tr>
-          <tr><td>Pure lookahead conjunction <code>^(?=.*A)(?=.*B)…</code></td><td><code>regex_automata::meta</code> per part</td><td>Each lookahead runs as one linear search; <code>fancy-regex</code> is kept only for captures (0.1.10: a cookie <code>SetEnvIf</code> fell from 29 to 1 µs).</td></tr>
+          <tr><td>Anchors, classes, alternation, repetition</td><td><code>regex_automata::meta</code></td><td>Linear time. Limit: per-pattern thread-local cache, no shared lock.</td></tr>
+          <tr><td>Lookahead <code>(?=…)</code> / <code>(?!…)</code>, lookbehind</td><td><code>fancy-regex</code></td><td>Not a finite automaton. Limit: backtracking only here.</td></tr>
+          <tr><td>In-pattern backreference <code>\1</code></td><td><code>fancy-regex</code></td><td>Requires backtracking. Limit: backtracking only here.</td></tr>
+          <tr><td>Pure lookahead conjunction <code>^(?=.*A)(?=.*B)…</code></td><td><code>regex_automata::meta</code> per part</td><td>One linear search per part. Limit: <code>fancy-regex</code> only for captures (0.1.10: 29 → 1 µs).</td></tr>
         </tbody></table></div>
-      <p>A regex that errors at match time <strong>fails closed toward the rule's polarity</strong>: a deny that cannot evaluate counts as matched; an allow that cannot evaluate is withheld (hardened 2026-09-06 alongside the spoofing checks).</p>
+      <p>A regex error at match time <strong>fails closed toward the rule's polarity</strong>. A failing deny counts as matched; a failing allow is withheld (hardened 2026-09-06).</p>
     </section>
 
     <section>
       <h2 id="outcome-cache">Rewrite-outcome cache &amp; UA classification</h2>
-      <p>For chains whose inputs are <em>path-cacheable</em>, the whole rewrite decision is memoized for <code>--rewrite-outcome-ttl-ms</code> (default 1000 ms — which also bounds <code>-f</code>/<code>-d</code> filesystem staleness and lets <code>.htaccess</code> edits land within a second; 0 disables). The key is vhost/scheme/method/host/path/query plus any keyable header variables the chain reads. Counters: <code>httpjet_rewrite_outcome_{hits,misses,uncacheable}_total</code>.</p>
-      <p><code>--rewrite-ua-classify</code> (default off, a deploy-time decision) keys User-Agent-reading chains by the <em>bitmap of matching UA RewriteConds</em> instead of the raw UA string, when parse-time analysis proves the outcome depends on the UA only through those matches. Real-world UA diversity collapses onto a handful of entries (<code>httpjet_rewrite_ua_classify_entries</code>). Since 2026-09-06 header-dependency collection continues past the UA classification so a chain that also reads Origin or Accept keys correctly.</p>
+      <p>See <a href="#memo">Two caches</a>. Outcome caching now lives there.</p>
     </section>
 
     <section>
-      <h2 id="memo">The fast-path memo and chain eligibility</h2>
-      <p>The on-core <strong>finished-response memo</strong> (default on; <code>--no-fast-memo</code> / <code>HJ_FAST_MEMO=0</code>) serves repeat cookieless static GETs without running the pipeline at all — per thread, 1 s TTL, 64 MiB/worker, only for 200 full bodies without <code>Set-Cookie</code>, and only after each distinct key has passed the full pipeline once. Whether a docroot's chain is eligible is a <strong>parse-time verdict</strong> (<code>MemoClass</code>, fail-closed) that <code>httpjet check</code> prints per vhost.</p>
+      <h2 id="memo">Two caches</h2>
+      <p><strong>Outcome cache.</strong> Memoize the rewrite decision for path-cacheable chains (<code>--rewrite-outcome-ttl-ms</code>, default 1000 ms; 0 disables). Key on vhost, scheme, method, host, path, query and keyable headers. Count with <code>httpjet_rewrite_outcome_{hits,misses,uncacheable}_total</code>.</p>
+      <p><strong>UA classification.</strong> Enable <code>--rewrite-ua-classify</code> (default off) to key UA chains by RewriteCond bitmap, when analysis proves that dependence. Since 2026-09-06 header collection continues past it, so Origin/Accept chains still key correctly (<code>httpjet_rewrite_ua_classify_entries</code>).</p>
+      <p><strong>Finished-response memo.</strong> Serve repeat cookieless static GETs without the pipeline (default on; <code>--no-fast-memo</code> / <code>HJ_FAST_MEMO=0</code>). Per thread, 1 s TTL, 64 MiB/worker. Store only 200 full bodies without <code>Set-Cookie</code>, after one full pass per key.</p>
+      <p>Eligibility is a <strong>parse-time verdict</strong> (<code>MemoClass</code>, fail-closed) that <code>httpjet check</code> prints per vhost. Note: <code>%{TIME*}</code> evaluates to the empty string, and chains reading it are ineligible for this memo.</p>
       <!--diagram:memo-eligibility|<strong>Memo eligibility.</strong> A chain that reads anything the memo key cannot carry — client/server addresses, protocol, IP/env/host access operands, <code>REDIRECT_STATUS</code>, <code>%{HTTP_COOKIE}</code>, <code>%{TIME*}</code> — is ineligible and pays the full pipeline every time. Eligible chains memoize with a VARY-SET of every header the chain reads (raw Origin, UA bitmap …), so an 800-line forum chain still memoizes.-->
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Same-binary A/B on the forum's 806-line docroot chain (<code>/robots.txt</code>, c=100): <strong>h2 137k → 248k req/s (+81%)</strong>, <strong>h1 107k → 153k (+43%)</strong>. The byte-identity gate <code>scripts/fast_memo_parity_test.sh</code> diffs a UA × Origin × Accept-Encoding × scheme matrix memo-on vs memo-off (192 cells, zero differences at the last three review rounds).</p><span class="regime">PGO · 2026-08-28 · parity re-run 2026-09-16</span></div></div>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Same-binary A/B on the forum's 806-line chain (<code>/robots.txt</code>, c=100): <strong>h2 137k → 248k req/s (+81%)</strong>, <strong>h1 107k → 153k (+43%)</strong>. Gate <code>scripts/fast_memo_parity_test.sh</code> diffs UA × Origin × Accept-Encoding × scheme (192 cells, zero differences).</p><span class="regime">PGO · 2026-08-28 · parity re-run 2026-09-16</span></div></div>
 
       <div class="widget" id="htaccess-inspector">
         <p class="widget__title">Interactive · <code>.htaccess</code> &amp; <code>fast_memo</code> readiness inspector</p>
@@ -81,7 +84,7 @@ RewriteRule ^ index.php [L]</textarea>
 
     <section>
       <h2 id="setenvif">SetEnvIf &amp; lazy headers</h2>
-      <p><code>SetEnvIf</code> / <code>SetEnvIfNoCase</code> evaluate with <strong>lazy header access</strong>: the engine hands each rule a callback that materializes headers only if the rule references one, and the attribute compare is case-insensitive without allocating a lowercased copy. A request matching no rule pays nothing. Since 2026-09-16, <code>SetEnvIf</code>/<code>[E=]</code> cannot set server-computed CGI names (<code>REMOTE_ADDR</code>, <code>HTTPS</code>, <code>CONTENT_LENGTH</code>, …) — those writes are denied.</p>
+      <p>Evaluate <code>SetEnvIf</code>/<code>SetEnvIfNoCase</code> with <strong>lazy header access</strong>: materialize only referenced headers, compare case-insensitively. No match costs nothing. Since 2026-09-16 you cannot set server-computed CGI names (<code>REMOTE_ADDR</code>, <code>HTTPS</code>, <code>CONTENT_LENGTH</code>, …) this way.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>.htaccess</b> · SetEnvIf</span></div><pre><code>SetEnvIfNoCase User-Agent "bot|crawler" is_bot=1
 SetEnvIf Request_URI "\.(?:png|jpg|css|js)$" is_asset=1
 RewriteCond %{ENV:is_bot} =1
@@ -90,22 +93,35 @@ RewriteRule ^/expensive/ - [E=no-cache:1]      <span class="t-c"># [E=no-cache] 
 
     <section>
       <h2 id="front-controller">Front-controller routing</h2>
-      <p>XenForo, WordPress and most PHP frameworks rewrite <em>every</em> URL to <code>/index.php</code>. The engine keeps the <strong>original <code>REQUEST_URI</code></strong> and pins the resolved script separately (<code>SCRIPT_FILENAME</code> via the <code>LsapiScript</code> extension, <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> into the env). PHP sees the front controller; everything downstream still sees the URL the visitor asked for — which is why the <a href="page-cache.html#keys">page cache keys by the original URI</a>.</p>
+      <p>XenForo and WordPress rewrite every URL to <code>/index.php</code>. Keep the <strong>original <code>REQUEST_URI</code></strong>; pin <code>SCRIPT_FILENAME</code> via <code>LsapiScript</code> and <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> via env. Hence the <a href="page-cache.html#keys">page-cache original-URI key</a>.</p>
     </section>
 
     <section>
       <h2 id="access-control">Access control</h2>
-      <p><code>&lt;Files&gt;</code> / <code>&lt;FilesMatch&gt;</code> / <code>&lt;Directory&gt;</code> / <code>&lt;DirectoryMatch&gt;</code> / <code>&lt;If&gt;</code> scoping carries <code>Order</code> / <code>Allow from</code> / <code>Deny from</code> and <code>Require</code>, ANDed across every enclosing block. A <code>&lt;Directory&gt;</code> deny applies to the directory <strong>and everything beneath it</strong>. <code>Require all granted</code> grants; <code>Require all denied</code> and every other predicate (<code>ip</code>, <code>host</code>, <code>env</code>, <code>expr</code>, <code>method</code>, …) <strong>fails closed to deny</strong> rather than being approximated — a shipped auth file that httpjet cannot honor 403s rather than opening up. Directory patterns accept mapped filesystem paths as well as the docroot-relative convention.</p>
+      <p><code>&lt;Files&gt;</code>/<code>&lt;FilesMatch&gt;</code>/<code>&lt;Directory&gt;</code>/<code>&lt;DirectoryMatch&gt;</code>/<code>&lt;If&gt;</code> carry <code>Order</code>/<code>Allow from</code>/<code>Deny from</code>/<code>Require</code>, ANDed across blocks. A <code>&lt;Directory&gt;</code> deny covers everything beneath it. Only <code>Require all granted</code> grants; other predicates (<code>ip</code>, <code>host</code>, <code>env</code>, <code>expr</code>, <code>method</code>, …) <strong>fail closed to deny</strong> (403). Directory patterns accept mapped or docroot-relative paths.</p>
     </section>
 
     <section>
       <h2 id="basic-auth">HTTP Basic auth</h2>
-      <p><code>AuthType Basic</code> + <code>AuthName</code> + <code>AuthUserFile</code> + <code>Require valid-user | user …</code> protect a subtree. Since the 2026-09-06 review the model separates parsed policy from the effective realm: requirements resolve in order across scopes, a metadata-only section cannot erase an inherited requirement, an explicit <code>Require</code> replaces it, exact usernames are preserved, and the realm is enforced against the original, rewritten, index, script/PATH_INFO and canonical filesystem targets <strong>before cache lookup</strong>, with a served-target backstop. Unsupported or incomplete active auth fails closed. Valid credentials set <code>REMOTE_USER</code>; failures return 401 with the challenge.</p>
+      <p>Protect a subtree with <code>AuthType Basic</code> + <code>AuthName</code> + <code>AuthUserFile</code> + <code>Require valid-user | user …</code>:</p>
+      <ul>
+        <li>Resolve requirements in scope order. Limit: metadata-only sections cannot erase inherited requirements; explicit <code>Require</code> replaces them.</li>
+        <li>Enforce before cache lookup, on original/rewritten/index/script targets. Limit: valid credentials set <code>REMOTE_USER</code>; failures return 401.</li>
+        <li>Fail closed on unsupported auth. Limit: exact usernames stay preserved.</li>
+      </ul>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>.htaccess</b> · a protected subtree</span></div><pre><code>AuthType Basic
 AuthName "Staging"
 AuthUserFile /srv/example.test/conf/htpasswd
 Require valid-user</code></pre></div>
-      <p>htpasswd hashes: <strong>bcrypt</strong> (<code>$2y$</code>/<code>$2b$</code>/<code>$2a$</code>, <code>htpasswd -B</code>, cost capped at 14 — a higher cost is refused before hashing), <strong>APR1-MD5</strong> (<code>$apr1$</code>), <strong>MD5-crypt</strong> (<code>$1$</code>) and <code>{SHA}</code>, verified in constant time; an unknown user pays dummy bcrypt/MD5 work at the file's recorded cost, so user enumeration costs nothing, and Basic-auth attempts are charged per client before hashing (repeated <code>Authorization</code> headers are refused). Plaintext entries and traditional DES / <code>$5$</code> / <code>$6$</code> <code>crypt()</code> hashes verify <em>false</em> with a parse-time warning. The <code>AuthUserFile</code> must resolve <strong>inside the vhost docroot</strong> — or a directory listed in <code>--auth-user-file-roots</code> — checked on the opened descriptor's real path (symlinks followed, <code>.</code>/<code>..</code> rejected in relative paths, read capped at 1 MiB, a planted FIFO cannot block the open); an unreadable or out-of-root file is a 500 with an error-log entry, never a silent 401, and <code>check</code> warns about out-of-root paths. Authenticated static responses get <code>Cache-Control: private, no-store</code> from automatic expiry when no explicit policy exists (#414).</p>
+      <p>Accepted htpasswd hashes — verify each in constant time:</p>
+      <ul>
+        <li><strong>bcrypt</strong> (<code>$2y$</code>/<code>$2b$</code>/<code>$2a$</code>, <code>htpasswd -B</code>). Limit: cost capped at 14; higher is refused before hashing.</li>
+        <li><strong>APR1-MD5</strong> (<code>$apr1$</code>), <strong>MD5-crypt</strong> (<code>$1$</code>) and <code>{SHA}</code>.</li>
+        <li>Plaintext, DES, <code>$5$</code> and <code>$6$</code> <code>crypt()</code>. Limit: these verify <em>false</em> with a parse-time warning.</li>
+      </ul>
+      <p>An unknown user pays dummy bcrypt/MD5 work at the file's recorded cost. Charge Basic-auth attempts per client before hashing. Refuse repeated <code>Authorization</code> headers.</p>
+      <p>Resolve <code>AuthUserFile</code> <strong>inside the docroot</strong>, or under <code>--auth-user-file-roots</code>. Check the descriptor's real path; cap reads at 1 MiB. An unreadable or out-of-root file returns 500, never a silent 401; <code>check</code> warns. Authenticated statics get <code>Cache-Control: private, no-store</code> without an explicit policy (#414).</p>
+      <p class="mini">Note: the 2026-09-06 review split parsed policy from the effective realm; the rules above carry its outcome.</p>
     </section>
 
     <section>
@@ -114,35 +130,31 @@ Require valid-user</code></pre></div>
       <div class="tablewrap"><table id="dirtable" class="flagtable"><colgroup><col class="c-key"><col class="c-mid"><col class="c-txt"></colgroup><thead><tr><th>Directive</th><th>Status</th><th>Notes</th></tr></thead>
         <tbody>
           <tr><th>RewriteEngine · RewriteBase</th><td><span class="badge ok">supported</span></td><td class="wrap">Toggle and base-path resolution.</td></tr>
-          <tr><th>RewriteCond · RewriteRule</th><td><span class="badge ok">supported</span></td><td class="wrap">Flags: <code>L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F</code>, <code>OR</code> on conditions; <code>-f/-F -d -e -l/-L/-h -s -x</code> file tests (<code>-U</code> always matches). Variables: <code>REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME</code>, <code>%{HTTP:Name}</code>, <code>%{ENV:NAME}</code>, <code>%{LA-U:…}</code>/<code>%{LA-F:…}</code>. <code>%{TIME*}</code> yields the empty string. <code>RewriteMap</code>, <code>${map:key}</code> lookups and the forced type/handler flags <code>T=</code>/<code>H=</code> are refused at parse time, so an <code>.htaccess</code> carrying one fails closed. Other unrecognized flags (e.g. <code>DPI</code>, <code>CO=</code>) are ignored.</td></tr>
-          <tr><th>SetEnvIf · SetEnvIfNoCase</th><td><span class="badge ok">supported</span></td><td class="wrap">Lazy header access; server-computed CGI names are protected.</td></tr>
-          <tr><th>Order · Allow from · Deny from</th><td><span class="badge ok">supported</span></td><td class="wrap">Apache accumulation per scope; <code>env=</code>, host and CIDR operands (host/env/IP operands make the chain memo-ineligible).</td></tr>
-          <tr><th>Require</th><td><span class="badge part">partial</span></td><td class="wrap"><code>all granted</code>, <code>valid-user</code>, <code>user …</code>. Everything else fails closed to deny.</td></tr>
-          <tr><th>AuthType · AuthName · AuthUserFile</th><td><span class="badge ok">supported</span></td><td class="wrap">Basic only; bcrypt, APR1 (<code>$apr1$</code>), MD5-crypt (<code>$1$</code>) and <code>{SHA}</code> hashes.</td></tr>
-          <tr><th>Header set / add / append / merge / unset</th><td><span class="badge ok">supported</span></td><td class="wrap"><code>always</code>/<code>onsuccess</code>, case-insensitive <code>env=</code>/<code>env=!</code> guards, <code>%{NAME}e</code> interpolation, <code>&lt;Files*&gt;</code>/<code>&lt;Directory*&gt;</code>/<code>&lt;If %{REQUEST_URI} =~ …&gt;</code> scopes (merged in Apache order: directory-level across the chain, then <code>&lt;Files*&gt;</code> against the resolved target file, then <code>&lt;If&gt;</code>). <code>merge</code> deduplicates trimmed comma-separated values. Applied in <code>finalize</code>, before cache storage and compression. CR/LF rejected.</td></tr>
-          <tr><th>Header echo</th><td><span class="badge part">partial</span></td><td class="wrap">Parses without error; emits nothing.</td></tr>
-          <tr><th>Header edit / edit* / note / setifempty / echo · RequestHeader *</th><td><span class="badge no">ignored</span></td><td class="wrap">Line ignored. See the header-directive compatibility inventory in the source tree (<code>docs/header-directive-compatibility.md</code>) for the exact boundary and the executable fixtures.</td></tr>
-          <tr><th>Header condition expr= / value expr=</th><td><span class="badge part">partial</span></td><td class="wrap">Only a conjunction of <code>%{REQUEST_URI} =~ / !~</code> is evaluated; other expressions are not. Value expressions are not implemented.</td></tr>
-          <tr><th>ErrorDocument</th><td><span class="badge ok">supported</span></td><td class="wrap">Path, inline and external forms; never clobbers an application's own JSON error body.</td></tr>
+          <tr><th>RewriteCond · RewriteRule</th><td><span class="badge ok">supported</span></td><td class="wrap"><ul><li>Flags: <code>L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F</code>; <code>OR</code> on conditions.</li><li>File tests: <code>-f/-F -d -e -l/-L/-h -s -x</code> (<code>-U</code> always matches).</li><li>Variables: <code>REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME</code>, <code>%{HTTP:Name}</code>, <code>%{ENV:NAME}</code>, <code>%{LA-U:…}</code>/<code>%{LA-F:…}</code>.</li><li><code>%{TIME*}</code> yields the empty string.</li><li><code>RewriteMap</code>, <code>${map:key}</code>, <code>T=</code>/<code>H=</code> fail closed at parse time. Limit: other flags (e.g. <code>DPI</code>, <code>CO=</code>) are ignored.</li></ul></td></tr>
+          <tr><th>SetEnvIf · SetEnvIfNoCase</th><td><span class="badge ok">supported</span></td><td class="wrap">Lazy header access. Limit: server-computed CGI names stay protected.</td></tr>
+          <tr><th>Order · Allow from · Deny from</th><td><span class="badge ok">supported</span></td><td class="wrap">Apache accumulation per scope. Limit: <code>env=</code>, host and CIDR operands make the chain memo-ineligible.</td></tr>
+          <tr><th>Require</th><td><span class="badge part">partial</span></td><td class="wrap"><code>all granted</code>, <code>valid-user</code>, <code>user …</code>. Limit: everything else fails closed to deny.</td></tr>
+          <tr><th>AuthType · AuthName · AuthUserFile</th><td><span class="badge ok">supported</span></td><td class="wrap">Basic only. Limit: bcrypt, APR1 (<code>$apr1$</code>), MD5-crypt (<code>$1$</code>) and <code>{SHA}</code> only.</td></tr>
+          <tr><th>Header set / add / append / merge / unset</th><td><span class="badge ok">supported</span></td><td class="wrap"><ul><li>Guards: <code>always</code>/<code>onsuccess</code>, <code>env=</code>/<code>env=!</code>, <code>%{NAME}e</code>.</li><li>Scopes merge directory, then <code>&lt;Files*&gt;</code>, then <code>&lt;If&gt;</code>. Limit: applied in <code>finalize</code>; CR/LF rejected.</li></ul></td></tr>
+
+          <tr><th>Header echo</th><td><span class="badge part">partial</span></td><td class="wrap">Parses without error. Limit: emits nothing.</td></tr>
+          <tr><th>Header edit / edit* / note / setifempty / echo · RequestHeader *</th><td><span class="badge no">ignored</span></td><td class="wrap">Line ignored. Limit: see <code>docs/header-directive-compatibility.md</code> for the exact boundary.</td></tr>
+          <tr><th>Header condition expr= / value expr=</th><td><span class="badge part">partial</span></td><td class="wrap">Only <code>%{REQUEST_URI} =~ / !~</code> conjunctions evaluate. Limit: value expressions are not implemented.</td></tr>
+          <tr><th>ErrorDocument</th><td><span class="badge ok">supported</span></td><td class="wrap">Path, inline and external forms. Limit: never clobbers an app's own JSON error body.</td></tr>
           <tr><th>DirectoryIndex</th><td><span class="badge ok">supported</span></td><td class="wrap">Including the <code>Disabled</code> form.</td></tr>
-          <tr><th>SetHandler · AddHandler · AddType · ForceType · RemoveHandler · RemoveType</th><td><span class="badge ok">supported</span></td><td class="wrap"><code>application/x-httpd-php</code> forces PHP handling / records the mapping; other handlers and <code>Remove*</code> record a non-PHP reset; <code>AddType</code>/<code>ForceType</code> override response <code>Content-Type</code>.</td></tr>
-          <tr><th>CacheLookup · CacheEnable · CacheDisable · CacheKeyModify</th><td><span class="badge ok">supported</span></td><td class="wrap">The LSCache directives driving the <a href="page-cache.html">page cache</a>; <code>CacheKeyModify</code> strips query parameters from the key.</td></tr>
-          <tr><th>php_value · php_admin_value · php_flag · php_admin_flag</th><td><span class="badge ok">supported</span></td><td class="wrap">Per-request PHP ini overrides on the LSAPI special-env path.</td></tr>
-          <tr><th>&lt;Files&gt; &lt;FilesMatch&gt; &lt;Directory&gt; &lt;DirectoryMatch&gt; &lt;If&gt; &lt;IfModule&gt;</th><td><span class="badge part">partial</span></td><td class="wrap">Common scopes honored; <code>&lt;If&gt;</code> only for the modeled REQUEST_URI shape; <code>&lt;IfModule&gt;</code> bodies are evaluated.</td></tr>
+          <tr><th>SetHandler · AddHandler · AddType · ForceType · RemoveHandler · RemoveType</th><td><span class="badge ok">supported</span></td><td class="wrap"><code>application/x-httpd-php</code> forces PHP. Limit: other handlers and <code>Remove*</code> record a non-PHP reset; <code>AddType</code>/<code>ForceType</code> override <code>Content-Type</code>.</td></tr>
+          <tr><th>CacheLookup · CacheEnable · CacheDisable · CacheKeyModify</th><td><span class="badge ok">supported</span></td><td class="wrap">LSCache directives for the <a href="page-cache.html">page cache</a>. Limit: <code>CacheKeyModify</code> strips query parameters from the key.</td></tr>
+          <tr><th>php_value · php_admin_value · php_flag · php_admin_flag</th><td><span class="badge ok">supported</span></td><td class="wrap">Per-request PHP ini overrides. Limit: LSAPI special-env path only.</td></tr>
+          <tr><th>&lt;Files&gt; &lt;FilesMatch&gt; &lt;Directory&gt; &lt;DirectoryMatch&gt; &lt;If&gt; &lt;IfModule&gt;</th><td><span class="badge part">partial</span></td><td class="wrap">Common scopes honored. Limit: <code>&lt;If&gt;</code> only for the modeled REQUEST_URI shape; <code>&lt;IfModule&gt;</code> bodies evaluate.</td></tr>
           <tr><th>FileETag · H2EarlyHints · esi · AddOutputFilterByType · AllowOverride · Options</th><td><span class="badge no">no-op</span></td><td class="wrap">Recognized and dropped.</td></tr>
-          <tr><th>ExpiresActive · ExpiresDefault · ExpiresByType</th><td><span class="badge ok">supported</span></td><td class="wrap">Scoped across directory, <code>&lt;Files*&gt;</code> and <code>&lt;If&gt;</code> blocks; shares <code>hj-compress</code>'s <code>A/M</code> time grammar and overrides the vhost XML <code>&lt;expires&gt;</code> defaults when active.</td></tr>
+          <tr><th>ExpiresActive · ExpiresDefault · ExpiresByType</th><td><span class="badge ok">supported</span></td><td class="wrap">Scoped across directory, <code>&lt;Files*&gt;</code> and <code>&lt;If&gt;</code>. Limit: shares the <code>A/M</code> grammar; overrides vhost XML <code>&lt;expires&gt;</code> when active.</td></tr>
         </tbody></table></div>
-      <p class="mini">Unrecognized directives are ignored leniently so vendor <code>.htaccess</code> files remain loadable. The planned first step for the header family is making unsupported forms visible in <code>check --strict</code> before adding more mutation behavior.</p>
+      <p class="mini">Unrecognized directives are ignored, so vendor files stay loadable.</p>
     </section>
 
     <section>
       <h2 id="context-overrides">Per-context overrides &amp; sub_filter</h2>
-      <p>Alongside the per-directory chain, XML contexts rewrite <em>responses</em> and override limits for a URI prefix (reference: <a href="configuration.html#contexts">Configuration → Contexts</a>):</p>
-      <ul>
-        <li><strong><code>subFilter</code></strong> — literal <code>SEARCH =&gt; REPLACEMENT</code> substitution between the expires and compress stages, 200 responses only, un-encoded bodies of matching <code>subFilterTypes</code> (default <code>text/html</code>). Buffered bodies and streams both cap filtered output at <code>subFilterMaxBody</code> (4 MiB default); a stream past the cap passes through raw, never half-filtered. <code>Content-Length</code> is recomputed, ETag dropped, Last-Modified off unless kept. sub_filter paths bypass the page cache (whose hits re-enter transforms), while eligible static responses may use the fast-path memo (which stores and replays finalized bytes without re-filtering).</li>
-        <li><strong><code>maxReqBodySize</code></strong> — per-context body cap enforced at dispatch for all terminals (413).</li>
-        <li><strong><code>responseTimeout</code></strong> (proxy paths) and <strong><code>bandwidthLimit</code></strong> — override the backend deadline and the server-wide egress rate.</li>
-      </ul>
+      <p>See <a href="configuration.html#contexts">Configuration → Contexts</a>. Per-context overrides and <code>sub_filter</code> now live there.</p>
     </section>
 
     <section>

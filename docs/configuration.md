@@ -1,6 +1,6 @@
 # Configuration — httpjet Documentation
 
-> The LiteSpeed-compatible XML reference: server, tuning, security, listeners, external processors, upstream groups, virtual hosts, contexts, and httpjet-native extensions.
+> Look up every setting in the XML reference.
 
 - **Canonical URL:** https://httpjet.net/docs/configuration
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -13,17 +13,17 @@ httpjet is configured by a **LiteSpeed-compatible XML tree** selected with `--ro
 
 ## The configuration tree
 
-With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) applies LiteSpeed value semantics faithfully:
+With no `--root`, httpjet uses `/usr/local/lsws`. You get LiteSpeed value semantics:
 
-- Variables `$SERVER_ROOT`, `$HOSTNAME`, `$VH_ROOT`, `$VH_NAME` (plus `$DOC_ROOT` and `$VH_DOMAIN` once the vhost resolves them) substitute in `$VAR` and `${VAR}` forms.
+- Variables `$SERVER_ROOT`, `$HOSTNAME`, `$VH_ROOT`, `$VH_NAME` substitute. Limit: `$DOC_ROOT` and `$VH_DOMAIN` need vhost resolution.
 
-- Sizes accept `K`/`M`/`G`/`B` suffixes; times are bare seconds.
+- Sizes accept `K`/`M`/`G`/`B` suffixes. Limit: times use bare seconds.
 
-- Bounded integers use OLS semantics: absent, unparsable *or out-of-range* values fall back to the default (never clamped). The isolation modes `setUIDMode`/`chrootMode` are the exception: out-of-range is a hard error (2026-09-16).
+- Bounded integers fall back to defaults when invalid. Limit: `setUIDMode`/`chrootMode` errors instead (2026-09-16).
 
-- Booleans are `1`, `2` or `true` (case-insensitive); `followSymbolLink`/`allowSymbolLink` treat `2` (owner-restricted) as fail-closed never-follow.
+- Booleans accept `1`, `2`, or `true`. Limit: symlink value `2` never follows.
 
-- Unknown elements are ignored so real trees load; `check` warns on the ones that would silently do nothing, and security-relevant ones httpjet cannot enforce (a partial `allowOverride` mask, vhost `clientVerify`, `rewrite` maps, `phpIniOverride`, `enableHotlinkCtrl`, `forceStrictOwnership`) refuse the load.
+- Unknown elements load silently. Limit: partial `allowOverride`, vhost `clientVerify`, rewrite maps, `phpIniOverride`, `enableHotlinkCtrl`, and `forceStrictOwnership` refuse the load.
 
            **layout** · a server root
 ```
@@ -37,6 +37,16 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 > [Diagram: config-inheritance] Configuration cascade and parse-time memo classification. Server-wide defaults in httpd_config.xml cascade into each  , then into longest-prefix   overrides and the per-directory .htaccess chain, where static analysis computes the MemoClass eligibility verdict reported by httpjet check.
 
+## Checking a configuration
+
+           **check**
+```
+httpjet --root /abs/root check            # summary: listeners, vhost map, fast-memo verdicts, warnings
+httpjet --root /abs/root check --strict   # same lint output; exits non-zero on lint errors (warnings never fail)
+```
+
+You run check under the service identity too. Readable-by-root does not prove readable at runtime. The write API runs the same normalization. It also refuses DTDs, nesting over 64 levels, over 128 vhosts, and XML over 1 MiB. Disk files cap at 16 MiB per file (`ConfigError::TooLarge`, 2026-10-06).
+
 ## Server and tuning
 
 | Directive | Default | Meaning |
@@ -47,7 +57,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | `indexFiles` | `index.html` | Directory-index candidates (vhost may override). |
 
-| `useIpInProxyHeader` | `2` | Client-IP trust: 0 never · 1 always · 2 trusted peers only (+ `CF-Connecting-IP`) · 3 as 2 for IP purposes · 4 always. Restart-required through the write API. |
+| `useIpInProxyHeader` | `2` | Client-IP trust mode. Limit: 0 never, 1 always, 2 trusted peers, 3 as 2, 4 always. |
 
 | ` ` | `0` | HTTP/3 master switch; also drives `Alt-Svc`. Needs the UDP port published. |
 
@@ -67,13 +77,13 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | `maxCachedFileSize` / `totalInMemCacheSize` | `4M` / `4G` | Small-file in-memory promotion threshold and budget (`CacheCaps`); the budget is clamped to 1 GiB. |
 
-| `maxMMapFileSize` / `totalMMapCacheSize` | `256K` / `2G` | The mmap tier is gone, but both still size the static-file RAM store: the per-file cap is the larger of `maxCachedFileSize` and `maxMMapFileSize`, and without `--page-cache` the store budget is `totalInMemCacheSize` (clamped to 1 GiB) + `totalMMapCacheSize` (clamped to 2 GiB). |
+| `maxMMapFileSize` / `totalMMapCacheSize` | `256K` / `2G` | Sizes the static RAM store. Limit: per-file cap uses the larger value; budgets clamp to 1 GiB + 2 GiB. |
 
 | `fileETag` | `28` | ETag bitmask (INODE|MTIME|SIZE → `"size-mtime-inode;;;"`); 0 = no ETag. |
 
 | `enable{Gzip,Br,Zstd}Compress` (+`Dyn`) | on | Static/dynamic compression per codec; `zstdCompressLevel` 3, `brCompressLevel` 5. |
 
-| ` enableExpires`, `expiresByType` | off | `image/*=A604800, text/css=M86400` (A = access, M = modify). Also honored in `.htaccess` via `ExpiresActive` / `ExpiresDefault` / `ExpiresByType` (sharing the same grammar). Authenticated responses get `private, no-store` when no explicit policy exists. |
+| ` enableExpires`, `expiresByType` | off | Expiry rules like `image/*=A604800`. Limit: authenticated responses default to `private, no-store`. |
 
 | ` expireInSeconds` · `privateExpireInSeconds` · `cacheStatusCode` · `enablePostCache` | `900` · `0` · `200,301` · off | Default public/private TTLs and cacheable statuses. `cacheStorePath` is parsed but deliberately unused (see `--page-cache-store-path`). |
 
@@ -101,7 +111,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | Directive | Default | Meaning |
 
-| `name`, `address` | `*:80` | `ip:port` / `host:port`. httpjet also `unix:/path` or `uds:/path` for an HTTP-over-Unix-socket listener (TLS over UDS is unsupported: `check` warns and the TLS half does not serve). Listener names are the stable identity across reloads. |
+| `name`, `address` | `*:80` | Listener bind address. Limit: `unix:`/`uds:` serves HTTP only; TLS over UDS never serves. |
 
 | `secure`, `keyFile`, `certFile`, `certChain` | off | TLS material; `certChain=1` appends `CACertFile` to the served chain. |
 
@@ -113,7 +123,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 | `proxyProtocol` httpjet | `0` | PROXY v2/v1 required on *this* listener; fail-closed; never on a public bind. |
 
-| `vhostMapList/vhostMap` `vhost`, `domain` | — | Host→vhost; domains lowercased; a configured `:port` is ignored and a leading `www.` is stripped for the lookup key. Resolution is exact match, then the nearest configured parent domain (`a.example.com` → `example.com`, treated as a non-canonical foreign host), then the bare `*` catch-all. Glob patterns such as `*.example.com` or `example.*` are not supported: `check` warns and they never match. |
+| `vhostMapList/vhostMap` `vhost`, `domain` | — | Maps host to vhost. Limit: exact, then parent, then `*`; globs never match. |
 
            **httpd_config.xml** · a TLS listener with h3
 ```
@@ -131,7 +141,7 @@ With no `--root`, httpjet uses `/usr/local/lsws`. The parser (`hj-config`) appli
 
 ## External processors
 
-An ` ` (server-level ` ` or per-vhost) is a reverse-proxy upstream (`proxy`), an LSAPI app (`lsapi`), or httpjet a FastCGI app (`fcgi`/`fastcgi`). ` ` configures the default PHP handler with the same pool knobs. Unknown legacy types (`rails`, `appserver`, …) keep proxy behavior; `cgi` contexts are not executed.
+You define proxy, LSAPI, or FastCGI upstreams here. Limit: unknown legacy types proxy; `cgi` contexts never execute.
 
 | Directive | Default | Meaning |
 
@@ -161,7 +171,7 @@ An ` ` (server-level ` ` or per-vhost) is a reverse-proxy upstream (`proxy`), an
 
 ## Virtual hosts
 
-Declarations live in `httpd_config.xml` (`name`, `vhRoot`, `configFile`, `allowSymbolLink`, `enableScript`, `restrained`); behavior lives in the referenced ` `. `allowSymbolLink` is a tri-state override (file > declaration > server); `restrained` confines the vhost to `vhRoot` and forces symlinks off; `enableScript=0` disables script handlers for the vhost.
+You declare vhosts in `httpd_config.xml`. Limit: `restrained` confines to `vhRoot`; `enableScript=0` disables scripts.
 
 | Vhost directive | Meaning |
 
@@ -169,7 +179,7 @@ Declarations live in `httpd_config.xml` (`name`, `vhRoot`, `configFile`, `allowS
 
 | ` ` `enable`, `autoLoadHtaccess`, `base`, `rules` | Inline rules run before the `.htaccess` chain. |
 
-| ` ` `allowOverride`, `accessFileName` | Only `allowOverride` `0` (no `.htaccess`) or `31` (all categories) loads per vhost; a partial category mask refuses the load (the server-level block accepts only 31). The access file name defaults to `.htaccess`. |
+| ` ` `allowOverride`, `accessFileName` | Controls `.htaccess` loading. Limit: only `0` or `31` loads; partial masks refuse. |
 
 | ` ` `keyFile`, `certFile`, `certChain`, `CACertFile` | The SNI identity for this vhost's domains (chain material, not a client-verify root). |
 
@@ -193,7 +203,7 @@ Contexts map URI prefixes to terminals (`static`, `proxy`, `redirect`, `php`/`ls
 
 | `type`, `uri`, `location`, `handler`, `enabled` | — | Kind, prefix, on-disk location (static), processor name (proxy/lsapi). |
 
-| `extraHeaders` | — | Additional response headers for the context: `Name: value` lines only (header operations refuse the load); `NONE` sets none and stops inheritance. Not allowed on `proxy` contexts (load error). |
+| `extraHeaders` | — | Adds response headers. Limit: `Name: value` only; never on `proxy` contexts. |
 
 | `addDefaultCharset` / `addDefaultCharsetCustomized` | off | Charset appended to text types. |
 
@@ -205,7 +215,7 @@ Contexts map URI prefixes to terminals (`static`, `proxy`, `redirect`, `php`/`ls
 
 | `bandwidthLimit` httpjet | `0` | Egress throttle overriding the server-wide rate. |
 
-| `subFilter` (repeatable) · `subFilterOnce` · `subFilterTypes` · `subFilterMaxBody` httpjet | — · `0` · `text/html` · `4M` | `SEARCH => REPLACEMENT` literal body substitution. The `=>` separator is mandatory — a rule missing it disables the whole context's sub_filter with a warning. → |
+| `subFilter` (repeatable) · `subFilterOnce` · `subFilterTypes` · `subFilterMaxBody` httpjet | — · `0` · `text/html` · `4M` | Literal body substitution. Limit: missing `=>` disables the context filter. → |
 
            **vhost XML** · a proxied API prefix with overrides
 ```
@@ -220,16 +230,10 @@ Contexts map URI prefixes to terminals (`static`, `proxy`, `redirect`, `php`/`ls
 
 ```
 
-## Checking a configuration
-
-           **check**
-```
-httpjet --root /abs/root check            # summary: listeners, vhost map, fast-memo verdicts, warnings
-httpjet --root /abs/root check --strict   # same lint output; exits non-zero on lint errors (warnings never fail)
-```
-
-Run the check under the intended service identity as well as as root: readable-by-root is not proof the runtime user can read certificates or write logs and sockets. The same normalization runs for the write API 's in-memory bundle (`parse_bundle`), which additionally refuses DTDs, more than 64 nesting levels, more than 128 vhosts, and 1 MiB of XML. A config file read from disk is capped at 16 MiB per file (`ConfigError::TooLarge`, 2026-10-06) — a bound on all readers, `check` included.
-
 ## Environment variables
 
-The full list, with the flags they pair with, is on the CLI reference . The ones most often set in a unit drop-in: `HTTPJET_ACCESS_LOG_FORMAT=json`, `HTTPJET_ERROR_LOG_FORMAT=json`, `HTTPJET_SYSLOG_TARGET`, `CF_SEND_ZSTD=1`, `HJ_FAST_MEMO=0`, `HTTPJET_OTEL=1`, `RUST_LOG`.
+See the CLI reference for the full list.
+
+Common unit settings include `RUST_LOG` and `CF_SEND_ZSTD=1`.
+
+You set variables in your unit drop-in.

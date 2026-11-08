@@ -59,9 +59,10 @@
 
   const sidebar = (() => {
     const groups = [
-      ["Guide", [['Overview', './'], ['Quickstart', 'quickstart.html'], ['Architecture', 'architecture.html'], ['Capabilities &amp; limits', 'capabilities.html']]],
-      ["Internals", [['Protocol stacks', 'protocols.html'], ['TLS, ACME &amp; OCSP', 'certificates.html'], ['LSAPI &amp; PHP', 'lsapi.html'], ['Proxy &amp; gateways', 'gateways.html'], ['Rewrite &amp; .htaccess', 'rewrite.html'], ['Security &amp; access control', 'security.html'], ['Page cache', 'page-cache.html'], ['Compression', 'compression.html']]],
-      ["Running it", [['Configuration', 'configuration.html'], ['CLI reference', 'cli.html'], ['Operations', 'operations.html'], ['Observability', 'observability.html'], ['Admin API &amp; reload', 'admin-api.html'], ['Extending httpjet', 'extensions.html'], ['Performance', 'performance.html'], ['Conformance &amp; testing', 'conformance.html'], ['Migrating from LiteSpeed', 'migration.html']]],
+      ["START HERE", [['Overview', './'], ['Quickstart', 'quickstart.html'], ['Migrating from LiteSpeed', 'migration.html'], ['Capabilities &amp; limits', 'capabilities.html']]],
+      ["CONFIGURE &amp; OPERATE", [['Configuration', 'configuration.html'], ['TLS, ACME &amp; OCSP', 'certificates.html'], ['Security &amp; access control', 'security.html'], ['Operations', 'operations.html'], ['Observability', 'observability.html'], ['Admin API &amp; reload', 'admin-api.html']]],
+      ["HOW IT WORKS", [['Architecture', 'architecture.html'], ['Protocol stacks', 'protocols.html'], ['Rewrite &amp; .htaccess', 'rewrite.html'], ['Page cache', 'page-cache.html'], ['LSAPI &amp; PHP', 'lsapi.html'], ['Proxy &amp; gateways', 'gateways.html'], ['Compression', 'compression.html'], ['Extending httpjet', 'extensions.html']]],
+      ["REFERENCE &amp; EVIDENCE", [['CLI reference', 'cli.html'], ['Performance', 'performance.html'], ['Conformance &amp; testing', 'conformance.html']]],
     ];
 
     let html = '<nav class="sidebar" aria-label="Documentation sections">';
@@ -103,7 +104,7 @@
   const top = document.createDocumentFragment();
   appendNodes(top, toNodes(header));
   body.insertBefore(top, shell);
-  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20261108f"]') || body.querySelector('script[src="assets/docs.min.js?v=20261108f"]');
+  const searchSlot = body.querySelector('script[src="assets/search-index.min.js?v=20261108g"]') || body.querySelector('script[src="assets/docs.min.js?v=20261108g"]');
   if (searchSlot) {
     const fragment = document.createDocumentFragment();
     appendNodes(fragment, toNodes(searchOverlay));

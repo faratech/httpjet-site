@@ -1,6 +1,6 @@
 # Overview — httpjet Documentation
 
-> httpjet is a from-scratch Rust web server and drop-in LiteSpeed replacement: the same XML configuration, native HTTP/2 and HTTP/3, LSAPI PHP, .htaccess rewriting, reverse proxy and FastCGI gateways, and an opt-in origin page cache.
+> Start here for what httpjet is.
 
 - **Canonical URL:** https://httpjet.net/docs/
 - **Source Repository:** https://github.com/faratech/httpjet
@@ -11,7 +11,7 @@ httpjet · documentation · v0.1.12
 
 # httpjet
 
-A from-scratch **Rust web server** that is a **drop-in LiteSpeed replacement**: it reads the same `conf/httpd_config.xml` tree, speaks native LSAPI to `lsphp`, evaluates the same `.htaccess` files, and adds native HTTP/2 and HTTP/3, reverse-proxy and FastCGI gateways, an opt-in LSCache-protocol page cache, optional ACME and OCSP, and a loopback admin API — all on one io_uring transport.
+A from-scratch **Rust web server** and **drop-in LiteSpeed replacement**: it reads the same `conf/httpd_config.xml` tree, speaks native LSAPI to `lsphp`, evaluates the same `.htaccess` files, and adds native HTTP/2 and HTTP/3, reverse-proxy and FastCGI gateways, and an opt-in LSCache-protocol page cache — all on one io_uring transport.
 
             resolve  SNI / Host → vhost
             acl  identity · throttle · geo · WAF
@@ -21,7 +21,7 @@ A from-scratch **Rust web server** that is a **drop-in LiteSpeed replacement**: 
             finalize  headers · compress
             store  cache write
 
-       one pipeline per request, whatever the wire protocol — every page tells you where it sits on this rail
+       One pipeline per request, any protocol.
 
            GitHub · faratech/httpjet ↗
            Drop-in LiteSpeed XML config
@@ -29,19 +29,25 @@ A from-scratch **Rust web server** that is a **drop-in LiteSpeed replacement**: 
            Native LSAPI → lsphp · FastCGI
            Apache .htaccess · Basic auth
            Opt-in origin page cache
-           ACME · OCSP · OTel (build features)
+
+### Choose your path
+
+          New to httpjet →  Install and serve.
+          Migrating →  Move from LiteSpeed safely.
+          Operating →   Operations  ·  Configuration
+          Reference →  Commands, flags, and variables.
 
 ## What httpjet is
 
-httpjet is a complete origin server on a memory-safe Rust core, built so that an existing LiteSpeed Web Server (LSWS 6.3.5 compatibility target) or OpenLiteSpeed deployment becomes an httpjet deployment by pointing `--root` at the tree it already has. Compatibility is the feature; everything httpjet adds on top is an explicit opt-in that LiteSpeed simply ignores.
+Point `--root` at your LiteSpeed Web Server (LSWS 6.3.5) or OpenLiteSpeed tree. httpjet runs it unchanged. Compatibility is the feature. Native additions stay opt-in.
 
 ### Compatible surface
 
-- LiteSpeed XML: server, tuning, listeners, vhosts, contexts, `mime.properties`
+- LiteSpeed XML and `mime.properties`
 
-- Native LSAPI wire protocol to any LSAPI-capable `lsphp`
+- Native LSAPI to `lsphp`
 
-- mod_rewrite , access control, Basic auth, `Header`, `ErrorDocument`, LSCache directives
+- mod_rewrite , access control, Basic auth, `Header`, `ErrorDocument`
 
 - LSCache protocol (`X-LiteSpeed-Cache-Control` / `-Tag` / `-Vary` / `-Purge`)
 
@@ -49,64 +55,67 @@ httpjet is a complete origin server on a memory-safe Rust core, built so that an
 
 ### httpjet-native (opt-in)
 
-- Per-client throttle, GeoIP/ASN rules, PROXY protocol , Unix-socket listeners
+- Throttle, GeoIP/ASN , PROXY protocol , Unix-socket listeners
 
-- Weighted upstream groups with active health checks; `h2://` / `h2s://` upstreams; FastCGI
+- Weighted groups with health checks; `h2://` / `h2s://`; FastCGI
 
-- Per-context body/timeout/bandwidth overrides, `sub_filter`, request decompression
+- Per-context body/timeout/bandwidth, `sub_filter`, request decompression
 
-- ACME HTTP-01/DNS-01, OCSP stapling , kTLS/sendfile, OpenTelemetry
+- ACME , OCSP , kTLS/sendfile, OpenTelemetry
 
-- Loopback status + transactional config API , WAF sidecar , compile-time extensions
+- Loopback admin API , WAF sidecar , compile-time extensions
 
         i   Where it runs
-httpjet serves WindowsForum.com on an x86_64 origin and MoonTimeNow.com + ThisDayInHistory.ai on an active ARM64 origin behind Cloudflare, over the pure io_uring transport with the page cache's file tier live. It replaced LiteSpeed as the production origin server for all three sites (semantic version **0.1.12**, Rust 1.99.1+, edition 2024, GPL-3.0-only) — validate your configuration with `check --strict` and test on alternate ports before cutover. See Capabilities & limits for the honest matrix.
+httpjet serves WindowsForum.com (x86_64) and MoonTimeNow.com + ThisDayInHistory.ai (ARM64) behind Cloudflare, on pure io_uring with the file tier live. It replaced LiteSpeed for all three (0.1.12, Rust 1.99.1+, edition 2024, GPL-3.0-only). Run `check --strict` and test on alternate ports before cutover. See Capabilities & limits .
 
 ## How the pieces fit
 
-Every wire protocol lands in the same request pipeline. Click a node to jump to its page.
+Select a node to open its page.
 
-> [Diagram: pipeline] The request pipeline. pipeline::handle() resolves the vhost and the client's identity, then dispatch() mirrors OpenLiteSpeed's ordering with the WAF, extension, page-cache lookup and store seams inserted at fixed points. Each terminal finishes through finalize_response before the transforms run.
-
-## By the numbers
-
-Headline figures from the checked-in benchmark record — every number names its regime (see Performance for methodology and the receipt names).
-
-          1,183 k rps   h2 static empty, c=50, dedicated load-generator VM, median of 3 rounds — httpjet 0.1.12 vs OpenLiteSpeed 892k and nginx 388k (2026-11-08); 1 KiB files: 1,097k vs 740k / 319k
-          44.8 k rps   PHP/LSAPI over h1, PGO loopback — vs LiteSpeed's ~38.5k (2026-06)
-          40 ×   cache hit vs full PHP render of the same page (19,215 vs 480 rps; p50 2 ms vs 34 ms)
-          146 /146   h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs
-          0.2 %   httpjet's request phases in June 2026 production telemetry (~138 µs/req: rewrite, cache lookup, compression); PHP render was 86.5–98.8% of wall time
-          3,000 +   test functions across 20 crates; full workspace suite green at v0.1.10 (3,068 tests)
-
-## Project status
-
-| Aspect | State (2026-10-26) |
-
-| Version | **0.1.12** (current production release, November 8, 2026; see the latest public release ) — headline change: hot-path allocation and contention reductions (borrowed vhost routing, a single-pass fast-serve header scan, HPACK header-name reuse, sharded telemetry counters); loopback on the production x86_64 host: HTTP/2 1 KiB static 371,540 req/s at c50 (nginx 180,940; OpenLiteSpeed 399,505), heavy-`.htaccess` HTTP/2 271,118 req/s (nginx 131,955), warm page-cache hits 110,158 req/s over HTTP/2; see Performance — semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
-
-| Configuration | LiteSpeed-compatible XML is the authority; httpjet-native directives are opt-in add-ons. `check --strict` is the deploy gate. |
-
-| Transport | Pure io_uring (monoio) for H1/H2/H3 — the *only* transport; there is no epoll fallback and no Windows/macOS port. |
-
-| PHP | Native LSAPI; the operator supplies `lsphp`. Production runs the persistent external pool with zero-downtime generation reloads. |
-
-| Page cache | Off by default; LSCache-protocol opt-in, private tier, per-URL cookie vary, tmpfs file tier, per-vhost dictionaries, generation-scoped namespaces. Live in production. |
-
-| Optional features | `acme`, `ocsp`, `otel`, `ktls`, `profiling` — build features that still need explicit runtime opt-in. |
-
-| Security posture | Whole-codebase review rounds through 2026-10-23 landed, plus the October bug-bash campaign (rounds 1–16 across 0.0.6–0.1.1, then a five-round review in 0.1.10 that closed 23 issues; see audit posture ); fail-closed defaults throughout. |
-
-| Release | The Linux installer and signed DEB, RPM and static archives are available through GitHub Releases . The full distribution matrix was not completed for the current release. |
+> [Diagram: pipeline] The request pipeline. pipeline::handle() resolves vhost and identity. dispatch() mirrors OpenLiteSpeed ordering. finalize_response finishes each terminal.
 
 ## Read next
 
-The docs follow the request: how the server is structured, the protocols it speaks, how it runs PHP and proxies, who gets in, the page cache, and how it is configured, operated and measured.
+Start, operate, learn internals, check reference.
 
-          Quickstart →  Install a signed Linux release, or build and serve from source.
-          Architecture →  20 crates, the frozen `hj-core` seam, the io_uring bridge, generations.
-          Capabilities →  Supported, optional, partial, unsupported — and the fixed bounds.
-          Page cache →  Keys, tiers, admission, purge, the file tier, capsules.
-          CLI reference →  Every subcommand and flag, filterable.
-          Migrating →  The validation-first path off LiteSpeed.
-          GitHub ↗  Browse the source tree, benchmark harnesses, and issues at `faratech/httpjet`.
+          Quickstart →  Install and serve.
+          Migrating →  Move from LiteSpeed safely.
+          Capabilities →  Supported, optional, unsupported.
+          Configuration →  Look up every XML setting.
+          Operations →  Deploy, roll back, recover.
+          Architecture →  How the server fits together.
+          Page cache →  Cache and purge full pages.
+          CLI reference →  Every command and flag.
+
+## By the numbers
+
+See Performance for method and receipts.
+
+          1,183 k rps   h2 empty, c=50, dedicated client VM, median of 3, 0.1.12 (2026-11-08): OLS 892k, nginx 388k; 1 KiB 1,097k vs 740k/319k
+          44.8 k rps   PHP/LSAPI h1, PGO loopback (2026-06): LiteSpeed ~38.5k
+          40 ×   cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms
+          146 /146   h2spec, native HTTP/2, TLS, three runs
+          0.2 %   httpjet phases, June 2026 production (~138 µs/req); PHP 86.5–98.8% of wall time
+          3,000 +   test functions, 20 crates; suite green at v0.1.10 (3,068 tests)
+
+## Project status
+
+| Aspect | State |
+
+| Version | **0.1.12** · November 8, 2026 · latest public release |
+
+| Release detail | Hot-path allocation/contention cuts: borrowed vhost routing, single-pass fast-serve header scan, HPACK header-name reuse, sharded telemetry counters. Loopback (production x86_64): HTTP/2 1 KiB static 371,540 req/s at c50 (nginx 180,940; OpenLiteSpeed 399,505); heavy-`.htaccess` HTTP/2 271,118 req/s (nginx 131,955); warm cache hits 110,158 req/s over HTTP/2; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
+
+| Configuration | LiteSpeed XML stays authoritative. Native directives stay opt-in. `check --strict` gates deploys. |
+
+| Transport | Pure io_uring (monoio), H1/H2/H3 only. No epoll fallback or Windows/macOS port. |
+
+| PHP | Native LSAPI; you supply `lsphp`. Production: persistent external pool, zero-downtime generation reloads. |
+
+| Page cache | Off by default; opt-in LSCache, private tier, cookie vary, tmpfs file tier, per-vhost dictionaries, generation namespaces. Live in production. |
+
+| Optional features | `acme`, `ocsp`, `otel`, `ktls`, `profiling` build features. Each still needs runtime opt-in. |
+
+| Security posture | Reviews through 2026-10-23 plus October bug-bash (rounds 1–16, 0.0.6–0.1.1; five rounds in 0.1.10 closed 23 issues; see audit posture ). Defaults stay fail-closed. |
+
+| Release | Linux installer plus signed DEB, RPM and static archives via GitHub Releases . Full distribution matrix not completed for this release. |

@@ -15,32 +15,35 @@
 - **Full Documentation Corpus (single file):** [https://httpjet.net/llms-full.txt](https://httpjet.net/llms-full.txt)
 - **Source Repository:** [https://github.com/faratech/httpjet](https://github.com/faratech/httpjet)
 
-## Guide
+## START HERE
 
-- [Overview](https://httpjet.net/docs/): httpjet is a from-scratch Rust web server and drop-in LiteSpeed replacement: the same XML configuration, native HTTP/2 and HTTP/3, LSAPI PHP, .htaccess rewriting, reverse proxy and FastCGI gateways, and an opt-in origin page cache.
-- [Quickstart](https://httpjet.net/docs/quickstart): Install a signed Linux release with HTTP and HTTPS, or build httpjet from source and serve it on loopback.
-- [Architecture](https://httpjet.net/docs/architecture): The httpjet workspace: 19 hj-* library crates under one binary, the frozen hj-core contract, the io_uring transport bridge, the request pipeline, and configuration generations.
-- [Capabilities & limits](https://httpjet.net/docs/capabilities): What httpjet supports today, what is optional behind build features, what is deliberately unsupported, and the fixed operational bounds.
+- [Overview](https://httpjet.net/docs/): Start here for what httpjet is.
+- [Quickstart](https://httpjet.net/docs/quickstart): Install httpjet and serve your first page.
+- [Migrating from LiteSpeed](https://httpjet.net/docs/migration): Move an existing LiteSpeed site step by step.
+- [Capabilities & limits](https://httpjet.net/docs/capabilities): See what is supported, optional, or unsupported.
 
-## Internals
+## CONFIGURE &amp; OPERATE
 
-- [Protocol stacks](https://httpjet.net/docs/protocols): HTTP/1.1, native HTTP/2 with zero-allocation HPACK, HTTP/3 over QUIC, sendfile and kTLS egress, PROXY protocol, and Unix-socket listeners on one io_uring transport.
-- [TLS, ACME & OCSP](https://httpjet.net/docs/certificates): Certificate selection, mutual TLS with CRLs, resumption policy, opt-in ACME HTTP-01 and DNS-01 issuance, and opt-in OCSP stapling.
-- [LSAPI & PHP](https://httpjet.net/docs/lsapi): The native LSAPI wire codec, the lsphp supervisor, the zero-downtime external pool with generation tracking, the CGI environment, and the fail-closed jail.
-- [Proxy & gateways](https://httpjet.net/docs/gateways): Reverse proxy over h1/h2/h2s, weighted upstream groups with active health checks, WebSocket and SSE relay, and the opt-in FastCGI gateway.
-- [Rewrite & .htaccess](https://httpjet.net/docs/rewrite): The Apache mod_rewrite engine: per-directory loading, the dense-DFA prefilter, directives and flags, access control, Basic auth, header operations, and the fast-path memo.
-- [Security & access control](https://httpjet.net/docs/security): Client identity, network ACLs, throttling, GeoIP/ASN rules, PROXY protocol trust, request decompression limits, the body budget, the WAF sidecar, and the PHP jail.
-- [Page cache](https://httpjet.net/docs/page-cache): The opt-in LSCache-protocol origin page cache: keys, tiers, admission, purge, the file tier, dictionaries, stale policies, capsules, and generation-scoped namespaces.
-- [Compression](https://httpjet.net/docs/compression): Response compression with gzip, brotli and zstd, server-priority negotiation, streaming encoders, precompressed siblings, and bounded request decompression.
+- [Configuration](https://httpjet.net/docs/configuration): Look up every setting in the XML reference.
+- [TLS, ACME & OCSP](https://httpjet.net/docs/certificates): Set up certificates, ACME issuance, and OCSP.
+- [Security & access control](https://httpjet.net/docs/security): Control who can reach your sites.
+- [Operations](https://httpjet.net/docs/operations): Deploy, upgrade, roll back, and recover safely.
+- [Observability](https://httpjet.net/docs/observability): Read metrics, logs, and request traces.
+- [Admin API & reload](https://httpjet.net/docs/admin-api): Check status and reload configuration safely.
 
-## Running it
+## HOW IT WORKS
 
-- [Configuration](https://httpjet.net/docs/configuration): The LiteSpeed-compatible XML reference: server, tuning, security, listeners, external processors, upstream groups, virtual hosts, contexts, and httpjet-native extensions.
-- [CLI reference](https://httpjet.net/docs/cli): Every httpjet subcommand and serve flag, grouped and filterable, plus the environment variables the binary reads.
-- [Operations](https://httpjet.net/docs/operations): Systemd socket activation, the persistent PHP pool, safe changes, deploy gates, rollback, kill switches, and the hardened OCI example.
-- [Observability](https://httpjet.net/docs/observability): Prometheus metrics, the cache-entries report, access and error logs in text or JSON, syslog, request ids, telemetry, the PHP slow log, OpenTelemetry, and profiling.
-- [Admin API & reload](https://httpjet.net/docs/admin-api): SIGHUP reload semantics, the read-only status API, the transactional configuration API, revisions, and the restart-required boundary.
-- [Extending httpjet](https://httpjet.net/docs/extensions): Compile-time extension hooks, the bounded WAF sidecar contract, and why there is no dynamic plugin ABI.
-- [Performance](https://httpjet.net/docs/performance): Measured throughput by regime: three-way benchmarks, the origin cache result, production attribution, sendfile and kTLS receipts, and PGO discipline.
-- [Conformance & testing](https://httpjet.net/docs/conformance): h2spec 146/146, RFC coverage, LiteSpeed parity, the test layers, CI interoperability jobs, fuzzing, and the deploy gates.
-- [Migrating from LiteSpeed](https://httpjet.net/docs/migration): A validation-first migration path from LiteSpeed or OpenLiteSpeed: inventory, check --strict, isolated candidate, behavioral proof, caching, cutover and rollback.
+- [Architecture](https://httpjet.net/docs/architecture): See how the server fits together.
+- [Protocol stacks](https://httpjet.net/docs/protocols): How HTTP versions and listeners work.
+- [Rewrite & .htaccess](https://httpjet.net/docs/rewrite): How .htaccess rules rewrite and protect requests.
+- [Page cache](https://httpjet.net/docs/page-cache): How full pages are cached and cleared.
+- [LSAPI & PHP](https://httpjet.net/docs/lsapi): How httpjet runs PHP through lsphp.
+- [Proxy & gateways](https://httpjet.net/docs/gateways): Proxy traffic to other servers and services.
+- [Compression](https://httpjet.net/docs/compression): How responses shrink for faster delivery.
+- [Extending httpjet](https://httpjet.net/docs/extensions): Add trusted code and sidecar checks.
+
+## REFERENCE &amp; EVIDENCE
+
+- [CLI reference](https://httpjet.net/docs/cli): Every command, flag, and environment variable.
+- [Performance](https://httpjet.net/docs/performance): Measured speed and how it was measured.
+- [Conformance & testing](https://httpjet.net/docs/conformance): Test results, protocol coverage, and parity checks.

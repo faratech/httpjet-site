@@ -1,5 +1,5 @@
     <h1>Capabilities &amp; limits</h1>
-    <p class="lede">What the current source tree does, what it does only behind a build feature, what is a tested subset, and what is deliberately unsupported. <strong>Supported</strong> means an implemented, tested code path — not directive-for-directive parity with LiteSpeed, NGINX, Apache or Caddy. Optional features stay off unless explicitly enabled at build <em>and</em> at runtime.</p>
+    <p class="lede">This page lists 25 capabilities, 6 build features and 14 operational bounds. <strong>Supported</strong> means an implemented, tested code path, not parity with another server.</p>
 
     <div class="chips">
       <span class="chip"><span class="badge ok">supported</span> implemented + tested</span>
@@ -13,46 +13,46 @@
       <div class="filterbar" data-filter="captable"><input type="search" placeholder="filter capabilities… (e.g. h3, cache, auth)" aria-label="Filter capabilities"><span class="count"></span></div>
       <div class="tablewrap"><table id="captable" class="flagtable"><colgroup><col class="c-key"><col class="c-mid"><col class="c-txt"></colgroup><thead><tr><th>Area</th><th>Status</th><th>Scope and important limits</th></tr></thead>
         <tbody>
-          <tr><td>HTTP/1.1</td><td><span class="badge ok">supported</span></td><td>Keep-alive, pipelining, chunked bodies; strict framing; configured header/URL/body/timeout/request-count limits; 103 Early Hints; single + multipart ranges; <code>CONNECT</code> answered 405. <a href="protocols.html#http1">→</a></td></tr>
-          <tr><td>HTTP/2</td><td><span class="badge ok">supported</span></td><td>Native TLS h2 and h2c prior knowledge; flow-controlled buffered, file and streaming responses; h2spec 146/146. No server push; no <code>Upgrade: h2c</code>. <a href="protocols.html#http2">→</a></td></tr>
-          <tr><td>HTTP/3</td><td><span class="badge ok">supported</span></td><td>QUIC over UDP through the same pipeline; TCP <em>and</em> UDP HTTPS ports must both be published. Connection migration disabled. <a href="protocols.html#http3">→</a></td></tr>
-          <tr><td>TLS</td><td><span class="badge ok">supported</span></td><td>rustls (aws-lc-rs) TLS 1.2/1.3, SNI, ALPN, dual ECDSA+RSA chains, certificate reload, optional/required client certificates, CRLs. <a href="certificates.html">→</a></td></tr>
-          <tr><td>Automatic certificates</td><td><span class="badge opt">optional</span></td><td>HTTP-01 and DNS-01 behind <code>--features acme</code> + CLI opt-in. One managed account/identifier set per process; DNS-01 needs an operator-supplied webhook controller. <a href="certificates.html#acme">→</a></td></tr>
-          <tr><td>OCSP stapling</td><td><span class="badge opt">optional</span></td><td><code>--features ocsp</code>, OpenSSL 3.x, an explicit responder that covers every issuer. Not for CAs that retired OCSP (Let's Encrypt). <a href="certificates.html#ocsp">→</a></td></tr>
-          <tr><td>kTLS / sendfile</td><td><span class="badge part">partial</span></td><td>Plain-TCP H1 file bodies use <code>sendfile(2)</code> always; a <code>--features ktls</code> build adds TLS 1.3 H1 sendfile only when <code>--ktls=auto</code> finds a physical NIC with active <code>tls-hw-tx-offload</code>. H2/H3/UDS/TLS 1.2 keep userspace paths. <a href="protocols.html#sendfile">→</a></td></tr>
-          <tr><td>Virtual hosts</td><td><span class="badge ok">supported</span></td><td>Listener + exact Host/SNI maps, nearest-configured-parent-domain fallback (an unmapped <code>a.example.test</code> reaches the vhost that maps <code>example.test</code>), and a bare <code>*</code> fallback. Glob patterns such as <code>*.example.test</code> or <code>example.*</code> are not matched: <code>check</code> warns and those hosts fall to <code>*</code>.</td></tr>
-          <tr><td>Static content</td><td><span class="badge ok">supported</span></td><td>Conditional requests, LiteSpeed ETags, ranges, in-memory small-file promotion, precompressed <code>.br</code>/<code>.gz</code> siblings, traversal-safe opens. <a href="protocols.html#sendfile">→</a></td></tr>
-          <tr><td>Reverse proxy</td><td><span class="badge ok">supported</span></td><td>HTTP/1 upstreams plus explicit <code>h2://</code>/<code>h2s://</code>; request/response streaming, SSE; upstream mTLS. <a href="gateways.html">→</a></td></tr>
-          <tr><td>WebSocket</td><td><span class="badge part">partial</span></td><td>HTTP/1 upgrade and raw relay. Relay does not support TLS, H2 or Unix-socket upstreams. <a href="gateways.html#websocket">→</a></td></tr>
-          <tr><td>Upstream groups</td><td><span class="badge ok">supported</span></td><td>Primary-first, smooth weighted round-robin, weighted least-active, passive breaker, optional connect/GET/HEAD probes. No automatic replay of unsafe requests. <a href="gateways.html#groups">→</a></td></tr>
-          <tr><td>PHP / LSAPI</td><td><span class="badge ok">supported</span></td><td>Native LSAPI; owned pool or separately supervised external pool with generation tracking and candidate-first reload. <a href="lsapi.html">→</a></td></tr>
-          <tr><td>FastCGI</td><td><span class="badge ok">supported</span> opt-in</td><td>Explicit <code>fcgi</code>/<code>fastcgi</code> processor + suffix routing over TCP or Unix sockets; the app is externally supervised; bodies buffered. <a href="gateways.html#fastcgi">→</a></td></tr>
-          <tr><td>CGI execution, uWSGI</td><td><span class="badge no">unsupported</span></td><td>Design contracts exist; nothing is routable. A <code>cgi</code> handler without an explicit FastCGI processor fails closed (never serves source). <a href="gateways.html#cgi">→</a></td></tr>
-          <tr><td>Rewrites &amp; <code>.htaccess</code></td><td><span class="badge part">partial</span></td><td>Common rewrite, access, auth, header (<code>set</code>/<code>append</code>/<code>add</code>/<code>merge</code>/<code>unset</code>), expiry (<code>ExpiresActive</code>/<code>ExpiresDefault</code>/<code>ExpiresByType</code>), cache and env directives. <code>Header edit</code>, <code>Header setifempty</code>, <code>Header echo</code> and <code>RequestHeader</code> are ignored. Run <code>check --strict</code>. <a href="rewrite.html#directives">→</a></td></tr>
-          <tr><td>Compression</td><td><span class="badge ok">supported</span></td><td>Dynamic gzip/brotli/zstd + precompressed siblings. Gzip <em>request</em> decoding on by default; brotli/zstd request decoding opt-in and bounded. <a href="compression.html">→</a></td></tr>
-          <tr><td>Origin page cache</td><td><span class="badge ok">supported</span> opt-in</td><td>Public/private tiers, vary (including per-URL cookie vary), purge tags, stale policies, single flight, admission, RAM/file tiers, dictionaries, restart scan, generation-scoped keys. A first-class route-level <em>microcache policy</em> is specified, not implemented. <a href="page-cache.html">→</a></td></tr>
-          <tr><td>Access controls</td><td><span class="badge ok">supported</span></td><td>Peer ACLs, trusted-proxy client IP, GeoIP/ASN CIDR rules, per-IP rate limit, body limits, Basic auth (bcrypt, APR1 <code>$apr1$</code>, MD5-crypt <code>$1$</code> and <code>{SHA}</code> htpasswd in constant time; bcrypt cost capped at 14, files confined to the docroot or an operator-listed <code>--auth-user-file-roots</code> directory). <a href="security.html">→</a></td></tr>
-          <tr><td>WAF</td><td><span class="badge opt">external</span> opt-in</td><td>Bounded request-inspection sidecar over Unix socket (peer-UID verified) or loopback TCP, fail-closed by default. No embedded ModSecurity/CRS engine. <a href="extensions.html#waf">→</a></td></tr>
-          <tr><td>Logs and metrics</td><td><span class="badge ok">supported</span></td><td>Combined or JSON access logs, text or JSON error logs with redaction, syslog tap, Prometheus text metrics, request ids, telemetry TSV, PHP slow log. <a href="observability.html">→</a></td></tr>
-          <tr><td>OpenTelemetry</td><td><span class="badge opt">optional</span></td><td>OTLP traces and metrics behind <code>--features otel</code> + <code>HTTPJET_OTEL=1</code>. Bounded queues; no payload export. <a href="observability.html#otel">→</a></td></tr>
-          <tr><td>Runtime APIs</td><td><span class="badge opt">opt-in</span></td><td>Loopback read-only status API; separately authenticated transactional config API. Boot-owned resources stay restart-required. <a href="admin-api.html">→</a></td></tr>
-          <tr><td>Extensions</td><td><span class="badge part">compile-time only</span></td><td>Trusted Rust crates register read-only pre-handlers and response transforms. No dynamic ABI, no in-process sandbox. <a href="extensions.html">→</a></td></tr>
-          <tr><td>Deployment</td><td><span class="badge ok">examples</span></td><td>Generic systemd units (socket activation, boot gate, PHP pool) and a hardened OCI example that still needs an io_uring-permitting runtime. <a href="operations.html">→</a></td></tr>
+          <tr><td>HTTP/1.1</td><td><span class="badge ok">supported</span></td><td>Keep-alive, pipelining, chunked bodies and 103 Early Hints. Limit: <code>CONNECT</code> gets 405; limits configure headers, URL, body and timeouts. <a href="protocols.html#http1">→</a></td></tr>
+          <tr><td>HTTP/2</td><td><span class="badge ok">supported</span></td><td>Native TLS h2 and h2c prior knowledge with h2spec 146/146. Limit: no server push and no <code>Upgrade: h2c</code>. <a href="protocols.html#http2">→</a></td></tr>
+          <tr><td>HTTP/3</td><td><span class="badge ok">supported</span></td><td>QUIC over UDP through the same pipeline. Limit: publish TCP and UDP HTTPS ports; migration stays disabled. <a href="protocols.html#http3">→</a></td></tr>
+          <tr><td>TLS</td><td><span class="badge ok">supported</span></td><td>rustls (aws-lc-rs) TLS 1.2/1.3 with SNI and ALPN. Limit: dual ECDSA+RSA, reload, client certs and CRLs only as configured. <a href="certificates.html">→</a></td></tr>
+          <tr><td>Automatic certificates</td><td><span class="badge opt">optional</span></td><td>HTTP-01 and DNS-01 behind <code>--features acme</code> plus CLI opt-in. Limit: one account/identifier set per process; DNS-01 needs your webhook. <a href="certificates.html#acme">→</a></td></tr>
+          <tr><td>OCSP stapling</td><td><span class="badge opt">optional</span></td><td>Stapling behind <code>--features ocsp</code> with OpenSSL 3.x. Limit: your responder must cover every issuer; not for Let's Encrypt. <a href="certificates.html#ocsp">→</a></td></tr>
+          <tr><td>kTLS / sendfile</td><td><span class="badge part">partial</span></td><td>Plain-TCP H1 file bodies always use <code>sendfile(2)</code>. Limit: TLS 1.3 H1 sendfile needs <code>--features ktls</code>, <code>--ktls=auto</code> and <code>tls-hw-tx-offload</code>. <a href="protocols.html#sendfile">→</a></td></tr>
+          <tr><td>Virtual hosts</td><td><span class="badge ok">supported</span></td><td>Exact Host/SNI maps with parent-domain and bare <code>*</code> fallback. Limit: glob patterns like <code>*.example.test</code> never match; <code>check</code> warns.</td></tr>
+          <tr><td>Static content</td><td><span class="badge ok">supported</span></td><td>Conditional requests, LiteSpeed ETags and ranges. Limit: precompressed <code>.br</code>/<code>.gz</code> siblings only; opens stay traversal-safe. <a href="protocols.html#sendfile">→</a></td></tr>
+          <tr><td>Reverse proxy</td><td><span class="badge ok">supported</span></td><td>HTTP/1 upstreams plus explicit <code>h2://</code>/<code>h2s://</code> with streaming and SSE. Limit: upstream mTLS only as configured. <a href="gateways.html">→</a></td></tr>
+          <tr><td>WebSocket</td><td><span class="badge part">partial</span></td><td>HTTP/1 upgrade and raw relay. Limit: relay excludes TLS, H2 and Unix-socket upstreams. <a href="gateways.html#websocket">→</a></td></tr>
+          <tr><td>Upstream groups</td><td><span class="badge ok">supported</span></td><td>Primary-first, weighted selection and passive breaker. Limit: probes use connect/GET/HEAD only; unsafe requests never replay. <a href="gateways.html#groups">→</a></td></tr>
+          <tr><td>PHP / LSAPI</td><td><span class="badge ok">supported</span></td><td>Native LSAPI with owned or external pools. Limit: external pools need generation tracking and candidate-first reload. <a href="lsapi.html">→</a></td></tr>
+          <tr><td>FastCGI</td><td><span class="badge ok">supported</span> opt-in</td><td>Explicit <code>fcgi</code>/<code>fastcgi</code> routing over TCP or Unix sockets. Limit: you supervise the app externally; bodies buffer. <a href="gateways.html#fastcgi">→</a></td></tr>
+          <tr><td>CGI execution, uWSGI</td><td><span class="badge no">unsupported</span></td><td>Design contracts exist for both. Limit: nothing routes; a bare <code>cgi</code> handler fails closed. <a href="gateways.html#cgi">→</a></td></tr>
+          <tr><td>Rewrites &amp; <code>.htaccess</code></td><td><span class="badge part">partial</span></td><td>Common rewrite, access, auth, header, expiry, cache and env directives. Limit: <code>Header edit</code>, <code>Header setifempty</code>, <code>Header echo</code> and <code>RequestHeader</code> are ignored. <a href="rewrite.html#directives">→</a></td></tr>
+          <tr><td>Compression</td><td><span class="badge ok">supported</span></td><td>Dynamic gzip/brotli/zstd plus precompressed siblings. Limit: gzip request decoding defaults on; brotli/zstd decoding is opt-in and bounded. <a href="compression.html">→</a></td></tr>
+          <tr><td>Origin page cache</td><td><span class="badge ok">supported</span> opt-in</td><td>Public/private tiers, vary, purge tags, stale, single flight and file tiers. Limit: route-level <em>microcache policy</em> is specified, not implemented. <a href="page-cache.html">→</a></td></tr>
+          <tr><td>Access controls</td><td><span class="badge ok">supported</span></td><td>Peer ACLs, trusted-proxy IP, GeoIP/ASN rules, rate and body limits. Limit: bcrypt caps at 14; use bcrypt, <code>$apr1$</code>, <code>$1$</code> or <code>{SHA}</code>; files need docroot or <code>--auth-user-file-roots</code>. <a href="security.html">→</a></td></tr>
+          <tr><td>WAF</td><td><span class="badge opt">external</span> opt-in</td><td>Bounded sidecar inspection over Unix or loopback TCP. Limit: it fails closed by default; no embedded ModSecurity/CRS. <a href="extensions.html#waf">→</a></td></tr>
+          <tr><td>Logs and metrics</td><td><span class="badge ok">supported</span></td><td>Combined or JSON access logs and Prometheus metrics. Limit: error logs redact; syslog and slow logs stay optional. <a href="observability.html">→</a></td></tr>
+          <tr><td>OpenTelemetry</td><td><span class="badge opt">optional</span></td><td>OTLP traces and metrics behind <code>--features otel</code> plus <code>HTTPJET_OTEL=1</code>. Limit: queues bound output; payloads never export. <a href="observability.html#otel">→</a></td></tr>
+          <tr><td>Runtime APIs</td><td><span class="badge opt">opt-in</span></td><td>Loopback status API and authenticated config API. Limit: boot-owned resources stay restart-required. <a href="admin-api.html">→</a></td></tr>
+          <tr><td>Extensions</td><td><span class="badge part">compile-time only</span></td><td>Trusted Rust crates register handlers and transforms. Limit: no dynamic ABI and no in-process sandbox. <a href="extensions.html">→</a></td></tr>
+          <tr><td>Deployment</td><td><span class="badge ok">examples</span></td><td>Generic systemd units and a hardened OCI example. Limit: your runtime must still permit io_uring. <a href="operations.html">→</a></td></tr>
         </tbody></table></div>
     </section>
 
     <section>
       <h2 id="unsupported">Deliberately unsupported or deferred</h2>
       <ul>
-        <li><strong>Generic CGI process execution and uWSGI</strong> are not routable; their fail-closed design gates are documented. FastCGI, LSAPI or HTTP proxying cover application paths.</li>
-        <li><strong>HTTP/2 server push</strong> is not implemented — use <code>Link</code> preload plus 103 Early Hints.</li>
-        <li><strong>HTTP trailers</strong> (inbound h2/h3 trailing HEADERS, chunked trailers) are discarded and not forwarded through gateways. LSAPI has no trailer concept.</li>
-        <li><strong>h2c is prior-knowledge only</strong>; the HTTP/1.1 <code>Upgrade: h2c</code> handshake was removed by RFC 9113 and is not implemented.</li>
-        <li><strong>QUIC connection migration</strong> is disabled: listener steering does not yet preserve connection ownership across an address change.</li>
+        <li><strong>Generic CGI and uWSGI</strong> never route. Use FastCGI, LSAPI or HTTP proxying instead.</li>
+        <li><strong>HTTP/2 server push</strong> is not implemented. Use <code>Link</code> preload plus 103 Early Hints.</li>
+        <li><strong>HTTP trailers</strong> are discarded, never forwarded. LSAPI has no trailer concept.</li>
+        <li><strong>h2c is prior-knowledge only</strong>. The <code>Upgrade: h2c</code> handshake is not implemented.</li>
+        <li><strong>QUIC connection migration</strong> is disabled. Listener steering cannot preserve ownership across address changes.</li>
         <li><strong>No epoll/tokio transport fallback</strong>, no Windows/macOS. Linux io_uring is mandatory.</li>
         <li><strong>No native dynamic-module ABI.</strong> Untrusted inspection belongs behind the bounded sidecar contract.</li>
         <li><strong>LiteSpeed anti-abuse elements</strong> (<code>lsrecaptcha</code>, <code>censorshipControl</code>, permission masks, <code>cgiRlimit</code>) are parsed and warned about, never enforced.</li>
-        <li><strong>Legacy crypt and plaintext htpasswd schemes</strong> (traditional DES, <code>$5$</code>/<code>$6$</code> <code>crypt()</code>, and plaintext entries) verify <em>false</em> with a parse-time warning — use bcrypt (<code>htpasswd -B</code>), APR1 (<code>$apr1$</code>), MD5-crypt (<code>$1$</code>) or <code>{SHA}</code>.</li>
+        <li><strong>Legacy htpasswd</strong> (DES, <code>$5$</code>/<code>$6$</code>, plaintext) verifies <em>false</em>. Use bcrypt, APR1 (<code>$apr1$</code>), MD5-crypt (<code>$1$</code>) or <code>{SHA}</code>.</li>
         <li><strong>Cross-node cache peers</strong> (<code>--cache-peer</code>, peer fill/purge fan-out) were removed in August 2026; the loopback purge and readiness endpoints remain.</li>
         <li><strong>Multipath QUIC</strong> was assessed and deferred (June 2026).</li>
       </ul>
@@ -60,7 +60,7 @@
 
     <section>
       <h2 id="features">Build-time feature gates</h2>
-      <p>The default binary includes the serving engine, LSAPI, FastCGI, proxy, cache, logging, metrics, the WAF sidecar client and an empty extension registry. These features add dependencies and require an explicit build — and still nothing happens until the matching runtime switch is set:</p>
+      <p>The default binary includes serving, LSAPI, FastCGI, proxy and cache. It also includes logging, metrics and the WAF client. Each feature below needs an explicit build plus its runtime switch.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>Cargo feature</th><th>Adds</th><th>Runtime opt-in</th></tr></thead>
         <tbody>
@@ -75,12 +75,12 @@
 
     <section>
       <h2 id="bounds">Operational bounds</h2>
-      <p>Request limits come from the LiteSpeed <code>&lt;tuning&gt;</code> block and per-context overrides; inspect the effective values with <code>check --strict</code> and <code>serve --help</code>. Fixed or separately configured bounds worth knowing:</p>
+      <p>Request limits come from <code>&lt;tuning&gt;</code> and per-context overrides. Inspect effective values with <code>check --strict</code> and <code>serve --help</code>.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>Bound</th><th>Value</th></tr></thead>
         <tbody>
           <tr><td>Page-cache single object</td><td>100 MiB — larger responses serve uncached</td></tr>
-          <tr><td>Page-cache budgets</td><td>Independent index (<code>--page-cache-mem</code>), file tier (<code>--page-cache-disk-mem</code>), hot tier (<code>--page-cache-hot-mem</code>), object TTL and stale-window caps; persistent files need an integrity key (<code>--page-cache-integrity-key</code>; loaded through a private-file validator — single link, owner root or the serving uid, no group/other bits — with <code>--page-cache-integrity-required</code> to refuse booting the file tier without one)</td></tr>
+          <tr><td>Page-cache budgets</td><td>Index <code>--page-cache-mem</code>; file <code>--page-cache-disk-mem</code>; hot <code>--page-cache-hot-mem</code>. Limit: files need <code>--page-cache-integrity-key</code> (single-link, root/serving uid, no group/other); <code>--page-cache-integrity-required</code> enforces it.</td></tr>
           <tr><td>Bridge buffering</td><td>Bodies ≤ 256 KiB buffered, larger streamed (H1/H2/H3)</td></tr>
           <tr><td>Request body budget</td><td>Process-wide byte budget with leases; usage, capacity and rejections exported as <code>httpjet_body_buffer_*</code></td></tr>
           <tr><td>Request decompression</td><td>16 MiB decoded ceiling; 17 MiB codec workspace reservation for br/zstd; zstd window ≤ 2<sup>24</sup></td></tr>
@@ -96,12 +96,12 @@
           <tr><td>OpenTelemetry</td><td>2048 queued spans + one 256-span batch, 1 s interval, 2 s export timeout, 3 s shutdown bound</td></tr>
           <tr><td>Loopback-only endpoints</td><td><code>/__hj_cache_purge</code>, <code>/__hj_cache_ready</code> (raw loopback peer), metrics <code>:9090</code>, admin listeners</td></tr>
         </tbody></table></div>
-      <p class="mini">Defaults are starting points, not sizing recommendations. Worker count, open-file limit, body budget, cache caps, PHP/backend concurrency and health/WAF timeouts must be sized together for the deployment.</p>
+      <p class="mini">Size workers, file limits, budgets, cache, PHP and timeouts together.</p>
     </section>
 
     <section>
       <h2 id="reload">Reload boundary (summary)</h2>
-      <p>SIGHUP and the transactional API replace application state without dropping in-flight requests: vhost maps, rewrites, document roots, contexts, reloadable request settings, TLS material on an unchanged listener topology, and the trust policy of an already-enabled QUIC endpoint. Listener addresses/roles, QUIC enablement, Unix-listener topology, PHP topology, cache-store identity, process user/namespace policy and other boot-owned resources are <strong>restart-required</strong>; the write API says so instead of partially applying. Details: <a href="admin-api.html#reload">Admin API &amp; reload</a>.</p>
+      <p>SIGHUP and the API replace app state without dropping requests. Boot-owned resources stay <strong>restart-required</strong>. See <a href="admin-api.html#reload">Admin API &amp; reload</a>.</p>
     </section>
 
     <section>
@@ -110,5 +110,5 @@
 cargo check --locked -p httpjet --bin httpjet
 cargo run --locked -p httpjet -- --root "$PWD/examples/litespeed" check --strict
 cargo test --locked --workspace</code></pre></div>
-      <p>Protocol, cache, ACME, OCSP, OTel, FastCGI, WAF, admin and OCI pages carry their narrower acceptance commands. Every test uses synthetic configuration, temporary files and ephemeral loopback ports.</p>
+      <p>Topic pages carry narrower acceptance commands. Tests use synthetic config and ephemeral loopback ports.</p>
     </section>
