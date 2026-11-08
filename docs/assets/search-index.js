@@ -915,7 +915,7 @@ window.DOCS_INDEX = [
    {
     "id": "release-0-1-12",
     "t": "Release 0.1.12: hot-path allocation and contention reductions",
-    "kw": "Router::resolve_ref htaccess"
+    "kw": "Router::resolve_ref htaccess h2load wrk"
    },
    {
     "id": "cache-result",

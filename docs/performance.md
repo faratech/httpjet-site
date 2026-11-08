@@ -11,7 +11,7 @@
 
 httpjet is fast — and these docs are strict about *where* the time goes. Every figure names its regime, because a **loopback benchmark** (synthetic, on-box, PGO build) is not the same thing as **production telemetry** (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.
 
-        ~908 k rps   h2 static, c=50, dedicated load-generator client (mean of 4 runs)
+        1,183 k rps   h2 static empty, c=50, dedicated load-generator VM, median of 3 (0.1.12, 2026-11-08)
         44.8 k rps   PHP/LSAPI over HTTP/1.1, PGO loopback
         40 ×   cache hit vs the same page through PHP
         0.2 %   httpjet's request phases, June 2026 production telemetry
@@ -131,6 +131,12 @@ Loopback throughput on the production x86_64 host (PGO build, 8 cores, live prod
 | Warm page-cache hit, HTTP/2 (c32/m32) | **110,158 req/s** | — | — |
 
 | Warm page-cache hit, HTTP/1.1 (c100) | **80,025 req/s** | — | — |
+
+Re-run on 2026-11-08 in the topology LiteSpeed and nginx publish with — `h2load` (and a `wrk` cross-check) on a **dedicated load-generator VM** (c4-highcpu-8, same zone) against the full, unpinned host over the VPC, production PGO binaries, median of 3 rounds:
+
+> [Benchmark Chart: dedicated-0112 — Dedicated load-generator client, three-way (httpjet 0.1.12) (c4-highcpu-8 client VM, same zone · full-host servers over VPC · h2load c=50 x100, 1M requests/cell · median of 3 rounds · 2026-11-08 · req/s)]
+
+The `wrk` HTTP/1.1 cross-check (1 KiB, c=100, 15 s) agrees on the ordering: httpjet **540,911**, nginx 439,433, OpenLiteSpeed 341,344 req/s. Dedicated-client numbers are not comparable cell-for-cell with the same-host rows above (the client no longer shares the server's cores); they are comparable with the August 2026 dedicated dataset (891k empty-body for the build of that week).
 
         ⎁   Honest caveats
 These are absolute loopback numbers for this build on a shared production host, not an A/B against `0.1.11`: the changed paths (memoized/fast-serve serves, cache-hit serving, logging) are exactly the ones the rows above exercise, but treat the comparison against the older dedicated-host baselines elsewhere on this page as approximate. Full CSV receipts are published with the release on the benchmark page .

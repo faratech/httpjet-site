@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261108d'
+VERSION = '20261108e'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -125,6 +125,10 @@ CHARTS = {
    ['httpjet (c=40)', 'LiteSpeed (c=40)', 'LiteSpeed best (c=60)'],
    [('PHP hello-world', [44.8, 38.5, 41.2])],
    'Same hardware, same lsphp binary; LiteSpeed needed higher concurrency to reach its best.'),
+ 'dedicated-0112': ('Dedicated load-generator client, three-way (httpjet 0.1.12)', 'c4-highcpu-8 client VM, same zone \u00b7 full-host servers over VPC \u00b7 h2load c=50 x100, 1M requests/cell \u00b7 median of 3 rounds \u00b7 2026-11-08 \u00b7 req/s', 'k rps',
+   ['httpjet', 'OpenLiteSpeed', 'nginx'],
+   [('h2 empty', [1182.7, 892.1, 388.0]), ('h2 1 KiB', [1097.1, 740.3, 319.2]), ('h1 1 KiB (h2load)', [427.0, 302.6, 346.8])],
+   'Same tools and topology as the published LiteSpeed/nginx benchmarks: h2load on a separate client, servers unpinned on the full host. wrk cross-check (h1 1 KiB, c=100, 15 s): httpjet 540,911, nginx 439,433, OpenLiteSpeed 341,344 req/s.'),
  'cache-vs-php': ('One forum page: cache hit vs full PHP render', 'HTTPS loopback · PGO · 152 KB page · req/s', 'rps',
    ['requests / s'],
    [('page-cache HIT (p50 2 ms)', [19215]), ('full DB-backed PHP render (p50 34 ms)', [480])],
@@ -255,7 +259,7 @@ def head(slug, title_suffix, desc, nav_title, docs_min_css, lastmod):
                     "name": "How fast is httpjet compared to LiteSpeed, OpenLiteSpeed, and nginx?",
                     "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": "In synthetic benchmarks, httpjet measured ~908k req/s on HTTP/2 static empty bodies at c=50 (mean of four runs from a dedicated load-generator client; ~891k vs OpenLiteSpeed ~838k in two interleaved pairs), 298k req/s on an 806-line .htaccess chain over HTTP/2 in a loopback PGO three-way (vs OpenLiteSpeed 283.3k and nginx 125.4k), 44.8k req/s on PHP over LSAPI over HTTP/1.1 (vs LiteSpeed 6.3.5 38.5k at the same concurrency and 41.2k at its best), and ~19.2k req/s on a 152 KB XenForo origin page-cache hit (about 40x an uncached PHP render)."
+                        "text": "In synthetic benchmarks with a dedicated load-generator VM (h2load, c=50 x100, median of 3 rounds, 2026-11-08), httpjet 0.1.12 measured 1,183k req/s on HTTP/2 static empty bodies (OpenLiteSpeed 892k, nginx 388k) and 1,097k req/s on 1 KiB files (740k / 319k); a wrk HTTP/1.1 cross-check gave 541k vs 439k / 341k req/s. Earlier campaigns: 298k req/s on an 806-line .htaccess chain over HTTP/2 in a loopback PGO three-way (vs OpenLiteSpeed 283.3k and nginx 125.4k), 44.8k req/s on PHP over LSAPI over HTTP/1.1 (vs LiteSpeed 6.3.5 38.5k at the same concurrency and 41.2k at its best), and ~19.2k req/s on a 152 KB XenForo origin page-cache hit (about 40x an uncached PHP render)."
                     }
                 }
             ]
@@ -595,7 +599,7 @@ def main():
         '',
         '## Key Facts & Benchmarks',
         '',
-        '- **HTTP/2 Static Throughput (empty bodies, c=50, dedicated load-generator client, 2026-08-27):** ~908k req/s (mean of 4 runs); interleaved with OpenLiteSpeed ~891k vs ~838k req/s (mean of 2 pairs)',
+        '- **HTTP/2 Static Throughput (empty bodies, c=50 x100, dedicated load-generator VM, 2026-11-08):** httpjet 0.1.12 1,183k req/s (median of 3 rounds) vs OpenLiteSpeed 892k and nginx 388k; on 1 KiB files 1,097k vs 740k / 319k; wrk HTTP/1.1 cross-check 541k vs 439k / 341k',
         '- **Heavy 806-line `.htaccess` Static (c=100, PGO):** 298k req/s HTTP/2, 168.7k req/s HTTP/1.1 (vs nginx 125.4k / 145.6k)',
         '- **Origin Page Cache Hit vs Full PHP Render:** 19,215 req/s (p50 2 ms) vs 480 req/s (p50 34 ms) — about 40× (loopback, 152 KB page)',
         '- **PHP over LSAPI (HTTP/1.1, c=40, PGO):** 44.8k req/s vs LiteSpeed 6.3.5 38.5k req/s (41.2k at c=60)',

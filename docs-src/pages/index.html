@@ -60,7 +60,7 @@
       <h2 id="numbers">By the numbers</h2>
       <p>Headline figures from the checked-in benchmark record — every number names its regime (see <a href="performance.html">Performance</a> for methodology and the receipt names).</p>
       <div class="stats">
-        <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static c=50, dedicated load-generator client, mean of 4 runs — interleaved with OpenLiteSpeed: ~891k vs ~838k (2026-08-27)</div></div>
+        <div class="stat accent"><div class="v">1,183<span class="u">k rps</span></div><div class="l">h2 static empty, c=50, dedicated load-generator VM, median of 3 rounds — httpjet 0.1.12 vs OpenLiteSpeed 892k and nginx 388k (2026-11-08); 1 KiB files: 1,097k vs 740k / 319k</div></div>
         <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI over h1, PGO loopback — vs LiteSpeed's ~38.5k (2026-06)</div></div>
         <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs full PHP render of the same page (19,215 vs 480 rps; p50 2 ms vs 34 ms)</div></div>
         <div class="stat"><div class="v">146<span class="u">/146</span></div><div class="l">h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs</div></div>

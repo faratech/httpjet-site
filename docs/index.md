@@ -72,7 +72,7 @@ Every wire protocol lands in the same request pipeline. Click a node to jump to 
 
 Headline figures from the checked-in benchmark record — every number names its regime (see Performance for methodology and the receipt names).
 
-          ~908 k rps   h2 static c=50, dedicated load-generator client, mean of 4 runs — interleaved with OpenLiteSpeed: ~891k vs ~838k (2026-08-27)
+          1,183 k rps   h2 static empty, c=50, dedicated load-generator VM, median of 3 rounds — httpjet 0.1.12 vs OpenLiteSpeed 892k and nginx 388k (2026-11-08); 1 KiB files: 1,097k vs 740k / 319k
           44.8 k rps   PHP/LSAPI over h1, PGO loopback — vs LiteSpeed's ~38.5k (2026-06)
           40 ×   cache hit vs full PHP render of the same page (19,215 vs 480 rps; p50 2 ms vs 34 ms)
           146 /146   h2spec conformance on the native HTTP/2 stack, over TLS, three consecutive runs

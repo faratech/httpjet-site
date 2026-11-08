@@ -2,7 +2,7 @@
     <p class="lede">httpjet is fast — and these docs are strict about <em>where</em> the time goes. Every figure names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.</p>
 
     <div class="stats">
-      <div class="stat accent"><div class="v">~908<span class="u">k rps</span></div><div class="l">h2 static, c=50, dedicated load-generator client (mean of 4 runs)</div></div>
+      <div class="stat accent"><div class="v">1,183<span class="u">k rps</span></div><div class="l">h2 static empty, c=50, dedicated load-generator VM, median of 3 (0.1.12, 2026-11-08)</div></div>
       <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI over HTTP/1.1, PGO loopback</div></div>
       <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs the same page through PHP</div></div>
       <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's request phases, June 2026 production telemetry</div></div>
@@ -121,6 +121,9 @@
           </tbody>
         </table>
       </div>
+      <p>Re-run on 2026-11-08 in the topology LiteSpeed and nginx publish with — <code>h2load</code> (and a <code>wrk</code> cross-check) on a <strong>dedicated load-generator VM</strong> (c4-highcpu-8, same zone) against the full, unpinned host over the VPC, production PGO binaries, median of 3 rounds:</p>
+      <!--chart:dedicated-0112-->
+      <p>The <code>wrk</code> HTTP/1.1 cross-check (1 KiB, c=100, 15 s) agrees on the ordering: httpjet <strong>540,911</strong>, nginx 439,433, OpenLiteSpeed 341,344 req/s. Dedicated-client numbers are not comparable cell-for-cell with the same-host rows above (the client no longer shares the server's cores); they are comparable with the August 2026 dedicated dataset (891k empty-body for the build of that week).</p>
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Honest caveats</span><p>These are absolute loopback numbers for this build on a shared production host, not an A/B against <code>0.1.11</code>: the changed paths (memoized/fast-serve serves, cache-hit serving, logging) are exactly the ones the rows above exercise, but treat the comparison against the older dedicated-host baselines elsewhere on this page as approximate. Full CSV receipts are published with the release on the <a href="https://windowsforum.com/admin/httpjet/benchmarks/">benchmark page</a>.</p></div></div>
     </section>
 
