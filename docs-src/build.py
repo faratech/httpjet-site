@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261108h'
+VERSION = '20261108i'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -667,6 +667,8 @@ def main():
     for af in os.listdir(ASSETS):  # benchmark result files the pages link to
         if af.endswith('.tsv'):
             shutil.copy2(os.path.join(ASSETS, af), os.path.join(dist, 'docs', 'assets', af))
+        elif os.path.isdir(os.path.join(ASSETS, af)):  # raw-log trees (release sweeps)
+            shutil.copytree(os.path.join(ASSETS, af), os.path.join(dist, 'docs', 'assets', af))
 
     print('built', len(ORDER), 'pages + clean Pages dist; version', VERSION)
 

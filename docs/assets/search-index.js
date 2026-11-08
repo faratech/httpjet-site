@@ -932,7 +932,8 @@ window.DOCS_INDEX = [
    },
    {
     "id": "timeline",
-    "t": "Performance across builds — interactive presentation"
+    "t": "Performance across builds — interactive presentation",
+    "kw": "h2load"
    },
    {
     "id": "attribution",

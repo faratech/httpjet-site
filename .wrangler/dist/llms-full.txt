@@ -3096,7 +3096,7 @@ Loopback removes network, handshakes, CDN. It isolates server code for compariso
 
 You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (`0.0.1`, June 2026) through `0.1.12`. CSV receipts stay outside the public export at github.com/faratech/httpjet .
 
-Compare v0.0.1–v0.1.12 in the **Release Speed Curve**, PGO tag builds. v0.0.1–v0.1.10: side-by-side, 2026-10-26 ( release-sweep-2026-10-26.tsv ). The paired v0.1.11 vs v0.1.12 run (2026-11-08, same shapes/split) is in the build slides below; it is not drawn on the curve — the host was busier, so its absolute points would read as a regression the paired deltas do not show. Then step through **16 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
+Compare v0.0.1–v0.1.12 in the **Release Speed Curve**. Every release was re-measured on 2026-11-08 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: release-sweep-2026-11-08.tsv ; raw `h2load` logs, server logs and the bench driver: release-sweep-2026-11-08/ . (The earlier 2026-10-26 sweep of v0.0.1–v0.1.10 is archived .) Then step through **16 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
 
 ## Where the time actually goes
 
@@ -3307,7 +3307,7 @@ Filter all 14 benchmarked eras by tag, commit, workload, regime, receipt:
 
 | `v0.1.11` · Coop Ring + Response Memo Defaults 2026-11-07 · `54df571f` | alt-port ABBA, both orders x86; aarch64 neutral | See Release 0.1.11 : hits **`+27.6%`**, CPU **`−26.7%`**. Receipt: source commit `54df571f`. |
 
-| `v0.1.12` · Hot-Path Allocation & Contention Reductions 2026-11-08 · `85b99e16` | paired run live production host, server 4 cores / loadgen 4 cores | See Release 0.1.12 : H2 1 KiB **525.0k → 597.4k (`+13.8%`)**, H2 three-way **371,540**. Receipts: `*-v0112-20261108.csv` on the benchmark page ; paired curve addendum 2026-11-08 |
+| `v0.1.12` · Hot-Path Allocation & Contention Reductions 2026-11-08 · `85b99e16` | lab re-run dedicated lab VM, server 4 cores / loadgen 4 cores, all 10 releases | See Release 0.1.12 : lab medians vs v0.1.11 — H2 1 KiB **440.9k → 424.6k (rounds overlap)**, H1 1 KiB **222.0k → 242.0k**, page-cache **132.1k → 129.2k**; dedicated-client three-way H2 **371,540**. Receipts: release-sweep-2026-11-08.tsv + raw logs ; three-way CSVs on the benchmark page |
 
 | `experiment` · H3 GSO Segment Cap SINGULARITY · same-binary A/B | H3 32 KiB, 100k req/arm GSO cap 10 vs 20 | Static `6,052 → 7,816/6,552 rps`, `sendmsg` `−44.6%`, instr ` Receipt: `docs/h3-gso-segment-experiment.md` in the source tree |
 
