@@ -88,4 +88,8 @@
     <loc>https://httpjet.net/docs/conformance</loc>
     <lastmod>2026-11-08</lastmod>
   </url>
+  <url>
+    <loc>https://httpjet.net/benchmarks/</loc>
+    <lastmod>2026-11-11</lastmod>
+  </url>
 </urlset>

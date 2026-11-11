@@ -1,8 +1,13 @@
 {
  "https://httpjet.net/": {
-  "hash": "2d77feaa8d232d7da711fd6a5c741a409c977e79b36b2a848873e2ae08958ffa",
+  "hash": "870cd9e0193523290c7ece992037a9badf81e45145976f6f2d1375207d7554c7",
   "lastmod": "2026-11-11",
-  "submitted": "2d77feaa8d232d7da711fd6a5c741a409c977e79b36b2a848873e2ae08958ffa"
+  "submitted": "870cd9e0193523290c7ece992037a9badf81e45145976f6f2d1375207d7554c7"
+ },
+ "https://httpjet.net/benchmarks/": {
+  "hash": "6b0b53e395badd3ebe3ab4982dc5af4497c31ae53d05f05951452835588c0cb6",
+  "lastmod": "2026-11-11",
+  "submitted": "6b0b53e395badd3ebe3ab4982dc5af4497c31ae53d05f05951452835588c0cb6"
  },
  "https://httpjet.net/docs/": {
   "hash": "d3ffdf090e6c3bc46e2af4f8cd6566ea82b246678dd804c124b97b93226f379a",

@@ -593,7 +593,12 @@ def main():
     touch(SITE + '/', landing)
     # generate canonical sitemap.xml: lastmod = real content-change date (not build date)
     smap = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    bench_index = os.path.join(ROOT, 'benchmarks', 'index.html')
+    if os.path.exists(bench_index):
+        touch(SITE + '/benchmarks/', read(bench_index))
     urls = [SITE + '/'] + [SITE + '/docs/' + ('' if slug == 'index' else slug) for slug, _, _, _ in ORDER]
+    if SITE + '/benchmarks/' in STATE:
+        urls.append(SITE + '/benchmarks/')
     for loc in urls:
         smap.append(f'  <url>\n    <loc>{loc}</loc>\n    <lastmod>{STATE[loc]["lastmod"]}</lastmod>\n  </url>')
     smap.append('</urlset>\n')
