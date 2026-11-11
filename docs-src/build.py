@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261111c'
+VERSION = '20261111d'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -534,6 +534,15 @@ def headings(body):
         # Extract code tokens (flags, directives, metrics, crates) from this section
         seen = []
         seen_set = set()
+        # Table row headers carry the flags and metric names of the reference pages
+        # (cli, observability); they are not wrapped in <code>, so read them directly.
+        for tm in re.finditer(r'<th[^>]*>(.*?)</th>', chunk, flags=re.S):
+            raw = unesc(re.sub(r'<[^>]+>', ' ', tm.group(1)))
+            for tok in re.findall(r'--[a-z0-9-]+|httpjet_[A-Za-z0-9_]+', raw):
+                tl = tok.lower()
+                if tl not in seen_set:
+                    seen_set.add(tl)
+                    seen.append(tok)
         for cm in re.finditer(r'<code>(.*?)</code>', chunk, flags=re.S):
             raw = unesc(re.sub(r'<[^>]+>', '', cm.group(1))).strip()
             if not raw or len(raw) > 64 or '\n' in raw:
@@ -545,7 +554,7 @@ def headings(body):
                     seen.append(tok)
         entry = {'id': m.group(2), 't': unesc(text)}
         if seen:
-            entry['kw'] = ' '.join(seen[:48])
+            entry['kw'] = ' '.join(seen[:160])
         hs.append(entry)
     return hs
 
