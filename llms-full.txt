@@ -97,7 +97,7 @@ See Performance for method and receipts.
           40 ×   cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms
           146 /146   h2spec, native HTTP/2, TLS, three runs
           0.2 %   httpjet phases, June 2026 production (~138 µs/req); PHP 86.5–98.8% of wall time
-          3,000 +   test functions, 20 crates; suite green at v0.1.10 (3,068 tests)
+          3,100 +   test functions, 20 crates; suite green at v0.2.0 (3,171 tests)
 
 ## Project status
 
@@ -105,7 +105,7 @@ See Performance for method and receipts.
 
 | Version | **0.2.0** · November 11, 2026 · latest public release |
 
-| Release detail | Hot-path allocation/contention cuts: borrowed vhost routing, single-pass fast-serve header scan, HPACK header-name reuse, sharded telemetry counters. Loopback (production x86_64): HTTP/2 1 KiB static 371,540 req/s at c50 (nginx 180,940; OpenLiteSpeed 399,505); heavy-`.htaccess` HTTP/2 271,118 req/s (nginx 131,955); warm cache hits 110,158 req/s over HTTP/2; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
+| Release detail | Security audit fixes (WebSocket handshake, capsule revalidation, multi-member gzip, QUIC handshake cleanup, H3 body budget) and cold-start latency: the `.htaccess` chain is parsed once before the first connection, so the slowest request after boot falls from 508 ms to 3 ms. Lab VM, same run, 0.2.0 vs 0.1.12: HTTP/2 1 KiB static 625.5k vs 591.8k req/s, heavy-`.htaccess` HTTP/2 515.3k vs 402.9k, page-cache hits 544.5k vs 410.5k; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
 
 | Configuration | LiteSpeed XML stays authoritative. Native directives stay opt-in. `check --strict` gates deploys. |
 
@@ -1167,7 +1167,9 @@ Configure suEXEC (` `, off by default; uid 0 always rejected), chroot (`chrootMo
 
 | 2026-10-25 | 0.1.10 bug/perf bash | 23 issues, 22 fixed, one closed by decision. Limit: no-follow walk, H1 send deadlines, dropped-POST replay. |
 
-Gates re-run after each round: full suite (3,068 tests at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
+| 2026-11-10..11 | 0.2.0 review of v0.1.10..v0.1.12 + the 2026-10-30 sweep (#1193–#1230) | 28 issues fixed, each with a regression test; two read-only reviews found no wrong-content path in the response memo or page cache. Limit: upstream WebSocket handshake validation, no credentials in capsule revalidation, every gzip member decoded, LSAPI packet order, error-log escaping, QUIC self-closing Initials (pre-handshake memory), shared cache bodies off the server-wide H3 budget, listener address checks, CPU steering gated on NIC queues. |
+
+Gates re-run after each round: full suite (3,171 tests at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
 
         i   Reporting
 Use private responsible disclosure per `SECURITY.md`, not a public issue. Findings reconcile against source and regression tests. Nothing here proves production exploitation, or absence of other vulnerabilities.
@@ -1362,6 +1364,10 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 | httpjet_h2_rapid_reset_goaways_total · httpjet_h2_send_stall_resets_total · httpjet_h3_send_stall_resets_total | counter | H2 connections closed with ENHANCE_YOUR_CALM when cancellations outrun the time-refilled rapid-reset budget; H2 and H3 response streams reset on send stall. |
 
+| httpjet_h2_conn_ends_total{reason} | counter | Every HTTP/2 connection of the io_uring transport, counted once under the first cause recorded for it: `idle` (our idle GOAWAY), `peer_eof`, `peer_goaway`, `protocol_error` (our error GOAWAY), `io_error`, `shutdown`, `other`. Behind a proxy that never resumes TLS, each ended connection costs a full handshake, so this shows who ends them. |
+
+| httpjet_htaccess_parses_total | counter | Access files parsed by the current configuration generation's `.htaccess` cache, re-parses after an edit included. Parsing is single-flight per file and happens before the first connection is accepted. |
+
 | httpjet_throttle_{allowed,rejected}_total | counter | Per-IP throttle decisions (0 when disabled). |
 
 | httpjet_body_buffer_{bytes,capacity_bytes,rejected_total} | gauge / counter | The process-wide request-body budget. |
@@ -1379,6 +1385,8 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 | httpjet_pagecache_{hits,misses,stores,purges,purges_received,store_purge_rejections,expired_misses}_total · httpjet_pagecache_hit_ratio · httpjet_cache_hit_ratio_real | counter / gauge | Core activity; `_real` excludes loopback probes; `httpjet_cache_{hits,misses}_by_vhost{vhost}` split it per vhost and `httpjet_pagecache_evictions_total` counts size/TTL teardowns. Telemetry twins `httpjet_cache_{hits,misses,bypass,stale_serves,sie_serves,admitted,rejected}` and `httpjet_disp_*` (why a response was or wasn't stored) plus `httpjet_cache_admit_ratio`. |
 
 | httpjet_pagecache_entries · _memory_bytes · _hot_bytes · _decoded_entries · _meta_{raw,compressed}_bytes · _tag_{keys,memberships,index_bytes} · _tag_purge_{tombstones,floor_milliseconds} | gauge | Exact RAM accounting of the index and tag indexes. |
+
+| httpjet_pagecache_ghost_hits_total | counter | Misses on a key the file tier had evicted while its copy was still fresh: misses a larger `--page-cache-disk-mem` could have served. An estimate (a bounded sample of recent evictions; later tag purges are not subtracted). Compare with `httpjet_pagecache_disk_evictions_total` before resizing the tier. |
 
 | httpjet_pagecache_disk_{bytes,max_bytes} · _disk_evictions_total · _disk_evict_age_{lt_1h,1h_6h,6h_24h,ge_24h}_total · _swept_expired_total | gauge / counter | File-tier footprint vs budget, LRU evictions by entry age, proactive expiry sweeps. |
 
@@ -1664,7 +1672,7 @@ SUMMARY: See how the server fits together.
 
 # Architecture
 
-httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Roughly 3,100 test functions span the workspace (3,068 green at v0.1.10).
+httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Roughly 3,200 test functions span the workspace (3,171 green at v0.2.0).
 
 ## Workspace shape
 
@@ -2797,9 +2805,23 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --workers   | — | Number of accept-loop workers (SO_REUSEPORT sockets). Defaults to CPUs |
 
-| --no-core-pinning | off | Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the machine's CPU count; this flag is the kill switch if pinned placement worsens tail latency |
+| --no-core-pinning | off | Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the number of CPUs the process may run on (its affinity mask); this flag is the kill switch if pinned placement worsens tail latency |
 
 | --uring-ring   | coop | Sets io_uring ring mode: `coop`, `legacy`, or `defer`. Measured: see Performance . |
+
+| --no-cpu-steering | off | Kill switch for listener CPU steering. Pinned TCP workers normally ask the kernel (SO_INCOMING_CPU) for the connections whose SYN arrived on their CPU, so RSS/RPS placement and the serving core coincide Steering is also skipped automatically unless every device-backed NIC that is up has at least as many receive queues (or RPS CPUs) as there are workers; the startup log says so. |
+
+| --ready-file   | — | Atomically publish this process's PID after worker activation. The absolute path must be fresh and its parent directory owned by root or this account |
+
+| --h3-engine   | legacy | HTTP/3 request engine. The accelerated engine tries the shared on-core cache path before dispatching misses through the io_uring bridge Values: `legacy`, `accelerated`, `auto`. |
+
+| --h3-gso-segments   | 10 | Maximum HTTP/3 datagrams in one GSO transmit. The experimental value 20 retains the same 20-datagram flush budget; the default remains 10 Values: `10`, `20`. |
+
+| --h3-send-batch   | 1 | Maximum UDP messages per send syscall; 1 retains the scalar path Values: `1`, `4`, `8`, `16`. |
+
+| --h3-ack-eliciting-threshold   | 0 | Ask HTTP/3 peers that support QUIC ACK_FREQUENCY to acknowledge every N ack-eliciting packets instead of every second one. 0 (default) asks nothing |
+
+| --h3-max-ack-delay-us   | 1000 | The max_ack_delay requested along with --h3-ack-eliciting-threshold |
 
 | --no-multishot-accept | off | Disable multishot accept: submit one accept SQE per connection (the pre-multishot behavior) instead of one armed SQE per listener |
 

@@ -9,7 +9,7 @@
 
 # Architecture
 
-httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Roughly 3,100 test functions span the workspace (3,068 green at v0.1.10).
+httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Roughly 3,200 test functions span the workspace (3,171 green at v0.2.0).
 
 ## Workspace shape
 

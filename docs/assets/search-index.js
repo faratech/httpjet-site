@@ -396,7 +396,7 @@ window.DOCS_INDEX = [
    {
     "id": "metrics",
     "t": "Prometheus metrics",
-    "kw": "--metrics-addr metrics httpjet_requests_total httpjet_pagecache_ httpjet_lsapi_ httpjet check _real httpjet_cache_ hits misses _by_vhost vhost httpjet_pagecache_evictions_total httpjet_disp_ httpjet_cache_admit_ratio httpjet_pagecache_integrity_active scope group peer cache-entries"
+    "kw": "--metrics-addr metrics httpjet_requests_total httpjet_pagecache_ httpjet_lsapi_ idle peer_eof peer_goaway protocol_error io_error shutdown other htaccess httpjet check _real httpjet_cache_ hits misses _by_vhost vhost httpjet_pagecache_evictions_total httpjet_disp_ httpjet_cache_admit_ratio --page-cache-disk-mem httpjet_pagecache_disk_evictions_total httpjet_pagecache_integrity_active scope group peer cache-entries"
    },
    {
     "id": "cache-entries",
@@ -906,7 +906,7 @@ window.DOCS_INDEX = [
    {
     "id": "serve",
     "t": "serve flags",
-    "kw": "--http-addr --https-addr --workers --root --page-cache --php-socket --lsphp-external --no-mtls --metrics-addr --no-php coop legacy defer unix: auto off perIpRate httpjet_tls_handshakes_resumed_total htaccess PHP_LSAPI_CHILDREN maxConns httpjet lsphp cache enableCache CacheLookup X-LiteSpeed-Cache-Control vhost path level name value xf_style_id X-LiteSpeed-Cache-Control: public whats-new X-LiteSpeed-Vary: cookie private max-age prefixes all-get-classified pipeline::fast_memo HJ_FAST_MEMO --page-cache-response-memo shadow httpjet_fast_early_predicted_total httpjet_fast_early_forfeit_total"
+    "kw": "--http-addr --https-addr --workers --root --page-cache --php-socket --lsphp-external --no-mtls --metrics-addr --no-php coop legacy defer accelerated auto unix: off perIpRate httpjet_tls_handshakes_resumed_total htaccess PHP_LSAPI_CHILDREN maxConns httpjet lsphp cache enableCache CacheLookup X-LiteSpeed-Cache-Control vhost path level name value xf_style_id X-LiteSpeed-Cache-Control: public whats-new X-LiteSpeed-Vary: cookie private max-age prefixes all-get-classified pipeline::fast_memo HJ_FAST_MEMO --page-cache-response-memo shadow httpjet_fast_early_predicted_total"
    },
    {
     "id": "env",

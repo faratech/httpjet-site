@@ -38,6 +38,10 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 | httpjet_h2_rapid_reset_goaways_total · httpjet_h2_send_stall_resets_total · httpjet_h3_send_stall_resets_total | counter | H2 connections closed with ENHANCE_YOUR_CALM when cancellations outrun the time-refilled rapid-reset budget; H2 and H3 response streams reset on send stall. |
 
+| httpjet_h2_conn_ends_total{reason} | counter | Every HTTP/2 connection of the io_uring transport, counted once under the first cause recorded for it: `idle` (our idle GOAWAY), `peer_eof`, `peer_goaway`, `protocol_error` (our error GOAWAY), `io_error`, `shutdown`, `other`. Behind a proxy that never resumes TLS, each ended connection costs a full handshake, so this shows who ends them. |
+
+| httpjet_htaccess_parses_total | counter | Access files parsed by the current configuration generation's `.htaccess` cache, re-parses after an edit included. Parsing is single-flight per file and happens before the first connection is accepted. |
+
 | httpjet_throttle_{allowed,rejected}_total | counter | Per-IP throttle decisions (0 when disabled). |
 
 | httpjet_body_buffer_{bytes,capacity_bytes,rejected_total} | gauge / counter | The process-wide request-body budget. |
@@ -55,6 +59,8 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 | httpjet_pagecache_{hits,misses,stores,purges,purges_received,store_purge_rejections,expired_misses}_total · httpjet_pagecache_hit_ratio · httpjet_cache_hit_ratio_real | counter / gauge | Core activity; `_real` excludes loopback probes; `httpjet_cache_{hits,misses}_by_vhost{vhost}` split it per vhost and `httpjet_pagecache_evictions_total` counts size/TTL teardowns. Telemetry twins `httpjet_cache_{hits,misses,bypass,stale_serves,sie_serves,admitted,rejected}` and `httpjet_disp_*` (why a response was or wasn't stored) plus `httpjet_cache_admit_ratio`. |
 
 | httpjet_pagecache_entries · _memory_bytes · _hot_bytes · _decoded_entries · _meta_{raw,compressed}_bytes · _tag_{keys,memberships,index_bytes} · _tag_purge_{tombstones,floor_milliseconds} | gauge | Exact RAM accounting of the index and tag indexes. |
+
+| httpjet_pagecache_ghost_hits_total | counter | Misses on a key the file tier had evicted while its copy was still fresh: misses a larger `--page-cache-disk-mem` could have served. An estimate (a bounded sample of recent evictions; later tag purges are not subtracted). Compare with `httpjet_pagecache_disk_evictions_total` before resizing the tier. |
 
 | httpjet_pagecache_disk_{bytes,max_bytes} · _disk_evictions_total · _disk_evict_age_{lt_1h,1h_6h,6h_24h,ge_24h}_total · _swept_expired_total | gauge / counter | File-tier footprint vs budget, LRU evictions by entry age, proactive expiry sweeps. |
 

@@ -147,7 +147,9 @@ Configure suEXEC (` `, off by default; uid 0 always rejected), chroot (`chrootMo
 
 | 2026-10-25 | 0.1.10 bug/perf bash | 23 issues, 22 fixed, one closed by decision. Limit: no-follow walk, H1 send deadlines, dropped-POST replay. |
 
-Gates re-run after each round: full suite (3,068 tests at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
+| 2026-11-10..11 | 0.2.0 review of v0.1.10..v0.1.12 + the 2026-10-30 sweep (#1193–#1230) | 28 issues fixed, each with a regression test; two read-only reviews found no wrong-content path in the response memo or page cache. Limit: upstream WebSocket handshake validation, no credentials in capsule revalidation, every gzip member decoded, LSAPI packet order, error-log escaping, QUIC self-closing Initials (pre-handshake memory), shared cache bodies off the server-wide H3 budget, listener address checks, CPU steering gated on NIC queues. |
+
+Gates re-run after each round: full suite (3,171 tests at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
 
         i   Reporting
 Use private responsible disclosure per `SECURITY.md`, not a public issue. Findings reconcile against source and regression tests. Nothing here proves production exploitation, or absence of other vulnerabilities.

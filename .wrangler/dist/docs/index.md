@@ -96,7 +96,7 @@ See Performance for method and receipts.
           40 ×   cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms
           146 /146   h2spec, native HTTP/2, TLS, three runs
           0.2 %   httpjet phases, June 2026 production (~138 µs/req); PHP 86.5–98.8% of wall time
-          3,000 +   test functions, 20 crates; suite green at v0.1.10 (3,068 tests)
+          3,100 +   test functions, 20 crates; suite green at v0.2.0 (3,171 tests)
 
 ## Project status
 
@@ -104,7 +104,7 @@ See Performance for method and receipts.
 
 | Version | **0.2.0** · November 11, 2026 · latest public release |
 
-| Release detail | Hot-path allocation/contention cuts: borrowed vhost routing, single-pass fast-serve header scan, HPACK header-name reuse, sharded telemetry counters. Loopback (production x86_64): HTTP/2 1 KiB static 371,540 req/s at c50 (nginx 180,940; OpenLiteSpeed 399,505); heavy-`.htaccess` HTTP/2 271,118 req/s (nginx 131,955); warm cache hits 110,158 req/s over HTTP/2; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
+| Release detail | Security audit fixes (WebSocket handshake, capsule revalidation, multi-member gzip, QUIC handshake cleanup, H3 body budget) and cold-start latency: the `.htaccess` chain is parsed once before the first connection, so the slowest request after boot falls from 508 ms to 3 ms. Lab VM, same run, 0.2.0 vs 0.1.12: HTTP/2 1 KiB static 625.5k vs 591.8k req/s, heavy-`.htaccess` HTTP/2 515.3k vs 402.9k, page-cache hits 544.5k vs 410.5k; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
 
 | Configuration | LiteSpeed XML stays authoritative. Native directives stay opt-in. `check --strict` gates deploys. |
 

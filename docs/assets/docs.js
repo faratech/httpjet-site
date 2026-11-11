@@ -2103,7 +2103,7 @@
       return out.join("");
     }
 
-    var curIdx = BUILDS.length - 1; /* start on latest build v0.1.12 or allow user to step from 0 */
+    var curIdx = BUILDS.length - 1; /* start on latest build v0.2.0 or allow user to step from 0 */
     curIdx = 0; /* start at slide 1 (0.0.1) so the user can step chronologically through the story */
     var curMode = "deck";
     var curLens = 0;

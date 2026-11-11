@@ -56,9 +56,23 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --workers   | — | Number of accept-loop workers (SO_REUSEPORT sockets). Defaults to CPUs |
 
-| --no-core-pinning | off | Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the machine's CPU count; this flag is the kill switch if pinned placement worsens tail latency |
+| --no-core-pinning | off | Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the number of CPUs the process may run on (its affinity mask); this flag is the kill switch if pinned placement worsens tail latency |
 
 | --uring-ring   | coop | Sets io_uring ring mode: `coop`, `legacy`, or `defer`. Measured: see Performance . |
+
+| --no-cpu-steering | off | Kill switch for listener CPU steering. Pinned TCP workers normally ask the kernel (SO_INCOMING_CPU) for the connections whose SYN arrived on their CPU, so RSS/RPS placement and the serving core coincide Steering is also skipped automatically unless every device-backed NIC that is up has at least as many receive queues (or RPS CPUs) as there are workers; the startup log says so. |
+
+| --ready-file   | — | Atomically publish this process's PID after worker activation. The absolute path must be fresh and its parent directory owned by root or this account |
+
+| --h3-engine   | legacy | HTTP/3 request engine. The accelerated engine tries the shared on-core cache path before dispatching misses through the io_uring bridge Values: `legacy`, `accelerated`, `auto`. |
+
+| --h3-gso-segments   | 10 | Maximum HTTP/3 datagrams in one GSO transmit. The experimental value 20 retains the same 20-datagram flush budget; the default remains 10 Values: `10`, `20`. |
+
+| --h3-send-batch   | 1 | Maximum UDP messages per send syscall; 1 retains the scalar path Values: `1`, `4`, `8`, `16`. |
+
+| --h3-ack-eliciting-threshold   | 0 | Ask HTTP/3 peers that support QUIC ACK_FREQUENCY to acknowledge every N ack-eliciting packets instead of every second one. 0 (default) asks nothing |
+
+| --h3-max-ack-delay-us   | 1000 | The max_ack_delay requested along with --h3-ack-eliciting-threshold |
 
 | --no-multishot-accept | off | Disable multishot accept: submit one accept SQE per connection (the pre-multishot behavior) instead of one armed SQE per listener |
 

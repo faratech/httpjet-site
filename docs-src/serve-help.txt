@@ -3,16 +3,30 @@ Serve the configured vhosts
 Usage: httpjet serve [OPTIONS]
 
 Options:
+      --ready-file <READY_FILE>
+          Atomically publish this process's PID after worker activation. The absolute path must be fresh and its parent directory owned by root or this account
       --http-addr <HTTP_ADDR>
           Address for the plain-HTTP listener [default: 127.0.0.1:8080]
       --https-addr <HTTPS_ADDR>
           Address for the TLS listener. Empty to disable [default: 127.0.0.1:4443]
       --workers <WORKERS>
           Number of accept-loop workers (SO_REUSEPORT sockets). Defaults to CPUs
+      --h3-engine <H3_ENGINE>
+          HTTP/3 request engine. The accelerated engine tries the shared on-core cache path before dispatching misses through the io_uring bridge [default: legacy] [possible values: legacy, accelerated, auto]
+      --h3-gso-segments <H3_GSO_SEGMENTS>
+          Maximum HTTP/3 datagrams in one GSO transmit. The experimental value 20 retains the same 20-datagram flush budget; the default remains 10 [default: 10] [possible values: 10, 20]
+      --h3-send-batch <H3_SEND_BATCH>
+          Maximum UDP messages per send syscall; 1 retains the scalar path [default: 1] [possible values: 1, 4, 8, 16]
+      --h3-ack-eliciting-threshold <H3_ACK_ELICITING_THRESHOLD>
+          Ask HTTP/3 peers that support QUIC ACK_FREQUENCY to acknowledge every N ack-eliciting packets instead of every second one. 0 (default) asks nothing [default: 0]
+      --h3-max-ack-delay-us <H3_MAX_ACK_DELAY_US>
+          The max_ack_delay requested along with --h3-ack-eliciting-threshold [default: 1000]
       --no-mtls
           Local testing / explicit rollback only: drop the mandatory Cloudflare client-cert requirement so TLS content can be tested locally without a Cloudflare-issued client cert. Without this flag, clientVerify=2 validates every presented certificate during TLS. A peer that presents none completes the handshake, then the request pipeline rejects it before dispatch (except the loopback exemption)
       --no-core-pinning
-          (#296) Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the machine's CPU count; this flag is the kill switch if pinned placement worsens tail latency
+          (#296) Do not pin the per-core io_uring transport threads to their CPU cores. Pinning is automatic (and only) when the worker count equals the number of CPUs the process may run on (its affinity mask); worker N then owns the mask's Nth CPU. This flag is the kill switch if pinned placement worsens tail latency
+      --no-cpu-steering
+          Kill switch for listener CPU steering. Pinned TCP workers normally ask the kernel (SO_INCOMING_CPU) for the connections whose SYN arrived on their CPU, so RSS/RPS placement and the serving core coincide
       --trusted-proxy-idle-secs <TRUSTED_PROXY_IDLE_SECS>
           (#486) Idle window in seconds for connections whose peer presented a VERIFIED client certificate (in prod, only Cloudflare's authenticated-origin-pull cert). Cloudflare never resumes TLS to the origin, so closing a connection it would have reused costs a full TCP + TLS + mTLS handshake. 0 (default) keeps the normal 90 s floor for everyone; uncertified peers always keep it [default: 0]
       --trusted-proxy-idle-max-conns <TRUSTED_PROXY_IDLE_MAX_CONNS>
@@ -20,11 +34,13 @@ Options:
       --tls-session-tickets <TLS_SESSION_TICKETS>
           TLS 1.3 session tickets issued per full handshake (rustls default 2). 0 stops minting them and shrinks the session cache to TLS 1.2 session IDs: Cloudflare's origin pull never resumes (httpjet_tls_handshakes_resumed_total stays 0), so the tickets only cost two records per handshake plus a cached copy of its client-cert chain [default: 2]
       --uring-ring <URING_RING>
-          (#330) io_uring ring setup for the per-core transport runtimes. `legacy` (default) = flagless rings — the A/B measured `coop` (COOP_TASKRUN + SUBMIT_ALL) as noise and `defer` (+SINGLE_ISSUER + DEFER_TASKRUN) as a consistent ~-2% on this virtualized guest; both stay available for other hardware. Ring size always stays default — ring memory is memlock-charged and bigger rings under the prod unit's LimitMEMLOCK bankrupt late runtimes (2026-08-27 crash-loop). Unsupported flags fall back to plain rings per-thread with a warning [default: legacy] [possible values: legacy, coop, defer]
+          (#330) io_uring ring setup for the per-core transport runtimes. `coop` (default) = COOP_TASKRUN + SUBMIT_ALL. With the default response memo it measured +28% RPS / -27% CPU per cookieless H2 cache hit on x86 (2026-11-07); alone it was neutral on aarch64. `legacy` = flagless rings; `defer` (+SINGLE_ISSUER + DEFER_TASKRUN) measured ~-2% on the GCE guest. Ring size always stays default — ring memory is memlock-charged and bigger rings under the prod unit's LimitMEMLOCK bankrupt late runtimes (2026-08-27 crash-loop). Unsupported flags fall back to plain rings per-thread with a warning [default: coop] [possible values: legacy, coop, defer]
       --no-multishot-accept
           (#334) Disable multishot accept: submit one accept SQE per connection (the pre-multishot behavior) instead of one armed SQE per listener
       --no-fast-memo
           (#349) Disable the finished-response memo on the on-core static fast path (default ON; per-thread, 1 s TTL, byte-identity-gated — see `pipeline::fast_memo`). Env `HJ_FAST_MEMO=0` is equivalent
+      --fast-early-bridge <FAST_EARLY_BRIDGE>
+          Bridge a cookieless request to the full pipeline before the on-core prefix when nothing on-core can serve it: the page cache cannot answer the path and the static branch would decline. `off` (default) is today's path; `shadow` only counts what `on` would do (`httpjet_fast_early_predicted_total`, `httpjet_fast_early_forfeit_total`). Env `HJ_FAST_EARLY_BRIDGE` is equivalent [default: off]
       --per-ip-rate <PER_IP_RATE>
           (Tier 1.1) Per-client-IP request throttle: max requests per client IP per second. 0 (default) = disabled — overrides the `<perIpRate>` tuning field when set. Protects the origin from single-source floods; a shared NAT egress aggregates many visitors, so size accordingly
       --http-uds <HTTP_UDS>
@@ -41,6 +57,8 @@ Options:
           Shared lsphp generation epoch used to invalidate pooled external connections after a supervisor reload or restart. When supplied with --lsphp-external, startup fails if the 16-byte mapping cannot be opened
       --page-cache
           Enable the LSCache-equivalent origin full-page cache (OFF by default; opt-in / R&D). Per-vhost `<cache><enableCache>` + `.htaccess CacheLookup` still gate each request, and the app must opt responses in via `X-LiteSpeed-Cache-Control`. With this flag absent the cache is inert
+      --no-page-cache-response-memo
+          Disable the default-on per-worker memo of finalized public page-cache hits (cookieless GET only; entries keep exact freshness/Age/purge fences and the fast-memo budget)
       --page-cache-mem <MEM>
           RAM budget (bytes) for the in-process index: entry metadata + precompressed variants + any in-RAM body. With --page-cache-store-path, persisted (tmpfs) bodies do NOT count here — they are bounded by --page-cache-disk-mem instead — so this should be sized for metadata, not body bytes. Without a file tier it is the whole body budget, as before. Default 128 MiB [default: 134217728]
       --page-cache-disk-mem <DISK_MEM>
@@ -65,6 +83,8 @@ Options:
           Comma-separated request-path prefixes under which an opted-in 303 may be stored (e.g. `/whats-new/`). A 303 anywhere else is never stored [default: ""]
       --page-cache-stream-fill-vhosts <STREAM_FILL_VHOSTS>
           Comma-separated vhost names whose cacheable page-cache misses WITHOUT a Content-Length (progressive template output, e.g. moontimenow) are sent to the client as the backend writes them and stored once the backend finishes, instead of being buffered whole first. Only identity-encoded public 200s; a body that errors, is cut short or grows past the object cap is served but never stored. Empty = off [default: ""]
+      --page-cache-egress-at-rest-vhosts <EGRESS_AT_REST_VHOSTS>
+          Comma-separated vhost names whose stored misses keep a dictionary-less zstd body (plain zstd) instead of being re-encoded against the vhost dictionary in the background. A miss answered with zstd (Cloudflare) stores the encode made for its own response, one encode instead of two; any other miss stores the identity and encodes it plain in the background. A zstd hit is served the stored bytes until the entry is hot enough for its L9 variant. The stored copy is larger than a dictionary-compressed one. Buffered misses only (not --page-cache-stream-fill-vhosts); with --xf-capsule dedicated storage, capsule renders keep the dictionary path. Empty = off [default: ""]
       --page-cache-admit-threshold <ADMIT_THRESHOLD>
           (W-TinyLFU) Base admission bar: minimum frequency a cacheable response must show before it is STORED. 2 = store on the 2nd sighting (miss-miss-hit; rejects the long-tail of one-hit-wonders — the default). 1 = store on the 1st sighting (miss-hit; cache everything — now cheap with --page-cache-dict, with the store's byte LRU protecting the hot set). Size-weighting adds +1 per 256 KiB on top. Watch httpjet_cache_hit_ratio_real to tune [default: 2]
       --page-cache-vary-cookies <VARY_COOKIES>

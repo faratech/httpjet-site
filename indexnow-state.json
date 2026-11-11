@@ -1,13 +1,13 @@
 {
  "https://httpjet.net/": {
-  "hash": "1507fb3e0f780a3dc605a8f5cac6abba81e221f83946d41853793fc7481b7435",
-  "lastmod": "2026-11-08",
-  "submitted": "1507fb3e0f780a3dc605a8f5cac6abba81e221f83946d41853793fc7481b7435"
+  "hash": "2d77feaa8d232d7da711fd6a5c741a409c977e79b36b2a848873e2ae08958ffa",
+  "lastmod": "2026-11-11",
+  "submitted": "2d77feaa8d232d7da711fd6a5c741a409c977e79b36b2a848873e2ae08958ffa"
  },
  "https://httpjet.net/docs/": {
-  "hash": "f4f279abc7c922a9f6cef655016f5c7dceed4a9469db2d367fcbd075ab296aee",
+  "hash": "d3ffdf090e6c3bc46e2af4f8cd6566ea82b246678dd804c124b97b93226f379a",
   "lastmod": "2026-11-11",
-  "submitted": "f4f279abc7c922a9f6cef655016f5c7dceed4a9469db2d367fcbd075ab296aee"
+  "submitted": "d3ffdf090e6c3bc46e2af4f8cd6566ea82b246678dd804c124b97b93226f379a"
  },
  "https://httpjet.net/docs/admin-api": {
   "hash": "cec94430ab2aad40d357313975b1972602ca2a465e386f12d0655ec22a428d73",
@@ -15,9 +15,9 @@
   "submitted": "cec94430ab2aad40d357313975b1972602ca2a465e386f12d0655ec22a428d73"
  },
  "https://httpjet.net/docs/architecture": {
-  "hash": "bb0d09ffcefa8a1139769812296ea775623e5171488a9b306931f2271e266292",
+  "hash": "211a816366a64e28f89f30e429e9b0971e480644cd17264826a2adc2f92360e0",
   "lastmod": "2026-11-11",
-  "submitted": "bb0d09ffcefa8a1139769812296ea775623e5171488a9b306931f2271e266292"
+  "submitted": "211a816366a64e28f89f30e429e9b0971e480644cd17264826a2adc2f92360e0"
  },
  "https://httpjet.net/docs/capabilities": {
   "hash": "275d3bb0780dbcd93d5d1067978022938eca00029bed78ccee79be05744c392c",
@@ -30,9 +30,9 @@
   "submitted": "fa5edc51e873f79ddf0c66b2726d64daecdc62ddd0909a02f05431daa80dc993"
  },
  "https://httpjet.net/docs/cli": {
-  "hash": "1bf0e9113970d06b38f9044a31b9e4f79fea68990878784b5273f7cdb7a73a03",
+  "hash": "a8078a5617f4dc8301761a9aee07a69a227dafc5217ad2647085e4ee2ebcc589",
   "lastmod": "2026-11-11",
-  "submitted": "1bf0e9113970d06b38f9044a31b9e4f79fea68990878784b5273f7cdb7a73a03"
+  "submitted": "a8078a5617f4dc8301761a9aee07a69a227dafc5217ad2647085e4ee2ebcc589"
  },
  "https://httpjet.net/docs/compression": {
   "hash": "36762cf6d58a8d277ac74920cf2c7bdf2d5c73665bab3409d126c4c13b90d69b",
@@ -70,9 +70,9 @@
   "submitted": "3de820e773c677229d48ffe41b4a911bfa34ec6005f4083f7018eeb93327281c"
  },
  "https://httpjet.net/docs/observability": {
-  "hash": "8d88e2222c45f849c5f34b1734b5d1256e7c6c2a024e269149886fa14f67aff9",
-  "lastmod": "2026-11-08",
-  "submitted": "8d88e2222c45f849c5f34b1734b5d1256e7c6c2a024e269149886fa14f67aff9"
+  "hash": "b68b31c5848bada6793d3624aac92360624707d405562642d50dd3861edbd717",
+  "lastmod": "2026-11-11",
+  "submitted": "b68b31c5848bada6793d3624aac92360624707d405562642d50dd3861edbd717"
  },
  "https://httpjet.net/docs/operations": {
   "hash": "26f5ec3697f38c4bf3525100d06cc7ee50e3e13300834fc1c5dd3cd95842e952",
@@ -105,8 +105,8 @@
   "submitted": "21e6c5d0f95defc6bcdf1503136b9c046cb1b7c86cd15588629ca30a970ad5c9"
  },
  "https://httpjet.net/docs/security": {
-  "hash": "700e2522815fd6496de1ab65be9b6eb15854b044e88439fc80f587a9b99d7cdf",
-  "lastmod": "2026-11-08",
-  "submitted": "700e2522815fd6496de1ab65be9b6eb15854b044e88439fc80f587a9b99d7cdf"
+  "hash": "2c1fb46a49e2b6ae508de27b90d90b4b49fd5582f811124fdb36225c4ad6b94f",
+  "lastmod": "2026-11-11",
+  "submitted": "2c1fb46a49e2b6ae508de27b90d90b4b49fd5582f811124fdb36225c4ad6b94f"
  }
 }

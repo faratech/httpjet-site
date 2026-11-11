@@ -114,7 +114,8 @@ asn 13335 203.0.113.0/24</code></pre></div>
           <tr><td>2026-10-13</td><td>0.0.6 (#594–#611)</td><td>Truncated LSAPI/FastCGI aborts, HPACK over-cap stream error. Limit: plus H3 backpressure, OCSP SAN checks.</td></tr>
           <tr><td>2026-10-14..24</td><td>0.0.7–0.1.5, bug-bash 1–16, #1138</td><td>OLS parity, APR1/MD5-crypt + auth rate limit, SHA-256 vary hashing. Limit: plus WAF peer-UID, rustls 0.23.46.</td></tr>
           <tr><td>2026-10-25</td><td>0.1.10 bug/perf bash</td><td>23 issues, 22 fixed, one closed by decision. Limit: no-follow walk, H1 send deadlines, dropped-POST replay.</td></tr>
+          <tr><td>2026-11-10..11</td><td>0.2.0 review of v0.1.10..v0.1.12 + the 2026-10-30 sweep (#1193&ndash;#1230)</td><td>28 issues fixed, each with a regression test; two read-only reviews found no wrong-content path in the response memo or page cache. Limit: upstream WebSocket handshake validation, no credentials in capsule revalidation, every gzip member decoded, LSAPI packet order, error-log escaping, QUIC self-closing Initials (pre-handshake memory), shared cache bodies off the server-wide H3 budget, listener address checks, CPU steering gated on NIC queues.</td></tr>
         </tbody></table></div>
-      <p>Gates re-run after each round: full suite (3,068 tests at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.</p>
+      <p>Gates re-run after each round: full suite (3,171 tests at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.</p>
       <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Reporting</span><p>Use private responsible disclosure per <code>SECURITY.md</code>, not a public issue. Findings reconcile against source and regression tests. Nothing here proves production exploitation, or absence of other vulnerabilities.</p></div></div>
     </section>
