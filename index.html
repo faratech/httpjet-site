@@ -8,7 +8,7 @@
 <meta name="description" content="httpjet is a blazing-fast Linux web server engineered in Rust on io_uring: a drop-in LiteSpeed (LSWS) replacement with native HTTP/1.1, HTTP/2, HTTP/3, LSAPI PHP, Apache .htaccess mod_rewrite, and an LSCache origin page cache.">
 <meta name="theme-color" content="#05060a">
 <meta property="og:title" content="httpjet — High-Performance Rust Web Server &amp; Drop-In LiteSpeed Replacement">
-<meta property="og:description" content="Drop-in LiteSpeed replacement in Rust on io_uring: HTTP/1.1 · HTTP/2 · HTTP/3, native LSAPI PHP, .htaccess rewrite engine, and LSCache origin page cache (1,183K h2 static req/s).">
+<meta property="og:description" content="Drop-in LiteSpeed replacement in Rust on io_uring: HTTP/1.1 · HTTP/2 · HTTP/3, native LSAPI PHP, .htaccess rewrite engine, and LSCache origin page cache (1,258K h2 static req/s).">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="en_US">
 <meta property="og:url" content="https://httpjet.net/">
@@ -94,10 +94,10 @@
   <p class="sub">A modern web server, reimagined from the socket up — engineered in&nbsp;Rust for the requests that never sleep.</p>
 
   <div class="chips">
-    <a class="chip" href="/docs/performance#release-0-1-12" title="HTTP/2 empty-body static, c=50 x100 streams, dedicated load-generator VM (c4-highcpu-8, same zone) against the full host — httpjet 0.1.12, median of 3 rounds, 2026-11-08. On 1 KiB files: httpjet 1,097K, OpenLiteSpeed 892K (empty) / 740K (1 KiB), nginx 388K / 319K req/s">⚡ <b><i data-count="1183000" data-suffix="">1183K</i></b> h2 static req/s</a>
-    <a class="chip" href="/docs/performance#release-0-1-12" title="Warm origin page-cache hits over HTTP/2 (c=32 x32) on /help/cookies/ — httpjet 0.1.12, same paired run, 2026-11-08">🚀 <b><i data-count="101000" data-suffix="">101K</i></b> cache hits req/s</a>
-    <a class="chip" href="/docs/performance#release-0-1-12" title="robots.txt through the full 806-line forum .htaccess chain over HTTP/2 (c=32 x10) — httpjet 0.1.12, same paired run, 2026-11-08">⚙ <b><i data-count="414000" data-suffix="">414K</i></b> heavy .htaccess h2 req/s</a>
-    <a class="chip" href="/docs/performance#release-0-2-0" title="Latest release, 2026-11-11: security audit fixes and cold-start latency (slowest request after boot 508 ms to 3 ms). The three throughput chips above are dedicated-client measurements of 0.1.12.">✦ <b>v0.2.0</b> latest</a>
+    <a class="chip" href="/docs/performance#release-0-2-0" title="HTTP/2 empty-body static, c=50 x100 streams, dedicated load-generator VM (c4-highcpu-8, same zone) against the full host over the private network — httpjet 0.2.0, median of 3 rounds, 2026-11-11. On 1 KiB files: httpjet 1,241K, OpenLiteSpeed 780K (empty 978K), nginx 409K (empty 484K) req/s">⚡ <b><i data-count="1258000" data-suffix="">1258K</i></b> h2 static req/s</a>
+    <a class="chip" href="/docs/performance#release-0-2-0" title="Warm origin page-cache hits over HTTP/2 (c=32 x32) on /help/cookies/, loopback on the production x86_64 host — httpjet 0.2.0, 2026-11-11">🚀 <b><i data-count="124000" data-suffix="">124K</i></b> cache hits req/s</a>
+    <a class="chip" href="/docs/performance#release-0-2-0" title="robots.txt through the full 806-line forum .htaccess chain over HTTP/2 (c=100 x10), loopback on the production x86_64 host — httpjet 0.2.0, 2026-11-11">⚙ <b><i data-count="310000" data-suffix="">310K</i></b> heavy .htaccess h2 req/s</a>
+    <a class="chip" href="/docs/performance#release-0-2-0" title="Latest release, 2026-11-11: security audit fixes and cold-start latency (slowest request after boot 508 ms to 3 ms). The throughput chips are 0.2.0 measurements: dedicated client for the first, production-host loopback for the other two.">✦ <b>v0.2.0</b> latest</a>
     <a class="chip" href="/docs/protocols" title="HTTP/1.1, HTTP/2 and HTTP/3 on io_uring">△ <b>HTTP/3</b> ready</a>
     <a class="chip" href="/docs/quickstart#install">↓ <b>Install</b></a>
     <a class="chip" href="/docs/">📄 <b>Docs</b></a>

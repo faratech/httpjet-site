@@ -958,7 +958,7 @@ window.DOCS_INDEX = [
    {
     "id": "release-0-2-0",
     "t": "Release 0.2.0: security audit fixes and cold-start latency",
-    "kw": "htaccess httpjet check --strict scripts cold_start_latency_test.sh httpjet_h2_conn_ends_total reason httpjet_pagecache_ghost_hits_total httpjet_htaccess_parses_total help x-litespeed-cache: hit"
+    "kw": "htaccess httpjet check --strict scripts cold_start_latency_test.sh httpjet_h2_conn_ends_total reason httpjet_pagecache_ghost_hits_total httpjet_htaccess_parses_total wrk help x-litespeed-cache: hit"
    },
    {
     "id": "release-0-1-12",

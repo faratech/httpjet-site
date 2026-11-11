@@ -91,7 +91,7 @@ Start, operate, learn internals, check reference.
 
 See Performance for method and receipts.
 
-          1,183 k rps   h2 empty, c=50, dedicated client VM, median of 3, 0.1.12 (2026-11-08): OLS 892k, nginx 388k; 1 KiB 1,097k vs 740k/319k
+          1,258 k rps   h2 empty, c=50, dedicated client VM, median of 3, 0.2.0 (2026-11-11): OLS 978k, nginx 484k; 1 KiB 1,241k vs 780k/409k
           44.8 k rps   PHP/LSAPI h1, PGO loopback (2026-06): LiteSpeed ~38.5k
           40 ×   cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms
           146 /146   h2spec, native HTTP/2, TLS, three runs

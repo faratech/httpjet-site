@@ -11,7 +11,7 @@
 
 httpjet is fast — and these docs are strict about *where* the time goes. Every figure names its regime, because a **loopback benchmark** (synthetic, on-box, PGO build) is not the same thing as **production telemetry** (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.
 
-        1,183 k rps   h2 static empty, c=50, dedicated load-generator VM, median of 3 (0.1.12, 2026-11-08)
+        1,258 k rps   h2 static empty, c=50, dedicated load-generator VM, median of 3 (0.2.0, 2026-11-11)
         44.8 k rps   PHP/LSAPI over HTTP/1.1, PGO loopback
         40 ×   cache hit vs the same page through PHP
         0.2 %   httpjet's request phases, June 2026 production telemetry
@@ -159,6 +159,12 @@ Same-host loopback on the production x86_64 host (PGO, 8 cores, live traffic sha
 | Warm page-cache hit, HTTP/2 (c32/m32) | **123,591 req/s** | — | — |
 
 | Warm page-cache hit, HTTP/1.1 (c100) | **90,566 req/s** | — | — |
+
+Dedicated load-generator VM (c4-highcpu-8, same zone) against the production host over the private network, 2026-11-11, production traffic live, median of 3 passes with the server order rotated. The VPC firewall admits only specific ports, so the three servers ran one at a time on one allowed port:
+
+> [Benchmark Chart: dedicated-0200 — Dedicated load-generator client, three-way (httpjet 0.2.0) (c4-highcpu-8 client VM, same zone · servers on the production host's private IP, one at a time · h2load c=50 x100, 1M requests/cell · median of 3 rotated passes · 2026-11-11 · req/s)]
+
+`wrk` cross-check (H1, 1 KiB, c=100, 15 s): httpjet **571,500**, nginx 430,111, OpenLiteSpeed 377,631 req/s. The 0.1.12 run of the same procedure (2026-11-08: 1,183k and 1,097k on HTTP/2 empty and 1 KiB) is in the section below; the 0.2.0 cells sit within about +6% and +13% of it, inside this setup's run-to-run spread.
 
 Lab VM, 2026-11-11 (loopback, server on 4 cores, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median). Use it to compare httpjet releases against each other: 0.2.0 vs 0.1.12 measured in the same run, H2 1 KiB **591.8k → 625.5k**, H1 1 KiB **273.3k → 311.2k**, heavy `.htaccess` H2 **402.9k → 515.3k**, PHP/LSAPI **27.8k → 32.3k**, page-cache hit **410.5k → 544.5k**, H2 empty **563.1k → 717.2k**; H2 64 KiB is flat (92.4k → 89.7k). Raw logs and the per-round TSV: release-sweep-2026-11-11/ . In the same lab nginx reached 196k (H2 1 KiB) against httpjet 0.2.0's 656k.
 
