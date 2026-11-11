@@ -30,9 +30,9 @@ Loopback removes network, handshakes, CDN. It isolates server code for compariso
 
 ## Performance across builds — interactive presentation
 
-You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (`0.0.1`, June 2026) through `0.1.12`. CSV receipts stay outside the public export at github.com/faratech/httpjet .
+You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (`0.0.1`, June 2026) through `0.2.0`. CSV receipts stay outside the public export at github.com/faratech/httpjet .
 
-Compare v0.0.1–v0.1.12 in the **Release Speed Curve**. Every release was re-measured on 2026-11-08 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: release-sweep-2026-11-08.tsv ; raw `h2load` logs, server logs and the bench driver: release-sweep-2026-11-08/ . (The earlier 2026-10-26 sweep of v0.0.1–v0.1.10 is archived .) Then step through **16 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
+Compare v0.0.1–v0.2.0 in the **Release Speed Curve**. Every release was re-measured on 2026-11-11 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: release-sweep-2026-11-11.tsv ; raw `h2load` logs, server logs and the bench driver: release-sweep-2026-11-11/ . (Earlier sweeps stay archived: 2026-11-08 and 2026-10-26 .) Then step through **16 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
 
         ⎁   One test, every version
 To keep this page simple, every version-to-version number comes from **one run under one set of conditions**: a dedicated lab VM (c4-highmem-8, the production machine type), loopback only, server pinned to 4 cores, `h2load` on the other 4, each release PGO-built from its tag the same way, same flags, same eight workloads, 3 rounds each, median shown. Before benching, every binary also had to pass the **same functional checks** (start, static file, `.htaccess` page, PHP page, cache hit, empty and 64 KiB files, config lint): lab-checks-2026-11-08.tsv . Numbers from *other* regimes — the dedicated-client server comparison, production telemetry, the dated build-history slides — are always labelled with their own conditions and are never mixed into the curve.
@@ -130,6 +130,43 @@ Memo alone, instructions/request, frozen non-PGO binary, SINGULARITY loopback, 1
 
 Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: `docs/pagecache-response-memo-experiment.md` in the source tree.
 
+## Release 0.2.0: security audit fixes and cold-start latency
+
+`0.2.0` (November 11, 2026) is the result of a security and robustness review of everything added since 0.1.10. It fixes 20+ issues, each with a regression test, and changes one startup behaviour you can measure: the `.htaccess` chain is parsed once, before the first connection, and its rewrite prefilter is built off the request path. Before, every serving thread parsed the same 900-line file after each restart, reload or edit, and requests stalled for the parse (about 0.5 s of CPU).
+
+- **Cold start:** slowest request of a 64-way burst right after boot **508 ms → 3 ms**; `httpjet check --strict` on the production config **1.5 s → 0.07 s**. Gate: `scripts/cold_start_latency_test.sh`.
+
+- **Security and correctness:** upstream WebSocket handshake validation; no credentials in capsule revalidation; every gzip member of a backend response decoded; out-of-order LSAPI packets refused; control characters escaped in the text error log; a QUIC Initial that closes itself no longer leaves a connection behind for 60 s; shared cache bodies no longer drain the server-wide HTTP/3 body budget; listener CPU steering only where the NIC has a receive queue per worker.
+
+- **Observability:** `httpjet_h2_conn_ends_total{reason}`, `httpjet_pagecache_ghost_hits_total`, `httpjet_htaccess_parses_total`.
+
+- **Verification:** 3,171 workspace tests, h2spec 146/146 over TLS, memo parity 192 cells with zero diffs, HPACK and HTTP/1 fuzzers clean for 14 million runs. No flags change; the wire is unchanged.
+
+Same-host loopback on the production x86_64 host (PGO, 8 cores, live traffic shared), 2026-11-11, standard suites. nginx 1.30 and OpenLiteSpeed ran the same docroot on alternate ports:
+
+| Workload (c50 unless noted) | httpjet 0.2.0 | nginx | OpenLiteSpeed |
+
+| HTTP/2 static 1 KiB | **423,164 req/s** | 153,485 req/s | 356,373 req/s |
+
+| HTTP/1.1 static 1 KiB | 172,387 req/s | 110,481 req/s | **176,827 req/s** |
+
+| HTTP/2 static 64 KiB | **60,314 req/s** | 28,667 req/s | — |
+
+| Heavy `.htaccess` vhost, HTTP/2 (c100) | **310,055 req/s** | 155,196 req/s | 263,947 req/s |
+
+| Heavy `.htaccess` vhost, HTTP/1.1 (c100) | 146,047 req/s | 118,156 req/s | **180,919 req/s** |
+
+| Warm page-cache hit, HTTP/2 (c32/m32) | **123,591 req/s** | — | — |
+
+| Warm page-cache hit, HTTP/1.1 (c100) | **90,566 req/s** | — | — |
+
+Lab VM, 2026-11-11 (loopback, server on 4 cores, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median). Use it to compare httpjet releases against each other: 0.2.0 vs 0.1.12 measured in the same run, H2 1 KiB **591.8k → 625.5k**, H1 1 KiB **273.3k → 311.2k**, heavy `.htaccess` H2 **402.9k → 515.3k**, PHP/LSAPI **27.8k → 32.3k**, page-cache hit **410.5k → 544.5k**, H2 empty **563.1k → 717.2k**; H2 64 KiB is flat (92.4k → 89.7k). Raw logs and the per-round TSV: release-sweep-2026-11-11/ . In the same lab nginx reached 196k (H2 1 KiB) against httpjet 0.2.0's 656k.
+
+> [Benchmark Chart: lab-threeway — Lab three-way, same-host loopback (httpjet vs nginx vs OpenLiteSpeed) (dedicated lab VM c4-highmem-8 · server cores 0-3 / loadgen cores 4-7 · h2load c=32 x10 (64 KiB: n=20k) · median of 3 rounds · 2026-11-11 · req/s)]
+
+        ⎁   Honest caveats
+The production-host rows share a machine with live traffic, and the same servers swing ±10–20% between runs there: nginx's H2 1 KiB moved from 180,940 (2026-11-08) to 153,485 (this run) with no change on its side. Read them as the shape of the comparison, not as a precise delta against 0.1.12. The lab table, where both builds ran back to back on an idle VM, is the version-to-version comparison. The 0.1.12 dedicated load-generator table below was not re-run for 0.2.0 and still describes 0.1.12. The cache rows used a non-forum `/help/` page through the real origin cache (metrics endpoint not verified in this run; each page was primed and confirmed as `x-litespeed-cache: hit`). Raw CSVs for this run are on the benchmark page .
+
 ## Release 0.1.12: hot-path allocation and contention reductions
 
 `0.1.12` (November 8, 2026) cuts hot-path allocation/contention: borrowed routing (`Router::resolve_ref`), single-pass header scan, HPACK name reuse, batched IDs, cached dates, sharded counters, diskstore/metablob refinements, lighter logging. No flags change. Wire unchanged. Parity gate: 192 cells, zero diffs.
@@ -156,9 +193,7 @@ Re-run 2026-11-08: `h2load` + `wrk` check, **dedicated load-generator VM** (c4-h
 
 `wrk` cross-check (H1, 1 KiB, c=100, 15 s): httpjet **540,911**, nginx 439,433, OpenLiteSpeed 341,344 req/s. Dedicated cells never compare with same-host rows. Compare August 2026 dedicated data: 891k empty-body.
 
-Same three servers, second regime: the lab VM re-run (loopback, server on 4 cores, loadgen on 4). Use it to compare httpjet releases against each other; the dedicated-client chart above stays the cross-server headline because it matches how LiteSpeed and nginx publish.
-
-> [Benchmark Chart: lab-threeway — Lab three-way, same-host loopback (httpjet vs nginx vs OpenLiteSpeed) (dedicated lab VM c4-highmem-8 · server cores 0-3 / loadgen cores 4-7 · h2load c=32 x10 (64 KiB: n=20k) · median of 3 rounds · 2026-11-08 · req/s)]
+Same three servers, second regime: the 2026-11-08 lab VM re-run; its three-way chart is now the 0.2.0 one in Release 0.2.0 . The dedicated-client chart above stays the cross-server headline because it matches how LiteSpeed and nginx publish.
 
         ⎁   Honest caveats
 This build ran on a shared production host here. This section forms no A/B against `0.1.11`. The rows exercise memoized and fast-serve paths directly. They exercise cache-hit serving and logging too. Treat older dedicated-host comparisons as approximate. Full CSV receipts are published with the release on the benchmark page .
@@ -251,5 +286,7 @@ Filter all 14 benchmarked eras by tag, commit, workload, regime, receipt:
 | `v0.1.11` · Coop Ring + Response Memo Defaults 2026-11-07 · `54df571f` | alt-port ABBA, both orders x86; aarch64 neutral | See Release 0.1.11 : hits **`+27.6%`**, CPU **`−26.7%`**. Receipt: source commit `54df571f`. |
 
 | `v0.1.12` · Hot-Path Allocation & Contention Reductions 2026-11-08 · `85b99e16` | lab re-run dedicated lab VM, server 4 cores / loadgen 4 cores, all 10 releases | See Release 0.1.12 : lab medians vs v0.1.11 — H2 1 KiB **443.2k → 549.7k**, H1 1 KiB **267.2k → 284.3k**, page-cache **396.0k → 485.7k**; dedicated-client three-way H2 **371,540**. Receipts: release-sweep-2026-11-08.tsv + raw logs ; three-way CSVs on the benchmark page |
+
+| `v0.2.0` · Security Audit Fixes & Cold-Start Latency 2026-11-11 · `8fcb4647` | lab re-run dedicated lab VM, server 4 cores / loadgen 4 cores, all 11 releases | See Release 0.2.0 : lab medians vs v0.1.12 in the same run — H2 1 KiB **591.8k → 625.5k**, heavy `.htaccess` H2 **402.9k → 515.3k**, page-cache **410.5k → 544.5k**; slowest request right after boot **508 ms → 3 ms**. Receipts: release-sweep-2026-11-11.tsv + raw logs ; loopback CSVs on the benchmark page |
 
 | `experiment` · H3 GSO Segment Cap SINGULARITY · same-binary A/B | H3 32 KiB, 100k req/arm GSO cap 10 vs 20 | Static `6,052 → 7,816/6,552 rps`, `sendmsg` `−44.6%`, instr ` Receipt: `docs/h3-gso-segment-experiment.md` in the source tree |

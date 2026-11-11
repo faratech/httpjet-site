@@ -1,0 +1,13 @@
+Running 15s test @ https://mcp.windowsforum.com:18443/__hjbench/1k.bin
+  4 threads and 100 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency   273.34us  228.61us  10.40ms   94.10%
+    Req/Sec    90.18k     5.97k  116.51k    68.22%
+  Latency Distribution
+     50%  246.00us
+     75%  323.00us
+     90%  412.00us
+     99%    1.11ms
+  5392127 requests in 15.10s, 6.76GB read
+Requests/sec: 357103.75
+Transfer/sec:    458.73MB

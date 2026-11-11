@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Release sweep 2026-11-11 — raw benchmark logs</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;background:#0b1220;color:#dbe7f3;margin:2rem auto;max-width:64rem;padding:0 1rem;line-height:1.55}a{color:#22d3ee}table{border-collapse:collapse}td,th{border:1px solid #263650;padding:.3rem .6rem;text-align:right}th:first-child,td:first-child{text-align:left}.mini{color:#8fa8c0;font-size:.85em}code{color:#a5f3fc}</style>
+</head><body>
+<h1>Release sweep 2026-11-11 — raw logs and checks</h1>
+<p>Every release from v0.0.1 to v0.2.0, measured under <strong>identical conditions</strong> on a dedicated lab VM
+(Google Cloud <code>c4-highmem-8</code>, Ubuntu 26.10 — the production x86 origin's machine type). No production host was loaded:
+server and load generator both ran inside the VM, over its loopback, server pinned to cores 0-3
+(<code>--workers 4</code>), <code>h2load</code> to cores 4-7. Each release was PGO-built from its tag with one
+unified gather profile (Rust 1.99.1) and served with uniform production flags. Three rounds per build in
+rotated order; tables show medians. Per-round data: <a href="../release-sweep-2026-11-11.tsv">release-sweep-2026-11-11.tsv</a>.</p>
+<p>Workloads: <code>static</code> = 1 KiB file (h2 c=32 m=10 / h1 c=100); <code>empty</code> = 0-byte file (h2);
+<code>big</code> = 64 KiB file (h2, n=20k); <code>heavy</code> = <code>/robots.txt</code> through the real 806-line forum
+<code>.htaccess</code> chain; <code>php</code> = <code>bench.php?n=50</code> over the real <code>lsphp</code> (h1 c=40);
+<code>cache</code> = 37 KB PHP fixture page (<code>cachebench.php</code>) through the real origin page cache (h2 c=32 m=32) —
+the lab has no XenForo database, so the cache workload is a fixture, not a forum page. PHP for v0.0.1-v0.0.3 measures cold-pool ramp: those builds grow their lsphp pool slowly from a cold start (single request: ~3 ms; warm pool measured separately at ~32k req/s on v0.0.1, see extended/php-warm-v0.0.1.log), so compare their PHP line with that in mind.
+TLS used a lab self-signed RSA-2048 certificate; heavy H2 is connection-bound on it (~110k for every build), so read its H1 line for trend.</p>
+<h2>Median results (k req/s)</h2>
+<table><tr><th>Build</th><th>static-h2</th><th>static-h1</th><th>heavy-h2</th><th>heavy-h1</th><th>php-h1</th><th>cache-h2</th><th>empty-h2</th><th>big-h2</th></tr>
+<tr><td>v0.0.1</td><td>405.4</td><td>260.7</td><td>351.2</td><td>234.3</td><td>0.6</td><td>108.9</td><td>453.9</td><td>69.8</td></tr>
+<tr><td>v0.0.2</td><td>434.6</td><td>262.3</td><td>384.0</td><td>223.2</td><td>0.6</td><td>91.5</td><td>447.6</td><td>66.0</td></tr>
+<tr><td>v0.0.3</td><td>419.1</td><td>290.8</td><td>373.6</td><td>230.3</td><td>0.6</td><td>96.2</td><td>489.3</td><td>74.6</td></tr>
+<tr><td>v0.0.9</td><td>443.5</td><td>257.8</td><td>342.5</td><td>226.6</td><td>24.7</td><td>129.7</td><td>470.1</td><td>73.5</td></tr>
+<tr><td>v0.0.10</td><td>443.0</td><td>254.9</td><td>379.4</td><td>231.7</td><td>24.8</td><td>133.5</td><td>457.5</td><td>78.4</td></tr>
+<tr><td>v0.1.2</td><td>414.8</td><td>247.6</td><td>379.5</td><td>211.2</td><td>27.1</td><td>166.4</td><td>441.8</td><td>95.5</td></tr>
+<tr><td>v0.1.5</td><td>444.4</td><td>261.5</td><td>354.4</td><td>231.5</td><td>27.0</td><td>147.3</td><td>455.1</td><td>95.2</td></tr>
+<tr><td>v0.1.10</td><td>490.6</td><td>241.3</td><td>314.6</td><td>231.9</td><td>27.3</td><td>165.1</td><td>538.0</td><td>89.5</td></tr>
+<tr><td>v0.1.11</td><td>470.3</td><td>261.3</td><td>348.2</td><td>244.2</td><td>27.6</td><td>368.7</td><td>555.1</td><td>89.0</td></tr>
+<tr><td>v0.1.12</td><td>591.8</td><td>273.3</td><td>402.9</td><td>231.7</td><td>27.8</td><td>410.5</td><td>563.1</td><td>92.4</td></tr>
+<tr><td>v0.2.0</td><td>625.5</td><td>311.2</td><td>515.3</td><td>281.3</td><td>32.3</td><td>544.5</td><td>717.2</td><td>89.7</td></tr>
+</table>
+<p class="mini">Round spreads overlap between neighbouring builds on most workloads; treat small median gaps as noise.</p>
+<h2>Functional checks (same harness, every version)</h2>
+<p>Each binary was started fresh and given the same requests. Full table:
+<a href="../lab-checks-2026-11-11.tsv">lab-checks-2026-11-11.tsv</a>; per-version logs in <code>checks/</code>.</p>
+<table><tr><th>tag</th><th>binary</th><th>match</th><th>static</th><th>heavy</th><th>php</th><th>cache hit</th><th>empty</th><th>64k</th><th>config check</th></tr>
+<tr><td>v0.0.1</td><td>0.0.1</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.0.2</td><td>0.0.2</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.0.3</td><td>0.0.3</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.0.9</td><td>0.0.9</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.0.10</td><td>0.0.10</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.2</td><td>0.1.2</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.5</td><td>0.1.5</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.10</td><td>0.1.10</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.11</td><td>0.1.11</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.1.12</td><td>0.1.12</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+<tr><td>v0.2.0</td><td>0.2.0</td><td>yes</td><td>200</td><td>200</td><td>200</td><td>yes</td><td>200</td><td>200</td><td>0</td></tr>
+</table>
+<h2>Files</h2>
+<p><code>raw/&lt;tag&gt;/</code> — 240 raw <code>h2load</code> logs (8 workloads x 3 rounds per build) ·
+<code>extended/</code> — three-way (nginx/OpenLiteSpeed) + <code>perf stat</code> raw output ·
+<code>checks/</code> — per-version check logs · <code>bench-logs/</code> — server logs, primes, run order.</p>
+<p id="links">Generating file links…</p>
+<script>
+var tags = ['v0.0.1', 'v0.0.2', 'v0.0.3', 'v0.0.9', 'v0.0.10', 'v0.1.2', 'v0.1.5', 'v0.1.10', 'v0.1.11', 'v0.1.12', 'v0.2.0'];
+var wls = ['static-h2', 'static-h1', 'heavy-h2', 'heavy-h1', 'php-h1', 'cache-h2', 'empty-h2', 'big-h2'];
+var h = "";
+tags.forEach(function (t) {
+  h += "<strong>" + t + "</strong>: ";
+  wls.forEach(function (w) {
+    h += w + " ";
+    for (var r = 1; r <= 3; r++) h += '<a href="raw/' + t + "/" + w + "-r" + r + '.log">r' + r + "</a> ";
+    h += "· ";
+  });
+  h += '<a href="checks/' + t + '.log">check log</a><br>';
+});
+document.getElementById("links").innerHTML = h;
+</script>
+</body></html>

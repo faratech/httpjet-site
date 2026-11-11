@@ -19,7 +19,7 @@ httpjet --root /abs/root check [--strict]     # parse + summary + lint; --strict
 httpjet --root /abs/root serve [flags…]       # bind the configured listeners and serve
 httpjet --root /abs/root lsphp [flags…]       # run a standalone persistent lsphp pool (the PHP half of a zero-downtime deploy)
 httpjet lsphp-reload [flags…]                 # ask a running pool to replace its worker generation without closing the listener
-httpjet --version                             # httpjet 0.1.12
+httpjet --version                             # httpjet 0.2.0
 ```
 
 | Subcommand · flag | Default | Meaning |

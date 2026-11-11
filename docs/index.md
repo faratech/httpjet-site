@@ -7,7 +7,7 @@
 
 ---
 
-httpjet · documentation · v0.1.12
+httpjet · documentation · v0.2.0
 
 # httpjet
 
@@ -102,7 +102,7 @@ See Performance for method and receipts.
 
 | Aspect | State |
 
-| Version | **0.1.12** · November 8, 2026 · latest public release |
+| Version | **0.2.0** · November 11, 2026 · latest public release |
 
 | Release detail | Hot-path allocation/contention cuts: borrowed vhost routing, single-pass fast-serve header scan, HPACK header-name reuse, sharded telemetry counters. Loopback (production x86_64): HTTP/2 1 KiB static 371,540 req/s at c50 (nginx 180,940; OpenLiteSpeed 399,505); heavy-`.htaccess` HTTP/2 271,118 req/s (nginx 131,955); warm cache hits 110,158 req/s over HTTP/2; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
 

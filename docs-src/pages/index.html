@@ -1,5 +1,5 @@
     <section id="top">
-      <p class="eyebrow reveal d1">httpjet · documentation · v0.1.12</p>
+      <p class="eyebrow reveal d1">httpjet · documentation · v0.2.0</p>
       <h1 class="reveal d1" style="font-size:clamp(40px,8vw,76px);line-height:1"><span style="background:var(--brand);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent">httpjet</span></h1>
       <p class="lede reveal d2">A from-scratch <strong>Rust web server</strong> and <strong>drop-in LiteSpeed replacement</strong>: it reads the same <code>conf/httpd_config.xml</code> tree, speaks native LSAPI to <code>lsphp</code>, evaluates the same <code>.htaccess</code> files, and adds native HTTP/2 and HTTP/3, reverse-proxy and FastCGI gateways, and an opt-in LSCache-protocol page cache — all on one io_uring transport.</p>
 
@@ -97,7 +97,7 @@
         <table>
           <thead><tr><th>Aspect</th><th>State</th></tr></thead>
           <tbody>
-            <tr><td>Version</td><td><strong>0.1.12</strong> · November 8, 2026 · <a href="https://github.com/faratech/httpjet/releases/latest">latest public release</a></td></tr>
+            <tr><td>Version</td><td><strong>0.2.0</strong> · November 11, 2026 · <a href="https://github.com/faratech/httpjet/releases/latest">latest public release</a></td></tr>
             <tr><td>Release detail</td><td>Hot-path allocation/contention cuts: borrowed vhost routing, single-pass fast-serve header scan, HPACK header-name reuse, sharded telemetry counters. Loopback (production x86_64): HTTP/2 1 KiB static 371,540 req/s at c50 (nginx 180,940; OpenLiteSpeed 399,505); heavy-<code>.htaccess</code> HTTP/2 271,118 req/s (nginx 131,955); warm cache hits 110,158 req/s over HTTP/2; see <a href="performance.html#release-0-1-12">Performance</a>. Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024.</td></tr>
             <tr><td>Configuration</td><td>LiteSpeed XML stays authoritative. Native directives stay opt-in. <code>check --strict</code> gates deploys.</td></tr>
             <tr><td>Transport</td><td>Pure io_uring (monoio), H1/H2/H3 only. No epoll fallback or Windows/macOS port.</td></tr>

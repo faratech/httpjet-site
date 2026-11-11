@@ -1,0 +1,57 @@
+starting benchmark...
+spawning thread #0: 8 total client(s). 25000 total requests
+spawning thread #1: 8 total client(s). 25000 total requests
+spawning thread #2: 8 total client(s). 25000 total requests
+spawning thread #3: 8 total client(s). 25000 total requests
+TLS Protocol: TLSv1.3
+Cipher: TLS_AES_128_GCM_SHA256
+Server Temp Key: X25519 253 bits
+Certificate: RSA 2048 bits
+Negotiated Group: x25519
+Resumption: no
+Application protocol: h2
+Process Request Failure: 2117
+Process Request Failure: 2117
+progress: 10% done
+Process Request Failure: 2117
+Process Request Failure: 4242
+Process Request Failure: 4242
+Process Request Failure: 6367
+progress: 20% done
+Process Request Failure: 4242
+Process Request Failure: 6367
+Process Request Failure: 2117
+Process Request Failure: 4242
+Process Request Failure: 8492
+Process Request Failure: 10617
+Process Request Failure: 6367
+Process Request Failure: 8492
+Process Request Failure: 10617
+Process Request Failure: 12742
+progress: 30% done
+Process Request Failure: 6367
+Process Request Failure: 8492
+Process Request Failure: 12742
+Process Request Failure: 10617
+Process Request Failure: 14867
+Process Request Failure: 16992
+Process Request Failure: 12742
+Process Request Failure: 14867
+Process Request Failure: 16992
+Process Request Failure: 8492
+Process Request Failure: 14867
+Process Request Failure: 10617
+Process Request Failure: 12742
+Process Request Failure: 16992
+Process Request Failure: 14867
+Process Request Failure: 16992
+
+finished in 164.67ms, 194325.69 req/s, 156.24MB/s
+requests: 100000 total, 32288 started, 32250 done, 32000 succeeded, 68000 failed, 68000 errored, 0 timeout
+status codes: 32000 2xx, 0 3xx, 0 4xx, 0 5xx
+traffic: 25.73MB (26978112) total, 3.27MB (3424000) headers (space savings 39.89%), 21.91MB (22976000) data
+                 min         max         median      p95         p99         mean        sd         +/- sd
+request     :       29us      9.98ms      1.14ms      1.64ms      2.23ms      1.14ms       650us    79.39%
+connect     :     1.83ms     11.82ms      4.37ms     11.04ms     11.82ms      5.15ms      2.99ms    68.75%
+TTFB        :     2.16ms     14.78ms     10.03ms     14.41ms     14.78ms      9.53ms      4.05ms    59.38%
+req/s       :    6091.10    43974.63     7765.40    37264.41    43974.63    11218.04     9176.58    81.25%

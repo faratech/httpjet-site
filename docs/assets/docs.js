@@ -1903,12 +1903,12 @@
           unit: "k rps",
           series: ["v0.1.11", "v0.1.12"],
           rows: [
-            ["Static 1 KiB H2 c=32x10", [443.2, 549.7]],
-            ["Static 1 KiB H1 c=100", [267.2, 284.3]],
-            ["Heavy .htaccess H2 c=32x10", [355.0, 425.8]],
-            ["Heavy .htaccess H1 c=100", [233.5, 253.0]],
-            ["PHP/LSAPI H1 c=40", [27.3, 27.8]],
-            ["Page-cache hit H2 c=32x32", [396.0, 485.7]]
+            ["Static 1 KiB H2 c=32x10", [591.8, 625.5]],
+            ["Static 1 KiB H1 c=100", [273.3, 311.2]],
+            ["Heavy .htaccess H2 c=32x10", [402.9, 515.3]],
+            ["Heavy .htaccess H1 c=100", [231.7, 281.3]],
+            ["PHP/LSAPI H1 c=40", [27.8, 32.3]],
+            ["Page-cache hit H2 c=32x32", [410.5, 544.5]]
           ],
           foot: "Absolute loopback numbers on a lab VM, not a capacity claim. Heavy H2 is connection-bound on the lab self-signed RSA certificate for every build; read H1 for trend. All ten releases, per-round: assets/release-sweep-2026-11-08.tsv; raw h2load logs: assets/release-sweep-2026-11-08/."
         },
@@ -2218,16 +2218,17 @@
           ymax: 300,
           ystep: 100,
           pts: [
-            { idx: 6, tag: "v0.0.1", h2: 362.5, h1: 230.0, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: 387.3, h1: 230.8, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", h2: 292.9, h1: 222.0, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", h2: 386.4, h1: 235.7, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", h2: 365.4, h1: 234.9, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", h2: 349.7, h1: 222.7, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", h2: 334.4, h1: 246.0, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 363.7, h1: 225.5, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", h2: 355.0, h1: 233.5, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", h2: 425.8, h1: 253.0, note: "Hot-path reductions" }
+            { idx: 6, tag: "v0.0.1", h2: 351.2, h1: 234.3, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 384.0, h1: 223.2, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 373.6, h1: 230.3, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", h2: 342.5, h1: 226.6, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", h2: 379.4, h1: 231.7, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", h2: 379.5, h1: 211.2, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", h2: 354.4, h1: 231.5, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 314.6, h1: 231.9, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", h2: 348.2, h1: 244.2, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", h2: 402.9, h1: 231.7, note: "Hot-path reductions" },
+            { idx: 16, tag: "v0.2.0", h2: 515.3, h1: 281.3, note: "Audit fixes + cold-start" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2245,16 +2246,17 @@
           ymax: 600,
           ystep: 200,
           pts: [
-            { idx: 6, tag: "v0.0.1", h2: 402.9, h1: 261.6, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: 369.1, h1: 264.0, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", h2: 461.4, h1: 266.4, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", h2: 381.3, h1: 270.7, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", h2: 418.6, h1: 265.2, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", h2: 370.1, h1: 248.5, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", h2: 446.9, h1: 250.9, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 456.0, h1: 246.4, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", h2: 443.2, h1: 267.2, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", h2: 549.7, h1: 284.3, note: "Hot-path reductions" }
+            { idx: 6, tag: "v0.0.1", h2: 405.4, h1: 260.7, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 434.6, h1: 262.3, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 419.1, h1: 290.8, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", h2: 443.5, h1: 257.8, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", h2: 443.0, h1: 254.9, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", h2: 414.8, h1: 247.6, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", h2: 444.4, h1: 261.5, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 490.6, h1: 241.3, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", h2: 470.3, h1: 261.3, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", h2: 591.8, h1: 273.3, note: "Hot-path reductions" },
+            { idx: 16, tag: "v0.2.0", h2: 625.5, h1: 311.2, note: "Audit fixes + cold-start" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2272,16 +2274,17 @@
           ymax: 150,
           ystep: 50,
           pts: [
-            { idx: 6, tag: "v0.0.1", php: 0.6, cache: 94.6, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", php: 0.6, cache: 107.4, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", php: 0.6, cache: 98.7, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", php: 24.7, cache: 145.9, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", php: 24.6, cache: 124.7, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", php: 27.0, cache: 135.2, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", php: 26.9, cache: 154.6, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", php: 27.3, cache: 173.9, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", php: 27.3, cache: 396.0, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", php: 27.8, cache: 485.7, note: "Hot-path reductions" }
+            { idx: 6, tag: "v0.0.1", php: 0.6, cache: 108.9, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", php: 0.6, cache: 91.5, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", php: 0.6, cache: 96.2, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", php: 24.7, cache: 129.7, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", php: 24.8, cache: 133.5, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", php: 27.1, cache: 166.4, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", php: 27.0, cache: 147.3, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", php: 27.3, cache: 165.1, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", php: 27.6, cache: 368.7, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", php: 27.8, cache: 410.5, note: "Hot-path reductions" },
+            { idx: 16, tag: "v0.2.0", php: 32.3, cache: 544.5, note: "Audit fixes + cold-start" }
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },

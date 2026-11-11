@@ -12,7 +12,7 @@ for h in windowsforum.com mcp.windowsforum.com; do
   first=$(getent ahosts "$h" | awk '{print $1; exit}')
   [ "$first" = "127.0.0.1" ] || { echo "PREFLIGHT FAIL: $h resolves to $first (not loopback)"; exit 1; }
 done
-BUA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
+BUA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36'
 
 bench_one() { # tag round
   local tag=$1 round=$2 bin=$ROOT/bin/httpjet-$tag RD pid i st

@@ -17,7 +17,7 @@ The graph is acyclic and `hj-config` sits at the root. `hj-core` is the small fr
 
            Browse workspace on GitHub ↗
            1 binary + 19 libraries
-           Rust 1.99.1 · edition 2024 · v0.1.12
+           Rust 1.99.1 · edition 2024 · v0.2.0
            Acyclic; hj-config at the root
            ≈3,000 test functions
            Vendored forks: monoio, monoio-rustls (real writev), dashmap, pprof

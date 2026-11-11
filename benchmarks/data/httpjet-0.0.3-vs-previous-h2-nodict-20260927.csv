@@ -1,0 +1,17 @@
+pair,position,kind,label,path,rps,failed,started_utc,finished_utc
+1,1,old,pair1-1-old,/help/cookies/,18764.35,0,2026-09-27T03:34:04Z,2026-09-27T03:34:06Z
+1,1,old,pair1-1-old,/help/smilies/,9668.31,0,2026-09-27T03:34:06Z,2026-09-27T03:34:09Z
+1,2,new,pair1-2-new,/help/cookies/,21017.73,0,2026-09-27T03:34:15Z,2026-09-27T03:34:16Z
+1,2,new,pair1-2-new,/help/smilies/,12560.54,0,2026-09-27T03:34:16Z,2026-09-27T03:34:19Z
+2,1,new,pair2-1-new,/help/smilies/,9833.94,0,2026-09-27T03:34:25Z,2026-09-27T03:34:28Z
+2,1,new,pair2-1-new,/help/cookies/,13816.23,0,2026-09-27T03:34:28Z,2026-09-27T03:34:30Z
+2,2,old,pair2-2-old,/help/smilies/,11973.91,0,2026-09-27T03:34:36Z,2026-09-27T03:34:38Z
+2,2,old,pair2-2-old,/help/cookies/,17463.11,0,2026-09-27T03:34:38Z,2026-09-27T03:34:40Z
+3,1,old,pair3-1-old,/help/cookies/,15698.69,0,2026-09-27T03:34:46Z,2026-09-27T03:34:48Z
+3,1,old,pair3-1-old,/help/smilies/,11897.87,0,2026-09-27T03:34:48Z,2026-09-27T03:34:50Z
+3,2,new,pair3-2-new,/help/cookies/,21462.80,0,2026-09-27T03:34:56Z,2026-09-27T03:34:57Z
+3,2,new,pair3-2-new,/help/smilies/,8640.61,0,2026-09-27T03:34:57Z,2026-09-27T03:35:01Z
+4,1,new,pair4-1-new,/help/smilies/,10913.89,0,2026-09-27T03:35:07Z,2026-09-27T03:35:10Z
+4,1,new,pair4-1-new,/help/cookies/,20443.35,0,2026-09-27T03:35:10Z,2026-09-27T03:35:11Z
+4,2,old,pair4-2-old,/help/smilies/,7570.05,0,2026-09-27T03:35:17Z,2026-09-27T03:35:21Z
+4,2,old,pair4-2-old,/help/cookies/,15933.09,0,2026-09-27T03:35:21Z,2026-09-27T03:35:23Z

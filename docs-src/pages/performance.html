@@ -24,11 +24,11 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (<code>0.0.1</code>, June 2026) through <code>0.1.12</code>. CSV receipts stay outside the public export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>.</p>
-      <p>Compare v0.0.1–v0.1.12 in the <strong>Release Speed Curve</strong>. Every release was re-measured on 2026-11-08 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: <a href="assets/release-sweep-2026-11-08.tsv">release-sweep-2026-11-08.tsv</a>; raw <code>h2load</code> logs, server logs and the bench driver: <a href="assets/release-sweep-2026-11-08/">release-sweep-2026-11-08/</a>. (The earlier 2026-10-26 sweep of v0.0.1–v0.1.10 is <a href="assets/release-sweep-2026-10-26.tsv">archived</a>.) Then step through <strong>16 build slides</strong>, <strong>Workload Trajectories</strong>, <strong>Build-vs-Build Diff</strong>.</p>
+      <p>You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (<code>0.0.1</code>, June 2026) through <code>0.2.0</code>. CSV receipts stay outside the public export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>.</p>
+      <p>Compare v0.0.1–v0.2.0 in the <strong>Release Speed Curve</strong>. Every release was re-measured on 2026-11-11 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: <a href="assets/release-sweep-2026-11-11.tsv">release-sweep-2026-11-11.tsv</a>; raw <code>h2load</code> logs, server logs and the bench driver: <a href="assets/release-sweep-2026-11-11/">release-sweep-2026-11-11/</a>. (Earlier sweeps stay archived: <a href="assets/release-sweep-2026-11-08.tsv">2026-11-08</a> and <a href="assets/release-sweep-2026-10-26.tsv">2026-10-26</a>.) Then step through <strong>16 build slides</strong>, <strong>Workload Trajectories</strong>, <strong>Build-vs-Build Diff</strong>.</p>
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">One test, every version</span><p>To keep this page simple, every version-to-version number comes from <strong>one run under one set of conditions</strong>: a dedicated lab VM (c4-highmem-8, the production machine type), loopback only, server pinned to 4 cores, <code>h2load</code> on the other 4, each release PGO-built from its tag the same way, same flags, same eight workloads, 3 rounds each, median shown. Before benching, every binary also had to pass the <strong>same functional checks</strong> (start, static file, <code>.htaccess</code> page, PHP page, cache hit, empty and 64 KiB files, config lint): <a href="assets/lab-checks-2026-11-08.tsv">lab-checks-2026-11-08.tsv</a>. Numbers from <em>other</em> regimes — the dedicated-client server comparison, production telemetry, the dated build-history slides — are always labelled with their own conditions and are never mixed into the curve.</p></div></div>
 
-      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve: every release from v0.0.1 to v0.1.12, re-measured 2026-11-08 on a dedicated lab VM">
+      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve: every release from v0.0.1 to v0.2.0, re-measured 2026-11-11 on a dedicated lab VM">
         <div class="bexp__curve"></div>
       </div>
 
@@ -116,6 +116,35 @@
     </section>
 
     <section>
+      <h2 id="release-0-2-0">Release 0.2.0: security audit fixes and cold-start latency</h2>
+      <p><code>0.2.0</code> (November 11, 2026) is the result of a security and robustness review of everything added since 0.1.10. It fixes 20+ issues, each with a regression test, and changes one startup behaviour you can measure: the <code>.htaccess</code> chain is parsed once, before the first connection, and its rewrite prefilter is built off the request path. Before, every serving thread parsed the same 900-line file after each restart, reload or edit, and requests stalled for the parse (about 0.5 s of CPU).</p>
+      <ul>
+        <li><strong>Cold start:</strong> slowest request of a 64-way burst right after boot <strong>508 ms &rarr; 3 ms</strong>; <code>httpjet check --strict</code> on the production config <strong>1.5 s &rarr; 0.07 s</strong>. Gate: <code>scripts/cold_start_latency_test.sh</code>.</li>
+        <li><strong>Security and correctness:</strong> upstream WebSocket handshake validation; no credentials in capsule revalidation; every gzip member of a backend response decoded; out-of-order LSAPI packets refused; control characters escaped in the text error log; a QUIC Initial that closes itself no longer leaves a connection behind for 60 s; shared cache bodies no longer drain the server-wide HTTP/3 body budget; listener CPU steering only where the NIC has a receive queue per worker.</li>
+        <li><strong>Observability:</strong> <code>httpjet_h2_conn_ends_total{reason}</code>, <code>httpjet_pagecache_ghost_hits_total</code>, <code>httpjet_htaccess_parses_total</code>.</li>
+        <li><strong>Verification:</strong> 3,171 workspace tests, h2spec 146/146 over TLS, memo parity 192 cells with zero diffs, HPACK and HTTP/1 fuzzers clean for 14 million runs. No flags change; the wire is unchanged.</li>
+      </ul>
+      <p>Same-host loopback on the production x86_64 host (PGO, 8 cores, live traffic shared), 2026-11-11, standard suites. nginx 1.30 and OpenLiteSpeed ran the same docroot on alternate ports:</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Workload (c50 unless noted)</th><th>httpjet 0.2.0</th><th>nginx</th><th>OpenLiteSpeed</th></tr></thead>
+          <tbody>
+            <tr><td>HTTP/2 static 1 KiB</td><td><strong>423,164 req/s</strong></td><td>153,485 req/s</td><td>356,373 req/s</td></tr>
+            <tr><td>HTTP/1.1 static 1 KiB</td><td>172,387 req/s</td><td>110,481 req/s</td><td><strong>176,827 req/s</strong></td></tr>
+            <tr><td>HTTP/2 static 64 KiB</td><td><strong>60,314 req/s</strong></td><td>28,667 req/s</td><td>&mdash;</td></tr>
+            <tr><td>Heavy <code>.htaccess</code> vhost, HTTP/2 (c100)</td><td><strong>310,055 req/s</strong></td><td>155,196 req/s</td><td>263,947 req/s</td></tr>
+            <tr><td>Heavy <code>.htaccess</code> vhost, HTTP/1.1 (c100)</td><td>146,047 req/s</td><td>118,156 req/s</td><td><strong>180,919 req/s</strong></td></tr>
+            <tr><td>Warm page-cache hit, HTTP/2 (c32/m32)</td><td><strong>123,591 req/s</strong></td><td>&mdash;</td><td>&mdash;</td></tr>
+            <tr><td>Warm page-cache hit, HTTP/1.1 (c100)</td><td><strong>90,566 req/s</strong></td><td>&mdash;</td><td>&mdash;</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Lab VM, 2026-11-11 (loopback, server on 4 cores, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median). Use it to compare httpjet releases against each other: 0.2.0 vs 0.1.12 measured in the same run, H2 1 KiB <strong>591.8k &rarr; 625.5k</strong>, H1 1 KiB <strong>273.3k &rarr; 311.2k</strong>, heavy <code>.htaccess</code> H2 <strong>402.9k &rarr; 515.3k</strong>, PHP/LSAPI <strong>27.8k &rarr; 32.3k</strong>, page-cache hit <strong>410.5k &rarr; 544.5k</strong>, H2 empty <strong>563.1k &rarr; 717.2k</strong>; H2 64 KiB is flat (92.4k &rarr; 89.7k). Raw logs and the per-round TSV: <a href="assets/release-sweep-2026-11-11/">release-sweep-2026-11-11/</a>. In the same lab nginx reached 196k (H2 1 KiB) against httpjet 0.2.0's 656k.</p>
+      <!--chart:lab-threeway-->
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Honest caveats</span><p>The production-host rows share a machine with live traffic, and the same servers swing &plusmn;10&ndash;20% between runs there: nginx's H2 1 KiB moved from 180,940 (2026-11-08) to 153,485 (this run) with no change on its side. Read them as the shape of the comparison, not as a precise delta against 0.1.12. The lab table, where both builds ran back to back on an idle VM, is the version-to-version comparison. The 0.1.12 dedicated load-generator table below was not re-run for 0.2.0 and still describes 0.1.12. The cache rows used a non-forum <code>/help/</code> page through the real origin cache (metrics endpoint not verified in this run; each page was primed and confirmed as <code>x-litespeed-cache: hit</code>). Raw CSVs for this run are on the <a href="/benchmarks/">benchmark page</a>.</p></div></div>
+    </section>
+
+    <section>
       <h2 id="release-0-1-12">Release 0.1.12: hot-path allocation and contention reductions</h2>
       <p><code>0.1.12</code> (November 8, 2026) cuts hot-path allocation/contention: borrowed routing (<code>Router::resolve_ref</code>), single-pass header scan, HPACK name reuse, batched IDs, cached dates, sharded counters, diskstore/metablob refinements, lighter logging. No flags change. Wire unchanged. Parity gate: 192 cells, zero diffs.</p>
       <p>Loopback, production x86_64 host, PGO, 8 cores, live traffic shared, 2026-11-08, standard suites:</p>
@@ -135,8 +164,7 @@
       <p>Re-run 2026-11-08: <code>h2load</code> + <code>wrk</code> check, <strong>dedicated load-generator VM</strong> (c4-highcpu-8, same zone), full unpinned host over VPC, production PGO, median of 3:</p>
       <!--chart:dedicated-0112-->
       <p><code>wrk</code> cross-check (H1, 1 KiB, c=100, 15 s): httpjet <strong>540,911</strong>, nginx 439,433, OpenLiteSpeed 341,344 req/s. Dedicated cells never compare with same-host rows. Compare August 2026 dedicated data: 891k empty-body.</p>
-      <p>Same three servers, second regime: the <a href="assets/release-sweep-2026-11-08/">lab VM</a> re-run (loopback, server on 4 cores, loadgen on 4). Use it to compare httpjet releases against each other; the dedicated-client chart above stays the cross-server headline because it matches how LiteSpeed and nginx publish.</p>
-      <!--chart:lab-threeway-->
+      <p>Same three servers, second regime: the <a href="assets/release-sweep-2026-11-08/">2026-11-08 lab VM</a> re-run; its three-way chart is now the 0.2.0 one in <a href="#release-0-2-0">Release 0.2.0</a>. The dedicated-client chart above stays the cross-server headline because it matches how LiteSpeed and nginx publish.</p>
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Honest caveats</span><p>This build ran on a shared production host here. This section forms no A/B against <code>0.1.11</code>. The rows exercise memoized and fast-serve paths directly. They exercise cache-hit serving and logging too. Treat older dedicated-host comparisons as approximate. Full CSV receipts are published with the release on the <a href="/benchmarks/">benchmark page</a>.</p></div></div>
     </section>
 
@@ -294,6 +322,11 @@
               <th><code>v0.1.12</code> &middot; Hot-Path Allocation &amp; Contention Reductions<span class="mini">2026-11-08 &middot; <code>85b99e16</code></span></th>
               <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 cores / loadgen 4 cores, all 10 releases</span></td>
               <td class="wrap">See <a href="#release-0-1-12">Release 0.1.12</a>: lab medians vs v0.1.11 — H2 1 KiB <strong>443.2k &rarr; 549.7k</strong>, H1 1 KiB <strong>267.2k &rarr; 284.3k</strong>, page-cache <strong>396.0k &rarr; 485.7k</strong>; dedicated-client three-way H2 <strong>371,540</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-08.tsv">release-sweep-2026-11-08.tsv</a> + <a href="assets/release-sweep-2026-11-08/">raw logs</a>; three-way CSVs on the <a href="/benchmarks/">benchmark page</a></span></td>
+            </tr>
+            <tr data-group="zerofault">
+              <th><code>v0.2.0</code> &middot; Security Audit Fixes &amp; Cold-Start Latency<span class="mini">2026-11-11 &middot; <code>8fcb4647</code></span></th>
+              <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 cores / loadgen 4 cores, all 11 releases</span></td>
+              <td class="wrap">See <a href="#release-0-2-0">Release 0.2.0</a>: lab medians vs v0.1.12 in the same run &mdash; H2 1 KiB <strong>591.8k &rarr; 625.5k</strong>, heavy <code>.htaccess</code> H2 <strong>402.9k &rarr; 515.3k</strong>, page-cache <strong>410.5k &rarr; 544.5k</strong>; slowest request right after boot <strong>508 ms &rarr; 3 ms</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-11.tsv">release-sweep-2026-11-11.tsv</a> + <a href="assets/release-sweep-2026-11-11/">raw logs</a>; loopback CSVs on the <a href="/benchmarks/">benchmark page</a></span></td>
             </tr>
             <tr data-group="zerofault">
               <th><code>experiment</code> &middot; H3 GSO Segment Cap<span class="mini">SINGULARITY &middot; same-binary A/B</span></th>

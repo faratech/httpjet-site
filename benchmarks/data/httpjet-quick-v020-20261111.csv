@@ -1,0 +1,8 @@
+target,protocol,vhost,path,size,concurrency,keepalive,rps,p50,p90,p99,max,failed
+httpjet,h1,mcp.windowsforum.com,/__hjbench/1k.bin,1k,50,1,172387.04,0.191ms,0.319ms,0.607ms,7.515ms,0
+httpjet,h2,mcp.windowsforum.com,/__hjbench/1k.bin,1k,50,1,423164.00,0.417ms,0.926ms,1.636ms,8.252ms,0
+httpjet,h3,mcp.windowsforum.com,/__hjbench/1k.bin,1k,50,1,26397.28,8.360ms,10.855ms,54.152ms,62.893ms,0
+httpjet,h1,mcp.windowsforum.com,/__hjbench/1k.bin,1k,50,0,1302.35,38,43,53,60,0
+httpjet,h1,mcp.windowsforum.com,/__hjbench/64k.bin,64k,50,1,61008.72,0.559ms,0.983ms,2.841ms,10.447ms,0
+httpjet,h2,mcp.windowsforum.com,/__hjbench/64k.bin,64k,50,1,60314.36,5.121ms,8.570ms,14.256ms,23.458ms,0
+httpjet,h3,mcp.windowsforum.com,/__hjbench/64k.bin,64k,50,1,7130.23,32.305ms,45.127ms,99.613ms,114.524ms,0
