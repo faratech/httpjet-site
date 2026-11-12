@@ -24,18 +24,18 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (<code>0.0.1</code>, June 2026) through <code>0.2.0</code>. CSV receipts stay outside the public export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>.</p>
-      <p>Compare v0.0.1–v0.2.0 in the <strong>Release Speed Curve</strong>. Every release was re-measured on 2026-11-11 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: <a href="assets/release-sweep-2026-11-11.tsv">release-sweep-2026-11-11.tsv</a>; raw <code>h2load</code> logs, server logs and the bench driver: <a href="assets/release-sweep-2026-11-11/">release-sweep-2026-11-11/</a>. (Earlier sweeps stay archived: <a href="assets/release-sweep-2026-11-08.tsv">2026-11-08</a> and <a href="assets/release-sweep-2026-10-26.tsv">2026-10-26</a>.) Then step through <strong>17 build slides</strong>, <strong>Workload Trajectories</strong>, <strong>Build-vs-Build Diff</strong>.</p>
+      <p>You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (<code>0.0.1</code>, June 2026) through <code>0.2.2</code>. CSV receipts stay outside the public export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>.</p>
+      <p>Compare v0.0.1–v0.2.2 in the <strong>Release Speed Curve</strong>. Every release was re-measured on 2026-11-12 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: <a href="assets/release-sweep-2026-11-12.tsv">release-sweep-2026-11-12.tsv</a>; raw <code>h2load</code> logs, server logs and the bench driver: <a href="assets/release-sweep-2026-11-12/">release-sweep-2026-11-12/</a>. (Earlier sweeps stay archived: <a href="assets/release-sweep-2026-11-08.tsv">2026-11-11</a> and <a href="assets/release-sweep-2026-10-26.tsv">2026-10-26</a>.) Then step through <strong>19 build slides</strong>, <strong>Workload Trajectories</strong>, <strong>Build-vs-Build Diff</strong>.</p>
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">One test, every version</span><p>To keep this page simple, every version-to-version number comes from <strong>one run under one set of conditions</strong>: a dedicated lab VM (c4-highmem-8, the production machine type), loopback only, server pinned to 4 cores, <code>h2load</code> on the other 4, each release PGO-built from its tag the same way, same flags, same eight workloads, 3 rounds each, median shown. Before benching, every binary also had to pass the <strong>same functional checks</strong> (start, static file, <code>.htaccess</code> page, PHP page, cache hit, empty and 64 KiB files, config lint): <a href="assets/lab-checks-2026-11-08.tsv">lab-checks-2026-11-08.tsv</a>. Numbers from <em>other</em> regimes — the dedicated-client server comparison, production telemetry, the dated build-history slides — are always labelled with their own conditions and are never mixed into the curve.</p></div></div>
 
-      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve: every release from v0.0.1 to v0.2.0, re-measured 2026-11-11 on a dedicated lab VM">
+      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve: every release from v0.0.1 to v0.2.2, re-measured 2026-11-12 on a dedicated lab VM">
         <div class="bexp__curve"></div>
       </div>
 
       <div class="bexp" id="build-explorer" tabindex="0" aria-label="Interactive performance across builds presentation">
         <div class="bexp__interactive"></div>
         <div class="bexp__fallback">
-          <p class="mini">Enable JavaScript for the interactive slide deck, cross-build trajectory charts, and build-vs-build comparator. All 17 builds are listed in the <a href="#build-ledger">complete receipts ledger</a> below.</p>
+          <p class="mini">Enable JavaScript for the interactive slide deck, cross-build trajectory charts, and build-vs-build comparator. All 19 builds are listed in the <a href="#build-ledger">complete receipts ledger</a> below.</p>
         </div>
       </div>
     </section>
@@ -116,6 +116,11 @@
     </section>
 
     <section>
+      <h2 id="release-0-2-2">Release 0.2.1 / 0.2.2: admission fix, second review pass</h2>
+      <p><code>0.2.1</code> (2026-11-12) sized the page-cache store-admission filter so a never-requested URL reads zero — <code>--page-cache-admit-threshold 2</code> had decayed into storing every cacheable response — kept LSAPI length-prefix guards in release builds, and added fuzz targets. <code>0.2.2</code> (2026-11-12) closed a QUIC flood-guard bypass (a second datagram re-servicing the handshake slot), re-parses access files on ctime/size/inode change, asks proxied upstreams for identity under subFilter, drops refused ACME orders, and cuts the admission filter's false positives. Neither release shipped hot-path work, and the lab shows it: 0.2.1 vs 0.2.0 and 0.2.2 vs 0.2.1 are flat within round spread on every workload.</p>
+      <p>Lab VM, 2026-11-12 (loopback, server on 4 cores, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median; all thirteen releases re-measured in this one run). The version comparisons: 0.2.0 &rarr; 0.2.1, H2 1 KiB <strong>699.3k &rarr; 669.1k</strong>, heavy <code>.htaccess</code> H2 <strong>518.9k &rarr; 545.7k</strong>, page-cache hit <strong>604.2k &rarr; 540.9k</strong>, PHP/LSAPI <strong>32.3k &rarr; 32.6k</strong>; 0.2.1 &rarr; 0.2.2, H2 1 KiB <strong>669.1k &rarr; 665.6k</strong>, heavy H2 <strong>545.7k &rarr; 537.8k</strong>, page-cache <strong>540.9k &rarr; 542.4k</strong>, PHP <strong>32.6k &rarr; 32.5k</strong>. In the same lab nginx reached 185k (H2 1 KiB) against httpjet 0.2.2's 728k three-way cell (639.7k median sweep cell; the three-way cell is noisier).</p>
+      <!--chart:lab-threeway-->
+
       <h2 id="release-0-2-0">Release 0.2.0: security audit fixes and cold-start latency</h2>
       <p><code>0.2.0</code> (November 11, 2026) is the result of a security and robustness review of everything added since 0.1.10. It fixes 20+ issues, each with a regression test, and changes one startup behaviour you can measure: the <code>.htaccess</code> chain is parsed once, before the first connection, and its rewrite prefilter is built off the request path. Before, every serving thread parsed the same 900-line file after each restart, reload or edit, and requests stalled for the parse (about 0.5 s of CPU).</p>
       <ul>
@@ -327,6 +332,14 @@
               <td class="wrap">See <a href="#release-0-1-12">Release 0.1.12</a>: lab medians vs v0.1.11 — H2 1 KiB <strong>443.2k &rarr; 549.7k</strong>, H1 1 KiB <strong>267.2k &rarr; 284.3k</strong>, page-cache <strong>396.0k &rarr; 485.7k</strong>; dedicated-client three-way H2 <strong>371,540</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-08.tsv">release-sweep-2026-11-08.tsv</a> + <a href="assets/release-sweep-2026-11-08/">raw logs</a>; three-way CSVs on the <a href="/benchmarks/">benchmark page</a></span></td>
             </tr>
             <tr data-group="zerofault">
+              <th><code>v0.2.2</code> &middot; Second Review Pass<span class="mini">2026-11-12 &middot; <code>d59a6379</code></span></th>
+              <td class="wrap">See <a href="#release-0-2-2">Release 0.2.1 / 0.2.2</a>: lab medians flat vs v0.2.1 in the same run &mdash; H2 1 KiB <strong>669.1k &rarr; 665.6k</strong>, heavy <code>.htaccess</code> H2 <strong>545.7k &rarr; 537.8k</strong>, page-cache <strong>540.9k &rarr; 542.4k</strong>, PHP <strong>32.6k &rarr; 32.5k</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-12.tsv">release-sweep-2026-11-12.tsv</a> + <a href="assets/release-sweep-2026-11-12/">raw logs</a>; loopback CSVs on the <a href="/benchmarks/">benchmark page</a></span></td>
+            </tr>
+            <tr>
+              <th><code>v0.2.1</code> &middot; Admission Fix + Fuzz<span class="mini">2026-11-12 &middot; <code>4345a424</code></span></th>
+              <td class="wrap">See <a href="#release-0-2-2">Release 0.2.1 / 0.2.2</a>: lab medians flat vs v0.2.0 in the same run &mdash; H2 1 KiB <strong>699.3k &rarr; 669.1k</strong>, heavy <code>.htaccess</code> H2 <strong>518.9k &rarr; 545.7k</strong>, page-cache <strong>604.2k &rarr; 540.9k</strong>, PHP <strong>32.3k &rarr; 32.6k</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-12.tsv">release-sweep-2026-11-12.tsv</a> + <a href="assets/release-sweep-2026-11-12/">raw logs</a></span></td>
+            </tr>
+            <tr>
               <th><code>v0.2.0</code> &middot; Security Audit Fixes &amp; Cold-Start Latency<span class="mini">2026-11-11 &middot; <code>8fcb4647</code></span></th>
               <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 cores / loadgen 4 cores, all 11 releases</span></td>
               <td class="wrap">See <a href="#release-0-2-0">Release 0.2.0</a>: lab medians vs v0.1.12 in the same run &mdash; H2 1 KiB <strong>591.8k &rarr; 625.5k</strong>, heavy <code>.htaccess</code> H2 <strong>402.9k &rarr; 515.3k</strong>, page-cache <strong>410.5k &rarr; 544.5k</strong>; slowest request right after boot <strong>508 ms &rarr; 3 ms</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-11.tsv">release-sweep-2026-11-11.tsv</a> + <a href="assets/release-sweep-2026-11-11/">raw logs</a>; loopback CSVs on the <a href="/benchmarks/">benchmark page</a></span></td>

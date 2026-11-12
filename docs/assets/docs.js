@@ -1924,9 +1924,9 @@
         summary: "A review of everything added since v0.1.10 closed 20+ issues, each with a regression test (WebSocket handshake validation, capsule revalidation, multi-member gzip, LSAPI packet order, error-log escaping, QUIC handshake cleanup, H3 body budget, listener address checks). The one behaviour change you can measure: the .htaccess chain is parsed once before the first connection and its rewrite prefilter is built off the request path, so a restart no longer stalls every core for the parse.",
         kpis: [
           { v: "508 → 3 ms", d: "slowest of a 64-way burst after boot", n: false, l: "Cold start on the real 899-line forum .htaccess (loopback gate)" },
-          { v: "515.3k rps", d: "v0.1.12: 402.9k (+27.9%)", n: false, l: "Heavy .htaccess H2 c=32 x10, lab median" },
-          { v: "544.5k rps", d: "v0.1.12: 410.5k (+32.6%)", n: false, l: "Page-cache hits H2 c=32 x32, lab median" },
-          { v: "625.5k rps", d: "v0.1.12: 591.8k (+5.7%)", n: true, l: "HTTP/2 static 1 KiB, c=32 x10; H2 64 KiB is flat (92.4k vs 89.7k)" }
+          { v: "518.9k rps", d: "v0.1.12: 461.6k (+12.4%)", n: false, l: "Heavy .htaccess H2 c=32 x10, lab median" },
+          { v: "604.2k rps", d: "v0.1.12: 467.5k (+29.2%)", n: false, l: "Page-cache hits H2 c=32 x32, lab median" },
+          { v: "699.3k rps", d: "v0.1.12: 576.8k (+21.2%)", n: true, l: "HTTP/2 static 1 KiB, c=32 x10; H2 64 KiB is flat (92.4k vs 89.7k)" }
         ],
         chart: {
           title: "v0.2.0 vs v0.1.12, Lab Loopback (k req/s)",
@@ -1934,19 +1934,79 @@
           unit: "k rps",
           series: ["v0.1.12", "v0.2.0"],
           rows: [
-            ["Static 1 KiB H2 c=32x10", [591.8, 625.5]],
-            ["Static 1 KiB H1 c=100", [273.3, 311.2]],
-            ["Heavy .htaccess H2 c=32x10", [402.9, 515.3]],
-            ["Heavy .htaccess H1 c=100", [231.7, 281.3]],
-            ["PHP/LSAPI H1 c=40", [27.8, 32.3]],
-            ["Page-cache hit H2 c=32x32", [410.5, 544.5]]
+            ["Static 1 KiB H2 c=32x10", [576.8, 699.3]],
+            ["Static 1 KiB H1 c=100", [290.6, 322.6]],
+            ["Heavy .htaccess H2 c=32x10", [461.6, 518.9]],
+            ["Heavy .htaccess H1 c=100", [250.6, 280.6]],
+            ["PHP/LSAPI H1 c=40", [27.9, 32.3]],
+            ["Page-cache hit H2 c=32x32", [467.5, 604.2]]
           ],
-          foot: "Absolute loopback numbers on a lab VM, not a capacity claim; both builds ran back to back in one sweep. Heavy H2 is connection-bound on the lab self-signed RSA certificate for every build; read H1 for trend. All eleven releases, per-round: assets/release-sweep-2026-11-11.tsv; raw h2load logs: assets/release-sweep-2026-11-11/."
+          foot: "Absolute loopback numbers on a lab VM, not a capacity claim; both builds ran back to back in one sweep. Heavy H2 is connection-bound on the lab self-signed RSA certificate for every build; read H1 for trend. All thirteen releases, per-round: assets/release-sweep-2026-11-12.tsv; raw h2load logs: assets/release-sweep-2026-11-12/."
         },
         notes: [
           "No flags or configuration changed; the wire behavior is unchanged (fast-memo parity gate: 192 cells, zero diffs; h2spec 146/146 over TLS; 3,171 workspace tests; HPACK and HTTP/1 fuzzers clean).",
           "New metrics: httpjet_h2_conn_ends_total{reason}, httpjet_pagecache_ghost_hits_total, httpjet_htaccess_parses_total. check --strict on the production config: 1.5 s to 0.07 s.",
           "Deployed to both production origins on 2026-11-11 after the full cache-gate set passed; 0 5xx afterwards. Same-host loopback against nginx and OpenLiteSpeed is in the Release 0.2.0 section above."
+        ]
+      },
+      {
+        id: "b18", tag: "v0.2.1", short: "Admission Fix + Fuzz", date: "2026-11-12", commit: "4345a424", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
+        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 cores / loadgen 4 cores · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
+        title: "v0.2.1 — Admission-Threshold Fix, Hardening & Fuzz",
+        summary: "No performance work: the store-admission filter was sized so a never-requested URL reads zero (threshold 2 had decayed into storing every cacheable response), LSAPI length-prefix guards were kept in release builds, HTTP/1 connection ends were counted by cause, HTTP/2 flush metadata was reused, and fuzz targets were added for HTTP/2 frames, HTTP/3 wire parsers, LSAPI packets, FastCGI records and the page-cache container.",
+        kpis: [
+          { v: "545.7k rps", d: "v0.2.0: 518.9k (+5.2%)", n: true, l: "Heavy .htaccess H2 c=32 x10, lab median" },
+          { v: "32.6k rps", d: "v0.2.0: 32.3k (flat)", n: true, l: "PHP/LSAPI H1 c=40, lab median" },
+          { v: "669.1k rps", d: "v0.2.0: 699.3k (-4.3%, noise)", n: false, l: "HTTP/2 static 1 KiB, c=32 x10; round spreads overlap" }
+        ],
+        chart: {
+          title: "v0.2.1 vs v0.2.0, Lab Loopback (k req/s)",
+          sub: "dedicated lab VM c4-highmem-8 · server 4 cores / loadgen 4 cores · median of 3 rotated rounds · unified-gather PGO tag builds",
+          unit: "k rps",
+          series: ["v0.2.0", "v0.2.1"],
+          rows: [
+            ["Static 1 KiB H2 c=32x10", [699.3, 669.1]],
+            ["Static 1 KiB H1 c=100", [322.6, 303.9]],
+            ["Heavy .htaccess H2 c=32x10", [518.9, 545.7]],
+            ["Heavy .htaccess H1 c=100", [280.6, 284.9]],
+            ["PHP/LSAPI H1 c=40", [32.3, 32.6]],
+            ["Page-cache hit H2 c=32x32", [604.2, 540.9]]
+          ],
+          foot: "Absolute loopback numbers on a lab VM, not a capacity claim; both builds ran back to back in one sweep. 0.2.1 shipped no hot-path work, so small deltas are run noise — read them as flat. Heavy H2 is connection-bound on the lab self-signed RSA certificate for every build; read H1 for trend. All thirteen releases, per-round: assets/release-sweep-2026-11-12.tsv; raw h2load logs: assets/release-sweep-2026-11-12/."
+        },
+        notes: [
+          "Admission table sizing: --page-cache-admit-threshold 2 honoured again; new metrics httpjet_pagecache_admission_*.",
+          "Deployed to both production origins on 2026-11-12."
+        ]
+      },
+      {
+        id: "b19", tag: "v0.2.2", short: "Second Review Pass", date: "2026-11-12", commit: "d59a6379", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
+        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 cores / loadgen 4 cores · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
+        title: "v0.2.2 — Second Review Pass: QUIC Flood-Guard, Stale Access Rules, subFilter, ACME",
+        summary: "The QUIC handshake slot survived a re-serviced datagram so spoofed Initials could not stay under the Retry threshold; access files re-parse on ctime/size/inode change (a reload kept old rules after cp -p); subFilter asks proxied upstreams for identity; ACME drops refused orders; the admission filter takes one counter per quarter block; HTTP/2 finds the Link anchor with memchr.",
+        kpis: [
+          { v: "728.0k rps", d: "v0.2.1: 639.7k (+13.8%)", n: true, l: "HTTP/2 static 1 KiB three-way cell, lab median (noisy cell)" },
+          { v: "32.5k rps", d: "v0.2.1: 32.6k (flat)", n: true, l: "PHP/LSAPI H1 c=40, lab median" },
+          { v: "537.8k rps", d: "v0.2.1: 545.7k (-1.4%, noise)", n: false, l: "Heavy .htaccess H2 c=32 x10, lab median" }
+        ],
+        chart: {
+          title: "v0.2.2 vs v0.2.1, Lab Loopback (k req/s)",
+          sub: "dedicated lab VM c4-highmem-8 · server 4 cores / loadgen 4 cores · median of 3 rotated rounds · unified-gather PGO tag builds",
+          unit: "k rps",
+          series: ["v0.2.1", "v0.2.2"],
+          rows: [
+            ["Static 1 KiB H2 c=32x10", [669.1, 665.6]],
+            ["Static 1 KiB H1 c=100", [303.9, 310.6]],
+            ["Heavy .htaccess H2 c=32x10", [545.7, 537.8]],
+            ["Heavy .htaccess H1 c=100", [284.9, 258.1]],
+            ["PHP/LSAPI H1 c=40", [32.6, 32.5]],
+            ["Page-cache hit H2 c=32x32", [540.9, 542.4]]
+          ],
+          foot: "Absolute loopback numbers on a lab VM, not a capacity claim; both builds ran back to back in one sweep. 0.2.2 shipped no hot-path work beyond memchr for the Link early-hint anchor, so small deltas are run noise — read them as flat. Heavy H2 is connection-bound on the lab self-signed RSA certificate for every build; read H1 for trend. All thirteen releases, per-round: assets/release-sweep-2026-11-12.tsv; raw h2load logs: assets/release-sweep-2026-11-12/."
+        },
+        notes: [
+          "subFilter, ACME, QUIC, rewrite-access, page-cache, FastCGI and HTTP/2 robustness fixes; no flags added (page-cache shared-path fixture gate only).",
+          "Deployed to both production origins on 2026-11-12."
         ]
       }
     ];
@@ -2250,17 +2310,19 @@
           ymax: 300,
           ystep: 100,
           pts: [
-            { idx: 6, tag: "v0.0.1", h2: 351.2, h1: 234.3, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: 384.0, h1: 223.2, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", h2: 373.6, h1: 230.3, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", h2: 342.5, h1: 226.6, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", h2: 379.4, h1: 231.7, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", h2: 379.5, h1: 211.2, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", h2: 354.4, h1: 231.5, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 314.6, h1: 231.9, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", h2: 348.2, h1: 244.2, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", h2: 402.9, h1: 231.7, note: "Hot-path reductions" },
-            { idx: 16, tag: "v0.2.0", h2: 515.3, h1: 281.3, note: "Audit fixes + cold-start" }
+            { idx: 6, tag: "v0.0.1", h2: 343.4, h1: 212.5, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 385.1, h1: 225.3, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 340.2, h1: 230.0, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", h2: 343.2, h1: 237.7, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", h2: 356.2, h1: 216.8, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", h2: 333.2, h1: 225.2, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", h2: 401.6, h1: 222.9, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 331.7, h1: 238.0, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", h2: 384.7, h1: 223.2, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", h2: 461.6, h1: 250.6, note: "Hot-path reductions" },
+            { idx: 16, tag: "v0.2.0", h2: 518.9, h1: 280.6, note: "Audit fixes + cold-start" },
+            { idx: 17, tag: "v0.2.1", h2: 545.7, h1: 284.9, note: "Admission fix + fuzz" },
+            { idx: 18, tag: "v0.2.2", h2: 537.8, h1: 258.1, note: "Second review pass" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2278,17 +2340,19 @@
           ymax: 600,
           ystep: 200,
           pts: [
-            { idx: 6, tag: "v0.0.1", h2: 405.4, h1: 260.7, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", h2: 434.6, h1: 262.3, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", h2: 419.1, h1: 290.8, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", h2: 443.5, h1: 257.8, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", h2: 443.0, h1: 254.9, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", h2: 414.8, h1: 247.6, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", h2: 444.4, h1: 261.5, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", h2: 490.6, h1: 241.3, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", h2: 470.3, h1: 261.3, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", h2: 591.8, h1: 273.3, note: "Hot-path reductions" },
-            { idx: 16, tag: "v0.2.0", h2: 625.5, h1: 311.2, note: "Audit fixes + cold-start" }
+            { idx: 6, tag: "v0.0.1", h2: 470.4, h1: 257.3, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", h2: 461.8, h1: 277.0, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", h2: 483.0, h1: 273.3, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", h2: 389.5, h1: 259.2, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", h2: 346.9, h1: 228.8, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", h2: 478.0, h1: 256.2, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", h2: 421.2, h1: 249.4, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", h2: 421.1, h1: 254.2, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", h2: 483.3, h1: 265.4, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", h2: 576.8, h1: 290.6, note: "Hot-path reductions" },
+            { idx: 16, tag: "v0.2.0", h2: 699.3, h1: 322.6, note: "Audit fixes + cold-start" },
+            { idx: 17, tag: "v0.2.1", h2: 669.1, h1: 303.9, note: "Admission fix + fuzz" },
+            { idx: 18, tag: "v0.2.2", h2: 665.6, h1: 310.6, note: "Second review pass" }
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2306,17 +2370,19 @@
           ymax: 150,
           ystep: 50,
           pts: [
-            { idx: 6, tag: "v0.0.1", php: 0.6, cache: 108.9, note: "fast_memo + 3-way" },
-            { idx: 7, tag: "v0.0.2", php: 0.6, cache: 91.5, note: "sendfile + kTLS" },
-            { idx: 8, tag: "v0.0.3", php: 0.6, cache: 96.2, note: "openat2 + H3 PGO" },
-            { idx: 9, tag: "v0.0.9", php: 24.7, cache: 129.7, note: "access-rule memo" },
-            { idx: 10, tag: "v0.0.10", php: 24.8, cache: 133.5, note: "TLS idle + dict L3" },
-            { idx: 11, tag: "v0.1.2", php: 27.1, cache: 166.4, note: "Recycled task pools" },
-            { idx: 12, tag: "v0.1.5", php: 27.0, cache: 147.3, note: "BODY_BUFS zero-fault" },
-            { idx: 13, tag: "v0.1.10", php: 27.3, cache: 165.1, note: "Bug/perf bash" },
-            { idx: 14, tag: "v0.1.11", php: 27.6, cache: 368.7, note: "Coop + memo defaults" },
-            { idx: 15, tag: "v0.1.12", php: 27.8, cache: 410.5, note: "Hot-path reductions" },
-            { idx: 16, tag: "v0.2.0", php: 32.3, cache: 544.5, note: "Audit fixes + cold-start" }
+            { idx: 6, tag: "v0.0.1", php: 0.2, cache: 98.1, note: "fast_memo + 3-way" },
+            { idx: 7, tag: "v0.0.2", php: 0.6, cache: 100.8, note: "sendfile + kTLS" },
+            { idx: 8, tag: "v0.0.3", php: 0.6, cache: 109.3, note: "openat2 + H3 PGO" },
+            { idx: 9, tag: "v0.0.9", php: 24.7, cache: 123.9, note: "access-rule memo" },
+            { idx: 10, tag: "v0.0.10", php: 24.6, cache: 130.3, note: "TLS idle + dict L3" },
+            { idx: 11, tag: "v0.1.2", php: 27.2, cache: 157.5, note: "Recycled task pools" },
+            { idx: 12, tag: "v0.1.5", php: 27.0, cache: 165.2, note: "BODY_BUFS zero-fault" },
+            { idx: 13, tag: "v0.1.10", php: 27.4, cache: 172.3, note: "Bug/perf bash" },
+            { idx: 14, tag: "v0.1.11", php: 27.6, cache: 418.5, note: "Coop + memo defaults" },
+            { idx: 15, tag: "v0.1.12", php: 27.9, cache: 467.5, note: "Hot-path reductions" },
+            { idx: 16, tag: "v0.2.0", php: 32.3, cache: 604.2, note: "Audit fixes + cold-start" },
+            { idx: 17, tag: "v0.2.1", php: 32.6, cache: 540.9, note: "Admission fix + fuzz" },
+            { idx: 18, tag: "v0.2.2", php: 32.5, cache: 542.4, note: "Second review pass" }
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },

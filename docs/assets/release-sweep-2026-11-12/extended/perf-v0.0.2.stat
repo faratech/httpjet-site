@@ -1,0 +1,14 @@
+# started on Thu Nov 12 19:52:10 2026
+
+
+ Performance counter stats for 'CPU(s) 0-3':
+
+   <not supported>      cycles                                                                
+   <not supported>      instructions                                                          
+               107      minor-faults                                                          
+                 0      major-faults                                                          
+             11825      context-switches                                                      
+                72      cpu-migrations                                                        
+
+       0.432255902 seconds time elapsed
+

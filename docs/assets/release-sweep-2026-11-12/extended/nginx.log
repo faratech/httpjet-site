@@ -1,0 +1,4 @@
+nginx: the configuration file /var/tmp/lab/nginx.conf syntax is ok
+nginx: [warn] 4096 worker_connections exceed open file resource limit: 1024
+nginx: configuration file /var/tmp/lab/nginx.conf test is successful
+nginx: [warn] 4096 worker_connections exceed open file resource limit: 1024

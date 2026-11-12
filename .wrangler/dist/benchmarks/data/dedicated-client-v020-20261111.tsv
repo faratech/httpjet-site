@@ -1,0 +1,37 @@
+server	pass	cell	raw
+httpjet	1	h2-empty	finished in 872.14ms, 1146602.27 req/s, 47.03MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+httpjet	1	h2-1k	finished in 968.73ms, 1032277.24 req/s, 1.03GB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+httpjet	1	h1-1k	finished in 1.94s, 516257.20 req/s, 663.18MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+httpjet	1	wrk-1k	Requests/sec: 537122.63 
+nginx	1	h2-empty	finished in 126.37ms, 395669.79 req/s, 46.06MB/s status codes: 50000 2xx, 0 3xx, 0 4xx, 0 5xx 
+nginx	1	h2-1k	finished in 154.63ms, 323358.79 req/s, 357.43MB/s status codes: 50000 2xx, 0 3xx, 0 4xx, 0 5xx 
+nginx	1	h1-1k	finished in 2.31s, 433210.62 req/s, 527.99MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+nginx	1	wrk-1k	Requests/sec: 434642.80 
+ols	1	h2-empty	finished in 1.02s, 977577.31 req/s, 25.19MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+ols	1	h2-1k	finished in 1.49s, 669286.25 req/s, 676.59MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+ols	1	h1-1k	finished in 3.14s, 318759.34 req/s, 446.56MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+ols	1	wrk-1k	Requests/sec: 331978.74 
+ols	2	h2-empty	finished in 1.04s, 962735.40 req/s, 24.81MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+ols	2	h2-1k	finished in 1.27s, 788958.99 req/s, 797.57MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+ols	2	h1-1k	finished in 2.83s, 353405.34 req/s, 495.10MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+ols	2	wrk-1k	Requests/sec: 377631.29 
+nginx	2	h2-empty	finished in 103.41ms, 483512.23 req/s, 56.29MB/s status codes: 50000 2xx, 0 3xx, 0 4xx, 0 5xx 
+nginx	2	h2-1k	finished in 116.20ms, 430307.41 req/s, 475.65MB/s status codes: 50000 2xx, 0 3xx, 0 4xx, 0 5xx 
+nginx	2	h1-1k	finished in 2.35s, 424879.05 req/s, 517.84MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+nginx	2	wrk-1k	Requests/sec: 430110.78 
+httpjet	2	h2-empty	finished in 794.65ms, 1258410.90 req/s, 51.62MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+httpjet	2	h2-1k	finished in 806.11ms, 1240530.10 req/s, 1.24GB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+httpjet	2	h1-1k	finished in 1.93s, 517642.55 req/s, 664.96MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+httpjet	2	wrk-1k	Requests/sec: 571500.31 
+nginx	3	h2-empty	finished in 77.92ms, 641700.25 req/s, 74.70MB/s status codes: 50000 2xx, 0 3xx, 0 4xx, 0 5xx 
+nginx	3	h2-1k	finished in 122.12ms, 409423.29 req/s, 452.56MB/s status codes: 50000 2xx, 0 3xx, 0 4xx, 0 5xx 
+nginx	3	h1-1k	finished in 2.48s, 402958.85 req/s, 491.12MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+nginx	3	wrk-1k	Requests/sec: 425014.88 
+httpjet	3	h2-empty	finished in 748.16ms, 1336610.70 req/s, 54.82MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+httpjet	3	h2-1k	finished in 761.37ms, 1313423.58 req/s, 1.32GB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+httpjet	3	h1-1k	finished in 1.91s, 522224.57 req/s, 670.85MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+httpjet	3	wrk-1k	Requests/sec: 578354.03 
+ols	3	h2-empty	finished in 995.35ms, 1004669.70 req/s, 25.89MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+ols	3	h2-1k	finished in 1.28s, 779834.11 req/s, 788.34MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+ols	3	h1-1k	finished in 2.74s, 364990.94 req/s, 511.33MB/s status codes: 1000000 2xx, 0 3xx, 0 4xx, 0 5xx 
+ols	3	wrk-1k	Requests/sec: 391910.46 

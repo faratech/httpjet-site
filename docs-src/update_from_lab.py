@@ -20,14 +20,16 @@ import statistics
 import sys
 
 TAGS = ["v0.0.1", "v0.0.2", "v0.0.3", "v0.0.9", "v0.0.10",
-        "v0.1.2", "v0.1.5", "v0.1.10", "v0.1.11", "v0.1.12", "v0.2.0"]
+        "v0.1.2", "v0.1.5", "v0.1.10", "v0.1.11", "v0.1.12", "v0.2.0",
+        "v0.2.1", "v0.2.2"]
 SWEEP_WLS = ["static-h2", "static-h1", "heavy-h2", "heavy-h1",
              "php-h1", "cache-h2", "empty-h2", "big-h2"]
 NOTES = {6: "fast_memo + 3-way", 7: "sendfile + kTLS", 8: "openat2 + H3 PGO",
          9: "access-rule memo", 10: "TLS idle + dict L3",
          11: "Recycled task pools", 12: "BODY_BUFS zero-fault",
          13: "Bug/perf bash", 14: "Coop + memo defaults",
-         15: "Hot-path reductions", 16: "Audit fixes + cold-start"}
+         15: "Hot-path reductions", 16: "Audit fixes + cold-start",
+         17: "Admission fix + fuzz", 18: "Second review pass"}
 
 
 def ms(v):
@@ -121,7 +123,7 @@ def main():
 <style>body{{font-family:ui-monospace,Menlo,monospace;background:#0b1220;color:#dbe7f3;margin:2rem auto;max-width:64rem;padding:0 1rem;line-height:1.55}}a{{color:#22d3ee}}table{{border-collapse:collapse}}td,th{{border:1px solid #263650;padding:.3rem .6rem;text-align:right}}th:first-child,td:first-child{{text-align:left}}.mini{{color:#8fa8c0;font-size:.85em}}code{{color:#a5f3fc}}</style>
 </head><body>
 <h1>Release sweep {datestr} — raw logs and checks</h1>
-<p>Every release from v0.0.1 to v0.2.0, measured under <strong>identical conditions</strong> on a dedicated lab VM
+<p>Every release from v0.0.1 to v0.2.2, measured under <strong>identical conditions</strong> on a dedicated lab VM
 (Google Cloud <code>c4-highmem-8</code>, Ubuntu 26.10 — the production x86 origin's machine type). No production host was loaded:
 server and load generator both ran inside the VM, over its loopback, server pinned to cores 0-3
 (<code>--workers 4</code>), <code>h2load</code> to cores 4-7. Each release was PGO-built from its tag with one
@@ -143,7 +145,7 @@ TLS used a lab self-signed RSA-2048 certificate; heavy H2 is connection-bound on
 <table><tr><th>tag</th><th>binary</th><th>match</th><th>static</th><th>heavy</th><th>php</th><th>cache hit</th><th>empty</th><th>64k</th><th>config check</th></tr>
 {check_rows}</table>
 <h2>Files</h2>
-<p><code>raw/&lt;tag&gt;/</code> — 240 raw <code>h2load</code> logs (8 workloads x 3 rounds per build) ·
+<p><code>raw/&lt;tag&gt;/</code> — 312 raw <code>h2load</code> logs (8 workloads x 3 rounds per build) ·
 <code>extended/</code> — three-way (nginx/OpenLiteSpeed) + <code>perf stat</code> raw output ·
 <code>checks/</code> — per-version check logs · <code>bench-logs/</code> — server logs, primes, run order.</p>
 <p id="links">Generating file links…</p>
@@ -192,9 +194,9 @@ document.getElementById("links").innerHTML = h;
         new = pts(pairs, keys)
         s = s[:m.start()] + new + s[m.end():]
         pos = m.start() + len(new)
-    # newest-build slide (b16) chart: v0.1.12 vs v0.2.0 lab medians
+    # newest-build slide chart: v0.2.1 vs v0.2.2 lab medians
     def row(label, w):
-        a = med.get(("v0.1.12", w), 0); b = med.get(("v0.2.0", w), 0)
+        a = med.get(("v0.2.1", w), 0); b = med.get(("v0.2.2", w), 0)
         return f'["{label}", [{a}, {b}]]'
     pairs = [("Static 1 KiB H2 c=32x10", "static-h2"), ("Static 1 KiB H1 c=100", "static-h1"),
              ("Heavy .htaccess H2 c=32x10", "heavy-h2"), ("Heavy .htaccess H1 c=100", "heavy-h1"),
@@ -207,7 +209,7 @@ document.getElementById("links").innerHTML = h;
 
     # ---- three-way TSV + build.py chart
     ext = os.path.join(results, "extended")
-    servers = ["v0.1.12", "v0.2.0", "nginx", "ols"]
+    servers = ["v0.2.1", "v0.2.2", "nginx", "ols"]
     tw_wls = ["empty-h2", "static-h2", "big-h2", "static-h1", "heavy-h2", "wrk-h1"]
     tw_rows = ["server\tworkload\tmedian_rps\trounds_rps"]
     tw_med = {}
@@ -228,7 +230,7 @@ document.getElementById("links").innerHTML = h;
     open(os.path.join(assets, tw_name), "w").write("\n".join(tw_rows) + "\n")
     print(f"wrote {tw_name}: {len(tw_rows) - 1} rows")
 
-    labels = {"v0.1.12": "httpjet v0.1.12", "v0.2.0": "httpjet v0.2.0",
+    labels = {"v0.2.1": "httpjet v0.2.1", "v0.2.2": "httpjet v0.2.2",
               "nginx": "nginx", "ols": "OpenLiteSpeed"}
     present = [srv for srv in servers if any((srv, w) in tw_med for w in tw_wls)]
     if present:

@@ -1,0 +1,57 @@
+starting benchmark...
+spawning thread #0: 8 total client(s). 25000 total requests
+spawning thread #1: 8 total client(s). 25000 total requests
+spawning thread #2: 8 total client(s). 25000 total requests
+spawning thread #3: 8 total client(s). 25000 total requests
+TLS Protocol: TLSv1.3
+Cipher: TLS_AES_128_GCM_SHA256
+Server Temp Key: X25519 253 bits
+Certificate: RSA 2048 bits
+Negotiated Group: x25519
+Resumption: no
+Application protocol: h2
+progress: 10% done
+Process Request Failure: 2117
+Process Request Failure: 2117
+Process Request Failure: 2117
+progress: 20% done
+Process Request Failure: 2117
+Process Request Failure: 4242
+Process Request Failure: 4242
+Process Request Failure: 6367
+Process Request Failure: 6367
+Process Request Failure: 8492
+Process Request Failure: 4242
+Process Request Failure: 6367
+Process Request Failure: 8492
+Process Request Failure: 10617
+Process Request Failure: 12742
+Process Request Failure: 10617
+Process Request Failure: 4242
+Process Request Failure: 6367
+Process Request Failure: 8492
+Process Request Failure: 10617
+progress: 30% done
+Process Request Failure: 8492
+Process Request Failure: 12742
+Process Request Failure: 14867
+Process Request Failure: 16992
+Process Request Failure: 10617
+Process Request Failure: 12742
+Process Request Failure: 14867
+Process Request Failure: 12742
+Process Request Failure: 16992
+Process Request Failure: 14867
+Process Request Failure: 16992
+Process Request Failure: 14867
+Process Request Failure: 16992
+
+finished in 136.39ms, 234619.59 req/s, 188.64MB/s
+requests: 100000 total, 32288 started, 32229 done, 32000 succeeded, 68000 failed, 68000 errored, 0 timeout
+status codes: 32000 2xx, 0 3xx, 0 4xx, 0 5xx
+traffic: 25.73MB (26978112) total, 3.27MB (3424000) headers (space savings 39.89%), 21.91MB (22976000) data
+                 min         max         median      p95         p99         mean        sd         +/- sd
+request     :       32us      6.90ms       934us      1.42ms      1.79ms       949us       462us    81.77%
+connect     :     1.78ms      9.14ms      3.96ms      8.74ms      9.14ms      4.37ms      2.13ms    62.50%
+TTFB        :     2.53ms     11.28ms      7.89ms     11.19ms     11.28ms      7.75ms      2.48ms    65.63%
+req/s       :    7344.76    29725.34    10068.02    29656.87    29725.34    11411.10     6232.62    90.63%
