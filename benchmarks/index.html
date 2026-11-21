@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="canonical" href="https://httpjet.net/benchmarks/">
 <title>httpjet — Performance Benchmarks</title>
-<meta name="description" content="httpjet loopback benchmark suite: HTTP/1.1, HTTP/2 and HTTP/3 static, rewrite, PHP/LSAPI and page-cache results with raw CSV data, against nginx and OpenLiteSpeed. Latest release 0.2.2.">
+<meta name="description" content="httpjet benchmark suite: HTTP/1.1, HTTP/2 and HTTP/3 static, rewrite, PHP/LSAPI and page-cache results with raw CSV/TSV data, against nginx and OpenLiteSpeed. Latest release 0.2.4.">
 <link rel="icon" href="/docs/assets/favicon.svg" type="image/svg+xml">
 <style>
 :root{--bg:#0b1020;--card:#141b2e;--fg:#e7ecf5;--mut:#9aa6bf;--acc:#3b82f6;--line:#243049}
@@ -27,8 +27,8 @@ ul{margin:6px 0}
 <header><div class="wrap">
 <h1>httpjet — Performance Benchmarks</h1>
 <div class="sub">A from-scratch Rust drop-in LiteSpeed replacement · comprehensive loopback benchmark suite</div>
-<div class="sub">Generated 2026-11-12 · 8-core host · release build</div>
-<div class="sub">Latest release <b>0.2.2</b> (2026-11-12): lab results, release notes and the per-release speed curve are on <a href="/docs/performance#release-0-2-2">httpjet.net/docs/performance</a>. Sections below are dated; the raw CSVs in <code>data/</code> include the 0.2.0 run (<code>*-v020-20261111.csv</code>). The 0.2.1/0.2.2 lab sweep is at <a href="/docs/assets/release-sweep-2026-11-12.tsv">release-sweep-2026-11-12.tsv</a>.</div>
+<div class="sub">Generated 2026-11-21 · 8-core host · release build</div>
+<div class="sub">Latest release <b>0.2.4</b> (2026-11-20; lab sweep 2026-11-21): lab results, release notes and the interactive 15-release speed curve are on <a href="/docs/performance#release-0-2-4">httpjet.net/docs/performance</a>. Sections below are dated; raw files in <code>data/</code> include the 0.2.3/0.2.4 lab sweep (<a href="data/release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a>, <a href="data/lab-threeway-2026-11-21.tsv">lab-threeway-2026-11-21.tsv</a>) and earlier 0.2.0 CSVs.</div>
 </div></header>
 <div class="wrap">
 
@@ -38,6 +38,42 @@ driven by <code>ab</code> (IP literal + Host header); HTTP/2 by <code>h2load</co
 ~no rewrite rules; the "heavy" vhost runs the production ~130-rule <code>.htaccess</code> front controller.
 PHP is served through httpjet's native LSAPI to an isolated <code>lsphp</code> pool. Static file-size
 fixtures are random blobs. RPS = requests/sec (higher is better); latency in ms. 
+</div>
+
+<h2>Release 0.2.4 &amp; 0.2.3 — Dedicated Lab VM Sweep (2026-11-21)</h2>
+<div class="card">
+All 15 releases (<code>v0.0.1</code>–<code>v0.2.4</code>) re-measured under identical conditions on a dedicated GCE
+<code>c4-highmem-8</code> VM (server pinned to 4 cores, <code>h2load</code> on 4 cores, Unified PGO per tag, median of 3
+rotated rounds, 15/15 functional checks pass). Raw TSVs:
+<a href="data/release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a> ·
+<a href="data/lab-threeway-2026-11-21.tsv">lab-threeway-2026-11-21.tsv</a> ·
+<a href="data/lab-checks-2026-11-21.tsv">lab-checks-2026-11-21.tsv</a> ·
+<a href="data/lab-perf-2026-11-21.tsv">lab-perf-2026-11-21.tsv</a>.
+<table>
+<thead><tr><th>Workload (4 server / 4 loadgen cores, Unified PGO)</th><th>0.2.2 (k req/s)</th><th>0.2.3 (k req/s)</th><th>0.2.4 (k req/s)</th><th>0.2.4 vs 0.2.3</th></tr></thead>
+<tbody>
+<tr><td>HTTP/2 empty body (c=32 × 10)</td><td>904.0k</td><td>860.1k</td><td><b>1,291.7k</b></td><td><b>+50.2%</b></td></tr>
+<tr><td>HTTP/2 static 1 KiB (c=32 × 10)</td><td>794.6k</td><td>849.1k</td><td><b>1,092.6k</b></td><td><b>+28.7%</b></td></tr>
+<tr><td>Heavy 806-line .htaccess H2 (c=32 × 10)</td><td>672.6k</td><td>656.9k</td><td><b>879.5k</b></td><td><b>+33.9%</b></td></tr>
+<tr><td>Page-cache hit H2 (37 KB fixture, c=32 × 32)</td><td>679.3k</td><td>720.3k</td><td><b>849.6k</b></td><td><b>+18.0%</b></td></tr>
+<tr><td>HTTP/1.1 static 1 KiB (c=100)</td><td>378.8k</td><td>383.4k</td><td><b>415.7k</b></td><td><b>+8.4%</b></td></tr>
+<tr><td>Heavy 806-line .htaccess H1 (c=100)</td><td>341.6k</td><td>343.1k</td><td><b>381.5k</b></td><td><b>+11.2%</b></td></tr>
+<tr><td>PHP/LSAPI H1 (c=40)</td><td>39.6k</td><td>39.6k</td><td><b>41.8k</b></td><td><b>+5.6%</b></td></tr>
+<tr><td>HTTP/2 static 64 KiB (c=32 × 10)</td><td>123.6k</td><td>114.4k</td><td>110.0k</td><td>−3.8% (noise)</td></tr>
+</tbody>
+</table>
+<b>Lab three-way vs nginx (same run, median of 3):</b>
+<table>
+<thead><tr><th>Workload</th><th>httpjet 0.2.3</th><th>httpjet 0.2.4</th><th>nginx</th><th>0.2.4 / nginx</th></tr></thead>
+<tbody>
+<tr><td>HTTP/2 empty body</td><td>881,368</td><td><b>1,161,184</b></td><td>311,666</td><td><b>3.73×</b></td></tr>
+<tr><td>HTTP/2 static 1 KiB</td><td>858,893</td><td><b>932,584</b></td><td>215,297</td><td><b>4.33×</b></td></tr>
+<tr><td>HTTP/2 /robots.txt (806-line .htaccess on httpjet; none on nginx)</td><td>637,735</td><td><b>940,088</b></td><td>265,465</td><td><b>3.54×</b></td></tr>
+<tr><td>HTTP/1.1 static 1 KiB (h2load)</td><td>364,582</td><td><b>415,749</b></td><td>269,262</td><td><b>1.54×</b></td></tr>
+<tr><td>HTTP/1.1 static 1 KiB (wrk, 15 s)</td><td>438,357</td><td><b>486,377</b></td><td>333,738</td><td><b>1.46×</b></td></tr>
+<tr><td>HTTP/2 static 64 KiB</td><td>126,038</td><td><b>117,105</b></td><td>53,361</td><td><b>2.19×</b></td></tr>
+</tbody>
+</table>
 </div>
 
 
