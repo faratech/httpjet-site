@@ -9,7 +9,7 @@
 
 # Architecture
 
-httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Roughly 3,200 test functions span the workspace (3,171 green at v0.2.0).
+httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Over 3,200 test functions span the workspace (3,237 green at v0.2.4).
 
 ## Workspace shape
 
@@ -17,9 +17,9 @@ The graph is acyclic and `hj-config` sits at the root. `hj-core` is the small fr
 
            Browse workspace on GitHub ↗
            1 binary + 19 libraries
-           Rust 1.99.1 · edition 2024 · v0.2.0
+           Rust 1.99.1 · edition 2024 · v0.2.4
            Acyclic; hj-config at the root
-           ≈3,000 test functions
+           3,237 test functions
            Vendored forks: monoio, monoio-rustls (real writev), dashmap, pprof
 
 ## Crate dependency graph

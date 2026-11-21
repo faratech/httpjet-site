@@ -1169,7 +1169,9 @@ Configure suEXEC (` `, off by default; uid 0 always rejected), chroot (`chrootMo
 
 | 2026-11-10..11 | 0.2.0 review of v0.1.10..v0.1.12 + the 2026-10-30 sweep (#1193–#1230) | 28 issues fixed, each with a regression test; two read-only reviews found no wrong-content path in the response memo or page cache. Limit: upstream WebSocket handshake validation, no credentials in capsule revalidation, every gzip member decoded, LSAPI packet order, error-log escaping, QUIC self-closing Initials (pre-handshake memory), shared cache bodies off the server-wide H3 budget, listener address checks, CPU steering gated on NIC queues. |
 
-Gates re-run after each round: full suite (3,171 tests at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
+| 2026-11-20 | 0.2.4 audit remediation + follow-up pass | 36 reliability and correctness fixes across H1/H2/H3 transport, page cache, rewrite/`.htaccess`, proxy pooling, TLS/OCSP lifecycle, and backend gateways; panic-lint ratchet reduced from 572 to 567 sites. |
+
+Gates re-run after each round: full suite (3,237 tests at 0.2.4; 3,171 at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
 
         i   Reporting
 Use private responsible disclosure per `SECURITY.md`, not a public issue. Findings reconcile against source and regression tests. Nothing here proves production exploitation, or absence of other vulnerabilities.
@@ -1672,7 +1674,7 @@ SUMMARY: See how the server fits together.
 
 # Architecture
 
-httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Roughly 3,200 test functions span the workspace (3,171 green at v0.2.0).
+httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Over 3,200 test functions span the workspace (3,237 green at v0.2.4).
 
 ## Workspace shape
 
@@ -1680,9 +1682,9 @@ The graph is acyclic and `hj-config` sits at the root. `hj-core` is the small fr
 
            Browse workspace on GitHub ↗
            1 binary + 19 libraries
-           Rust 1.99.1 · edition 2024 · v0.2.0
+           Rust 1.99.1 · edition 2024 · v0.2.4
            Acyclic; hj-config at the root
-           ≈3,000 test functions
+           3,237 test functions
            Vendored forks: monoio, monoio-rustls (real writev), dashmap, pprof
 
 ## Crate dependency graph
@@ -3415,6 +3417,8 @@ Filter all 14 benchmarked eras by tag, commit, workload, regime, receipt:
 | `v0.1.11` · Coop Ring + Response Memo Defaults 2026-11-07 · `54df571f` | alt-port ABBA, both orders x86; aarch64 neutral | See Release 0.1.11 : hits **`+27.6%`**, CPU **`−26.7%`**. Receipt: source commit `54df571f`. |
 
 | `v0.1.12` · Hot-Path Allocation & Contention Reductions 2026-11-08 · `85b99e16` | lab re-run dedicated lab VM, server 4 cores / loadgen 4 cores, all 10 releases | See Release 0.1.12 : lab medians vs v0.1.11 — H2 1 KiB **443.2k → 549.7k**, H1 1 KiB **267.2k → 284.3k**, page-cache **396.0k → 485.7k**; dedicated-client three-way H2 **371,540**. Receipts: release-sweep-2026-11-08.tsv + raw logs ; three-way CSVs on the benchmark page |
+
+| `v0.2.4` · Transport, Pipeline & Backend Optimizations (Waves 1–11) 2026-11-20 · `6b6f1c6` | 3-way loopback A/B/C 4 workers / 4 h2load threads, native release, 3 interleaved rounds | See Release 0.2.4 : vs v0.2.3 — H2 `fast_memo` 64 B **1,084k → 1,347k** (**+24.2%**, p50 929 µs → 610 µs), heavy `.htaccess` H2 **273.8k → 331.9k** (**+21.2%**), heavy `.htaccess` H1 **180.4k → 220.5k** (**+22.2%**), H2 8 KiB gzip/br **561.6k → 620.1k** (**+10.4%**). 3,237 tests green; 36 reliability fixes. |
 
 | `v0.2.2` · Second Review Pass 2026-11-12 · `d59a6379` | See Release 0.2.1 / 0.2.2 : lab medians flat vs v0.2.1 in the same run — H2 1 KiB **669.1k → 665.6k**, heavy `.htaccess` H2 **545.7k → 537.8k**, page-cache **540.9k → 542.4k**, PHP **32.6k → 32.5k**. Receipts: release-sweep-2026-11-12.tsv + raw logs ; loopback CSVs on the benchmark page |
 

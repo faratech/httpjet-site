@@ -328,6 +328,8 @@ Filter all 14 benchmarked eras by tag, commit, workload, regime, receipt:
 
 | `v0.1.12` · Hot-Path Allocation & Contention Reductions 2026-11-08 · `85b99e16` | lab re-run dedicated lab VM, server 4 cores / loadgen 4 cores, all 10 releases | See Release 0.1.12 : lab medians vs v0.1.11 — H2 1 KiB **443.2k → 549.7k**, H1 1 KiB **267.2k → 284.3k**, page-cache **396.0k → 485.7k**; dedicated-client three-way H2 **371,540**. Receipts: release-sweep-2026-11-08.tsv + raw logs ; three-way CSVs on the benchmark page |
 
+| `v0.2.4` · Transport, Pipeline & Backend Optimizations (Waves 1–11) 2026-11-20 · `6b6f1c6` | 3-way loopback A/B/C 4 workers / 4 h2load threads, native release, 3 interleaved rounds | See Release 0.2.4 : vs v0.2.3 — H2 `fast_memo` 64 B **1,084k → 1,347k** (**+24.2%**, p50 929 µs → 610 µs), heavy `.htaccess` H2 **273.8k → 331.9k** (**+21.2%**), heavy `.htaccess` H1 **180.4k → 220.5k** (**+22.2%**), H2 8 KiB gzip/br **561.6k → 620.1k** (**+10.4%**). 3,237 tests green; 36 reliability fixes. |
+
 | `v0.2.2` · Second Review Pass 2026-11-12 · `d59a6379` | See Release 0.2.1 / 0.2.2 : lab medians flat vs v0.2.1 in the same run — H2 1 KiB **669.1k → 665.6k**, heavy `.htaccess` H2 **545.7k → 537.8k**, page-cache **540.9k → 542.4k**, PHP **32.6k → 32.5k**. Receipts: release-sweep-2026-11-12.tsv + raw logs ; loopback CSVs on the benchmark page |
 
 | `v0.2.1` · Admission Fix + Fuzz 2026-11-12 · `4345a424` | See Release 0.2.1 / 0.2.2 : lab medians flat vs v0.2.0 in the same run — H2 1 KiB **699.3k → 669.1k**, heavy `.htaccess` H2 **518.9k → 545.7k**, page-cache **604.2k → 540.9k**, PHP **32.3k → 32.6k**. Receipts: release-sweep-2026-11-12.tsv + raw logs |
