@@ -130,6 +130,33 @@ Memo alone, instructions/request, frozen non-PGO binary, SINGULARITY loopback, 1
 
 Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: `docs/pagecache-response-memo-experiment.md` in the source tree.
 
+## Release 0.2.4: transport, pipeline, and backend optimizations (Waves 1–11)
+
+`0.2.4` (November 20, 2026) ships 11 waves of hot-path performance work and 36 reliability fixes across transport, page cache, rewrite, proxy, and lifecycle paths (following `0.2.3` on November 16, which added progressive stream-fill for unframed misses, single-encode streamed zstd caching, `--buffered-work-min-bytes`, and a full dependency refresh). Verification: **3,237 workspace tests** green, panic-lint ratchet down to 567 sites (from 572), wire and flags unchanged.
+
+- **Transport & framing (H1/H2/H3):** stack-local zero-map fast path for single-frame H2 requests; small-body coalescing into inline/head buffers across H1, H2, and H3; direct HPACK and QPACK encoding without scratch copies; compile-time QPACK static lookup; single-pass HPACK static/dynamic lookups; inherited listener TCP socket options.
+
+- **`fast_memo` & request pipeline:** shared `Arc ` zero-clone `fast_memo` egress across H1/H2/H3; 50 ms coarse HTTP `Date` clock cache; single-probe router host resolution; compact IPv4/IPv6 ACL bitmask tables with a 16-slot reload-safe TLS peer cache; cached static `RootDir` descriptors with `FxHash` metadata lookups.
+
+- **Rewrite, compression & backends:** borrowed zero-alloc header and path lookups across `.htaccess` and `mod_rewrite` evaluation; pooled plain-zstd and streamed-gzip codecs; borrowed LSAPI CGI builders and zero-alloc log escaping.
+
+Controlled 3-way A/B/C loopback comparison on the x86_64 host (2026-11-20, native release builds with `-Ctarget-cpu=native`, 4 workers vs 4 `h2load` threads, 1 s warmup + 5 s measured, median of 3 interleaved rounds, 100% `2xx`):
+
+| Workload | 0.2.3 (req/s) | 0.2.4 (req/s) | Delta vs 0.2.3 | p50 latency (0.2.3 → 0.2.4) |
+
+| HTTP/2 `fast_memo` (64 B, TLS) | 1,084,102 | **1,346,816** | **+24.23%** | 929 µs → **610 µs** |
+
+| HTTP/2 `--no-fast-memo` heavy `.htaccess` (64 B, TLS) | 273,773 | **331,930** | **+21.24%** | 3.85 ms → **3.02 ms** |
+
+| HTTP/1.1 `--no-fast-memo` heavy `.htaccess` (64 B) | 180,417 | **220,519** | **+22.23%** | 244 µs → **245 µs** (p99 1.02 ms → 770 µs) |
+
+| HTTP/2 `fast_memo` (8 KiB HTML, TLS, gzip/br) | 561,555 | **620,061** | **+10.42%** | 819 µs → **641 µs** |
+
+| HTTP/1.1 `fast_memo` (64 B, plaintext) | 489,413 | 502,602 (peak 542,918) | +2.69% (client/scheduler-bound) | 115 µs → **107 µs** |
+
+        ⎁   Regime & honest caveats
+This table is a same-host loopback A/B/C between identical native release builds (non-PGO) on isolated alternate ports with a self-contained 150-rule `.htaccess` fixture; it is not mixed into the dedicated-VM PGO release curve above. Plaintext HTTP/1.1 `fast_memo` saturates loopback/client scheduling near ~520k req/s on 8 shared cores (4 workers + 4 loadgen threads).
+
 ## Release 0.2.1 / 0.2.2: admission fix, second review pass
 
 `0.2.1` (2026-11-12) sized the page-cache store-admission filter so a never-requested URL reads zero — `--page-cache-admit-threshold 2` had decayed into storing every cacheable response — kept LSAPI length-prefix guards in release builds, and added fuzz targets. `0.2.2` (2026-11-12) closed a QUIC flood-guard bypass (a second datagram re-servicing the handshake slot), re-parses access files on ctime/size/inode change, asks proxied upstreams for identity under subFilter, drops refused ACME orders, and cuts the admission filter's false positives. Neither release shipped hot-path work, and the lab shows it: 0.2.1 vs 0.2.0 and 0.2.2 vs 0.2.1 are flat within round spread on every workload.

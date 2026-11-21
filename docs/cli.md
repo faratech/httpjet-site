@@ -19,7 +19,7 @@ httpjet --root /abs/root check [--strict]     # parse + summary + lint; --strict
 httpjet --root /abs/root serve [flags…]       # bind the configured listeners and serve
 httpjet --root /abs/root lsphp [flags…]       # run a standalone persistent lsphp pool (the PHP half of a zero-downtime deploy)
 httpjet lsphp-reload [flags…]                 # ask a running pool to replace its worker generation without closing the listener
-httpjet --version                             # httpjet 0.2.0
+httpjet --version                             # httpjet 0.2.4
 ```
 
 | Subcommand · flag | Default | Meaning |
@@ -199,6 +199,8 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 | --rewrite-outcome-ttl-ms   | 1000 | TTL in milliseconds for the rewrite-outcome cache (memoized rewrite decisions for `path_cacheable` chains, keyed by vhost/scheme/ method/host/path/query + any keyable header vars). 0 disables the cache entirely. The default (1000 ms) matches the historical hard-coded TTL — it bounds `-f`/`-d` filesystem staleness exactly like the StatCache and lets `.htaccess` edits take effect within ~1 s |
 
 | --rewrite-ua-classify | off | Key UA-reading rewrite chains by the bitmap of matching User-Agent RewriteConds instead of the raw UA string, when parse-time analysis proves the outcome depends on the UA only through those match results. Collapses real-world UA diversity (near-zero hit rate on raw UAs) onto a handful of outcome-cache entries. Default OFF — enabling is a deploy-time decision |
+
+| --buffered-work-min-bytes   | 0 | Encode a buffered response body of at least this many bytes in 64 KiB slices, yielding to other requests between slices so large encodings do not stall sibling connections on the worker. 0 disables slicing. |
 
 | Memory |
 

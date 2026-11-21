@@ -1,5 +1,5 @@
     <section id="top">
-      <p class="eyebrow reveal d1">httpjet · documentation · v0.2.0</p>
+      <p class="eyebrow reveal d1">httpjet · documentation · v0.2.4</p>
       <h1 class="reveal d1" style="font-size:clamp(40px,8vw,76px);line-height:1"><span style="background:var(--brand);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent">httpjet</span></h1>
       <p class="lede reveal d2">A from-scratch <strong>Rust web server</strong> and <strong>drop-in LiteSpeed replacement</strong>: it reads the same <code>conf/httpd_config.xml</code> tree, speaks native LSAPI to <code>lsphp</code>, evaluates the same <code>.htaccess</code> files, and adds native HTTP/2 and HTTP/3, reverse-proxy and FastCGI gateways, and an opt-in LSCache-protocol page cache — all on one io_uring transport.</p>
 
@@ -54,7 +54,7 @@
           <li><a href="admin-api.html">Loopback admin API</a>, <a href="extensions.html#waf">WAF sidecar</a>, compile-time extensions</li>
         </ul></div>
       </div>
-      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Where it runs</span><p>httpjet serves <a href="https://windowsforum.com">WindowsForum.com</a> (x86_64) and <a href="https://moontimenow.com">MoonTimeNow.com</a> + <a href="https://thisdayinhistory.ai">ThisDayInHistory.ai</a> (ARM64) behind Cloudflare, on pure io_uring with the file tier live. It replaced LiteSpeed for all three (0.1.12, Rust 1.99.1+, edition 2024, GPL-3.0-only). Run <code>check --strict</code> and test on alternate ports before cutover. See <a href="capabilities.html">Capabilities &amp; limits</a>.</p></div></div>
+      <div class="callout note"><div class="ico">i</div><div class="body"><span class="tag">Where it runs</span><p>httpjet serves <a href="https://windowsforum.com">WindowsForum.com</a> (x86_64) and <a href="https://moontimenow.com">MoonTimeNow.com</a> + <a href="https://thisdayinhistory.ai">ThisDayInHistory.ai</a> (ARM64) behind Cloudflare, on pure io_uring with the file tier live. It replaced LiteSpeed for all three (0.2.4, Rust 1.99.1+, edition 2024, GPL-3.0-only). Run <code>check --strict</code> and test on alternate ports before cutover. See <a href="capabilities.html">Capabilities &amp; limits</a>.</p></div></div>
     </section>
 
     <section>
@@ -87,7 +87,7 @@
         <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms</div></div>
         <div class="stat"><div class="v">146<span class="u">/146</span></div><div class="l">h2spec, native HTTP/2, TLS, three runs</div></div>
         <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet phases, June 2026 production (~138 µs/req); PHP 86.5–98.8% of wall time</div></div>
-        <div class="stat accent"><div class="v">3,100<span class="u">+</span></div><div class="l">test functions, 20 crates; suite green at v0.2.0 (3,171 tests)</div></div>
+        <div class="stat accent"><div class="v">3,200<span class="u">+</span></div><div class="l">test functions, 20 crates; suite green at v0.2.4 (3,237 tests)</div></div>
       </div>
     </section>
 
@@ -97,8 +97,8 @@
         <table>
           <thead><tr><th>Aspect</th><th>State</th></tr></thead>
           <tbody>
-            <tr><td>Version</td><td><strong>0.2.0</strong> · November 11, 2026 · <a href="https://github.com/faratech/httpjet/releases/latest">latest public release</a></td></tr>
-            <tr><td>Release detail</td><td>Security audit fixes (WebSocket handshake, capsule revalidation, multi-member gzip, QUIC handshake cleanup, H3 body budget) and cold-start latency: the <code>.htaccess</code> chain is parsed once before the first connection, so the slowest request after boot falls from 508 ms to 3 ms. Lab VM, same run, 0.2.0 vs 0.1.12: HTTP/2 1 KiB static 625.5k vs 591.8k req/s, heavy-<code>.htaccess</code> HTTP/2 515.3k vs 402.9k, page-cache hits 544.5k vs 410.5k; see <a href="performance.html#release-0-2-0">Performance</a>. Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024.</td></tr>
+            <tr><td>Version</td><td><strong>0.2.4</strong> · November 20, 2026 · <a href="https://github.com/faratech/httpjet/releases/latest">latest public release</a></td></tr>
+            <tr><td>Release detail</td><td>11 waves of hot-path optimizations (zero-map single-frame H2 fast path, small-body coalescing across H1/H2/H3, direct HPACK/QPACK encoding, shared <code>Arc&lt;HeaderMap&gt;</code> <code>fast_memo</code> egress, 50 ms coarse HTTP Date cache, single-probe router resolution, compact ACL bitmasks + TLS peer cache, cached static <code>RootDir</code> descriptors, borrowed <code>.htaccess</code>/rewrite/LSAPI paths) plus 36 reliability fixes across transport, page cache, rewrite, proxy, and lifecycle. Same-host loopback A/B vs 0.2.3 (4 workers vs 4 <code>h2load</code> threads): H2 <code>fast_memo</code> <strong>+24.2%</strong> (1.35M req/s), unmemoized heavy <code>.htaccess</code> H1/H2 <strong>+22.2% / +21.2%</strong>; see <a href="performance.html#release-0-2-4">Performance</a>. Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024.</td></tr>
             <tr><td>Configuration</td><td>LiteSpeed XML stays authoritative. Native directives stay opt-in. <code>check --strict</code> gates deploys.</td></tr>
             <tr><td>Transport</td><td>Pure io_uring (monoio), H1/H2/H3 only. No epoll fallback or Windows/macOS port.</td></tr>
             <tr><td>PHP</td><td>Native LSAPI; you supply <code>lsphp</code>. Production: persistent external pool, zero-downtime generation reloads.</td></tr>

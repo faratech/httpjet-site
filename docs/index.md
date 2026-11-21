@@ -7,7 +7,7 @@
 
 ---
 
-httpjet · documentation · v0.2.0
+httpjet · documentation · v0.2.4
 
 # httpjet
 
@@ -66,7 +66,7 @@ Point `--root` at your LiteSpeed Web Server (LSWS 6.3.5) or OpenLiteSpeed tree. 
 - Loopback admin API , WAF sidecar , compile-time extensions
 
         i   Where it runs
-httpjet serves WindowsForum.com (x86_64) and MoonTimeNow.com + ThisDayInHistory.ai (ARM64) behind Cloudflare, on pure io_uring with the file tier live. It replaced LiteSpeed for all three (0.1.12, Rust 1.99.1+, edition 2024, GPL-3.0-only). Run `check --strict` and test on alternate ports before cutover. See Capabilities & limits .
+httpjet serves WindowsForum.com (x86_64) and MoonTimeNow.com + ThisDayInHistory.ai (ARM64) behind Cloudflare, on pure io_uring with the file tier live. It replaced LiteSpeed for all three (0.2.4, Rust 1.99.1+, edition 2024, GPL-3.0-only). Run `check --strict` and test on alternate ports before cutover. See Capabilities & limits .
 
 ## How the pieces fit
 
@@ -96,15 +96,15 @@ See Performance for method and receipts.
           40 ×   cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms
           146 /146   h2spec, native HTTP/2, TLS, three runs
           0.2 %   httpjet phases, June 2026 production (~138 µs/req); PHP 86.5–98.8% of wall time
-          3,100 +   test functions, 20 crates; suite green at v0.2.0 (3,171 tests)
+          3,200 +   test functions, 20 crates; suite green at v0.2.4 (3,237 tests)
 
 ## Project status
 
 | Aspect | State |
 
-| Version | **0.2.0** · November 11, 2026 · latest public release |
+| Version | **0.2.4** · November 20, 2026 · latest public release |
 
-| Release detail | Security audit fixes (WebSocket handshake, capsule revalidation, multi-member gzip, QUIC handshake cleanup, H3 body budget) and cold-start latency: the `.htaccess` chain is parsed once before the first connection, so the slowest request after boot falls from 508 ms to 3 ms. Lab VM, same run, 0.2.0 vs 0.1.12: HTTP/2 1 KiB static 625.5k vs 591.8k req/s, heavy-`.htaccess` HTTP/2 515.3k vs 402.9k, page-cache hits 544.5k vs 410.5k; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
+| Release detail | 11 waves of hot-path optimizations (zero-map single-frame H2 fast path, small-body coalescing across H1/H2/H3, direct HPACK/QPACK encoding, shared `Arc ` `fast_memo` egress, 50 ms coarse HTTP Date cache, single-probe router resolution, compact ACL bitmasks + TLS peer cache, cached static `RootDir` descriptors, borrowed `.htaccess`/rewrite/LSAPI paths) plus 36 reliability fixes across transport, page cache, rewrite, proxy, and lifecycle. Same-host loopback A/B vs 0.2.3 (4 workers vs 4 `h2load` threads): H2 `fast_memo` **+24.2%** (1.35M req/s), unmemoized heavy `.htaccess` H1/H2 **+22.2% / +21.2%**; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
 
 | Configuration | LiteSpeed XML stays authoritative. Native directives stay opt-in. `check --strict` gates deploys. |
 

@@ -8,7 +8,7 @@ PAGE: Overview (https://httpjet.net/docs/)
 SUMMARY: Start here for what httpjet is.
 ==============================================================================
 
-httpjet · documentation · v0.2.0
+httpjet · documentation · v0.2.4
 
 # httpjet
 
@@ -67,7 +67,7 @@ Point `--root` at your LiteSpeed Web Server (LSWS 6.3.5) or OpenLiteSpeed tree. 
 - Loopback admin API , WAF sidecar , compile-time extensions
 
         i   Where it runs
-httpjet serves WindowsForum.com (x86_64) and MoonTimeNow.com + ThisDayInHistory.ai (ARM64) behind Cloudflare, on pure io_uring with the file tier live. It replaced LiteSpeed for all three (0.1.12, Rust 1.99.1+, edition 2024, GPL-3.0-only). Run `check --strict` and test on alternate ports before cutover. See Capabilities & limits .
+httpjet serves WindowsForum.com (x86_64) and MoonTimeNow.com + ThisDayInHistory.ai (ARM64) behind Cloudflare, on pure io_uring with the file tier live. It replaced LiteSpeed for all three (0.2.4, Rust 1.99.1+, edition 2024, GPL-3.0-only). Run `check --strict` and test on alternate ports before cutover. See Capabilities & limits .
 
 ## How the pieces fit
 
@@ -97,15 +97,15 @@ See Performance for method and receipts.
           40 ×   cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms
           146 /146   h2spec, native HTTP/2, TLS, three runs
           0.2 %   httpjet phases, June 2026 production (~138 µs/req); PHP 86.5–98.8% of wall time
-          3,100 +   test functions, 20 crates; suite green at v0.2.0 (3,171 tests)
+          3,200 +   test functions, 20 crates; suite green at v0.2.4 (3,237 tests)
 
 ## Project status
 
 | Aspect | State |
 
-| Version | **0.2.0** · November 11, 2026 · latest public release |
+| Version | **0.2.4** · November 20, 2026 · latest public release |
 
-| Release detail | Security audit fixes (WebSocket handshake, capsule revalidation, multi-member gzip, QUIC handshake cleanup, H3 body budget) and cold-start latency: the `.htaccess` chain is parsed once before the first connection, so the slowest request after boot falls from 508 ms to 3 ms. Lab VM, same run, 0.2.0 vs 0.1.12: HTTP/2 1 KiB static 625.5k vs 591.8k req/s, heavy-`.htaccess` HTTP/2 515.3k vs 402.9k, page-cache hits 544.5k vs 410.5k; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
+| Release detail | 11 waves of hot-path optimizations (zero-map single-frame H2 fast path, small-body coalescing across H1/H2/H3, direct HPACK/QPACK encoding, shared `Arc ` `fast_memo` egress, 50 ms coarse HTTP Date cache, single-probe router resolution, compact ACL bitmasks + TLS peer cache, cached static `RootDir` descriptors, borrowed `.htaccess`/rewrite/LSAPI paths) plus 36 reliability fixes across transport, page cache, rewrite, proxy, and lifecycle. Same-host loopback A/B vs 0.2.3 (4 workers vs 4 `h2load` threads): H2 `fast_memo` **+24.2%** (1.35M req/s), unmemoized heavy `.htaccess` H1/H2 **+22.2% / +21.2%**; see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
 
 | Configuration | LiteSpeed XML stays authoritative. Native directives stay opt-in. `check --strict` gates deploys. |
 
@@ -2768,7 +2768,7 @@ httpjet --root /abs/root check [--strict]     # parse + summary + lint; --strict
 httpjet --root /abs/root serve [flags…]       # bind the configured listeners and serve
 httpjet --root /abs/root lsphp [flags…]       # run a standalone persistent lsphp pool (the PHP half of a zero-downtime deploy)
 httpjet lsphp-reload [flags…]                 # ask a running pool to replace its worker generation without closing the listener
-httpjet --version                             # httpjet 0.2.0
+httpjet --version                             # httpjet 0.2.4
 ```
 
 | Subcommand · flag | Default | Meaning |
@@ -2948,6 +2948,8 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 | --rewrite-outcome-ttl-ms   | 1000 | TTL in milliseconds for the rewrite-outcome cache (memoized rewrite decisions for `path_cacheable` chains, keyed by vhost/scheme/ method/host/path/query + any keyable header vars). 0 disables the cache entirely. The default (1000 ms) matches the historical hard-coded TTL — it bounds `-f`/`-d` filesystem staleness exactly like the StatCache and lets `.htaccess` edits take effect within ~1 s |
 
 | --rewrite-ua-classify | off | Key UA-reading rewrite chains by the bitmap of matching User-Agent RewriteConds instead of the raw UA string, when parse-time analysis proves the outcome depends on the UA only through those match results. Collapses real-world UA diversity (near-zero hit rate on raw UAs) onto a handful of outcome-cache entries. Default OFF — enabling is a deploy-time decision |
+
+| --buffered-work-min-bytes   | 0 | Encode a buffered response body of at least this many bytes in 64 KiB slices, yielding to other requests between slices so large encodings do not stall sibling connections on the worker. 0 disables slicing. |
 
 | Memory |
 
@@ -3215,6 +3217,33 @@ Memo alone, instructions/request, frozen non-PGO binary, SINGULARITY loopback, 1
 | H3 | 98,293 | 68,024 | **−30.8%** |
 
 Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: `docs/pagecache-response-memo-experiment.md` in the source tree.
+
+## Release 0.2.4: transport, pipeline, and backend optimizations (Waves 1–11)
+
+`0.2.4` (November 20, 2026) ships 11 waves of hot-path performance work and 36 reliability fixes across transport, page cache, rewrite, proxy, and lifecycle paths (following `0.2.3` on November 16, which added progressive stream-fill for unframed misses, single-encode streamed zstd caching, `--buffered-work-min-bytes`, and a full dependency refresh). Verification: **3,237 workspace tests** green, panic-lint ratchet down to 567 sites (from 572), wire and flags unchanged.
+
+- **Transport & framing (H1/H2/H3):** stack-local zero-map fast path for single-frame H2 requests; small-body coalescing into inline/head buffers across H1, H2, and H3; direct HPACK and QPACK encoding without scratch copies; compile-time QPACK static lookup; single-pass HPACK static/dynamic lookups; inherited listener TCP socket options.
+
+- **`fast_memo` & request pipeline:** shared `Arc ` zero-clone `fast_memo` egress across H1/H2/H3; 50 ms coarse HTTP `Date` clock cache; single-probe router host resolution; compact IPv4/IPv6 ACL bitmask tables with a 16-slot reload-safe TLS peer cache; cached static `RootDir` descriptors with `FxHash` metadata lookups.
+
+- **Rewrite, compression & backends:** borrowed zero-alloc header and path lookups across `.htaccess` and `mod_rewrite` evaluation; pooled plain-zstd and streamed-gzip codecs; borrowed LSAPI CGI builders and zero-alloc log escaping.
+
+Controlled 3-way A/B/C loopback comparison on the x86_64 host (2026-11-20, native release builds with `-Ctarget-cpu=native`, 4 workers vs 4 `h2load` threads, 1 s warmup + 5 s measured, median of 3 interleaved rounds, 100% `2xx`):
+
+| Workload | 0.2.3 (req/s) | 0.2.4 (req/s) | Delta vs 0.2.3 | p50 latency (0.2.3 → 0.2.4) |
+
+| HTTP/2 `fast_memo` (64 B, TLS) | 1,084,102 | **1,346,816** | **+24.23%** | 929 µs → **610 µs** |
+
+| HTTP/2 `--no-fast-memo` heavy `.htaccess` (64 B, TLS) | 273,773 | **331,930** | **+21.24%** | 3.85 ms → **3.02 ms** |
+
+| HTTP/1.1 `--no-fast-memo` heavy `.htaccess` (64 B) | 180,417 | **220,519** | **+22.23%** | 244 µs → **245 µs** (p99 1.02 ms → 770 µs) |
+
+| HTTP/2 `fast_memo` (8 KiB HTML, TLS, gzip/br) | 561,555 | **620,061** | **+10.42%** | 819 µs → **641 µs** |
+
+| HTTP/1.1 `fast_memo` (64 B, plaintext) | 489,413 | 502,602 (peak 542,918) | +2.69% (client/scheduler-bound) | 115 µs → **107 µs** |
+
+        ⎁   Regime & honest caveats
+This table is a same-host loopback A/B/C between identical native release builds (non-PGO) on isolated alternate ports with a self-contained 150-rule `.htaccess` fixture; it is not mixed into the dedicated-VM PGO release curve above. Plaintext HTTP/1.1 `fast_memo` saturates loopback/client scheduling near ~520k req/s on 8 shared cores (4 workers + 4 loadgen threads).
 
 ## Release 0.2.1 / 0.2.2: admission fix, second review pass
 
