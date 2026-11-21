@@ -27,7 +27,7 @@ window.DOCS_INDEX = [
    {
     "id": "status",
     "t": "Project status",
-    "kw": "Arc HeaderMap fast_memo RootDir htaccess h2load check --strict lsphp acme ocsp otel ktls profiling"
+    "kw": "Arc HeaderMap fast_memo RootDir htaccess check --strict lsphp acme ocsp otel ktls profiling"
    }
   ]
  },
@@ -958,7 +958,12 @@ window.DOCS_INDEX = [
    {
     "id": "release-0-2-4",
     "t": "Release 0.2.4: transport, pipeline, and backend optimizations (Waves 1–11)",
-    "kw": "--buffered-work-min-bytes fast_memo Arc HeaderMap Date RootDir FxHash htaccess mod_rewrite Ctarget-cpu native h2load --no-fast-memo"
+    "kw": "fast_memo Arc HeaderMap Date RootDir FxHash htaccess mod_rewrite h2load nginx robots.txt wrk"
+   },
+   {
+    "id": "release-0-2-3",
+    "t": "Release 0.2.3: progressive stream-fill, single-encode zstd, buffered-work slicing",
+    "kw": "--buffered-work-min-bytes aws-lc-rs brotli zstd-safe io-uring openssl nix htaccess"
    },
    {
     "id": "release-0-2-2",
@@ -1002,7 +1007,7 @@ window.DOCS_INDEX = [
    {
     "id": "build-ledger",
     "t": "All builds & benchmark receipts ledger",
-    "kw": "dcf4ca1e RESULTS.md litespeed- run1.csv Tier fc2088 statx FileCache StatCache RegexSet robots.txt Batches d80a25 Cow zstd gzip Batch dfc target-cpu native mimalloc scripts build-pgo.sh LSCache Fix openat httpjet-sweep-fixed.csv httpjet-cache-run1.csv httpjet-cache-jetfile.csv io_uring c4930ff6 monoio writev CLAUDE.md v0.0.1 c5e7c2 versus5-dedicated-final-20260827.csv compare-rewrite-memo-vary-pgo.csv v0.0.2 f987d7cd sendfile httpjet-sendfile-sendfile-release.csv httpjet-ktls-sendfile- csv v0.0.3 e36d652 openat2 httpjet-0.0.3-vs-previous- v0.0.9 d4a4e333 v0.0.10 f73fcedf v0.1.2 f259201 Recycled c10fdc4 v0.1.5 ed92f9 BODY_BUFS v0.1.6 bea req docs performance BASELINE.md v0.1.7 v0.1.8 eefffd v0.1.9 fdca111 v0.1.10 c07d345 v0.1.11 df571f v0.1.12 b99e16 v0.2.4 b6f1c6 fast_memo htaccess v0.2.2 d59a6379 v0.2.1 a424 v0.2.0 fcb4647 experiment rps sendmsg h3-gso-segment-experiment.md"
+    "kw": "dcf4ca1e RESULTS.md litespeed- run1.csv Tier fc2088 statx FileCache StatCache RegexSet robots.txt Batches d80a25 Cow zstd gzip Batch dfc target-cpu native mimalloc scripts build-pgo.sh LSCache Fix openat httpjet-sweep-fixed.csv httpjet-cache-run1.csv httpjet-cache-jetfile.csv io_uring c4930ff6 monoio writev CLAUDE.md v0.0.1 c5e7c2 versus5-dedicated-final-20260827.csv compare-rewrite-memo-vary-pgo.csv v0.0.2 f987d7cd sendfile httpjet-sendfile-sendfile-release.csv httpjet-ktls-sendfile- csv v0.0.3 e36d652 openat2 httpjet-0.0.3-vs-previous- v0.0.9 d4a4e333 v0.0.10 f73fcedf v0.1.2 f259201 Recycled c10fdc4 v0.1.5 ed92f9 BODY_BUFS v0.1.6 bea req docs performance BASELINE.md v0.1.7 v0.1.8 eefffd v0.1.9 fdca111 v0.1.10 c07d345 v0.1.11 df571f v0.1.12 b99e16 v0.2.4 b6f1c6 htaccess v0.2.3 a9899c7 v0.2.2 d59a6379 v0.2.1 a424 v0.2.0 fcb4647 experiment rps sendmsg h3-gso-segment-experiment.md"
    }
   ]
  },

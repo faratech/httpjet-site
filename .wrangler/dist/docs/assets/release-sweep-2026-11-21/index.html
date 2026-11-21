@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Release sweep 2026-11-21 — raw benchmark logs</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;background:#0b1220;color:#dbe7f3;margin:2rem auto;max-width:64rem;padding:0 1rem;line-height:1.55}a{color:#22d3ee}table{border-collapse:collapse}td,th{border:1px solid #263650;padding:.3rem .6rem;text-align:right}th:first-child,td:first-child{text-align:left}.mini{color:#8fa8c0;font-size:.85em}code{color:#a5f3fc}</style>
+</head><body>
+<h1>Release sweep 2026-11-21 — raw logs and checks</h1>
+<p>Every release from v0.0.1 to v0.2.4 (15 releases), measured under <strong>identical conditions</strong> on a dedicated lab VM
+(Google Cloud <code>c4-highmem-8</code>, Ubuntu 26.10 — the production x86 origin's machine type). No production host was loaded:
+server and load generator both ran inside the VM, over its loopback, server pinned to cores 0-3
+(<code>--workers 4</code>), <code>h2load</code> to cores 4-7. Each release was PGO-built from its tag with one
+unified gather profile (Rust 1.99.1) and served with uniform production flags. Three rounds per build in
+rotated order; tables show medians. Per-round data: <a href="../release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a> ·
+Three-way vs nginx: <a href="../lab-threeway-2026-11-21.tsv">lab-threeway-2026-11-21.tsv</a> ·
+Functional checks (15/15 pass): <a href="../lab-checks-2026-11-21.tsv">lab-checks-2026-11-21.tsv</a> ·
+Perf counters: <a href="../lab-perf-2026-11-21.tsv">lab-perf-2026-11-21.tsv</a>.</p>
+<h2>Median results (k req/s)</h2>
+<table><tr><th>Build</th><th>static-h2</th><th>static-h1</th><th>heavy-h2</th><th>heavy-h1</th><th>php-h1</th><th>cache-h2</th><th>empty-h2</th><th>big-h2</th></tr>
+<tr><td>v0.0.1</td><td>539.3</td><td>357.5</td><td>405.2</td><td>276.0</td><td>0.6</td><td>118.5</td><td>572.8</td><td>97.2</td></tr><tr><td>v0.0.2</td><td>488.7</td><td>330.3</td><td>456.7</td><td>280.5</td><td>0.6</td><td>125.1</td><td>609.9</td><td>102.9</td></tr><tr><td>v0.0.3</td><td>534.2</td><td>340.8</td><td>499.4</td><td>247.9</td><td>0.6</td><td>115.2</td><td>571.9</td><td>91.5</td></tr><tr><td>v0.0.9</td><td>522.8</td><td>351.8</td><td>485.2</td><td>295.8</td><td>30.2</td><td>155.9</td><td>503.6</td><td>108.8</td></tr><tr><td>v0.0.10</td><td>504.4</td><td>322.2</td><td>485.3</td><td>315.8</td><td>30.2</td><td>157.4</td><td>562.2</td><td>99.3</td></tr><tr><td>v0.1.2</td><td>509.4</td><td>305.4</td><td>387.5</td><td>285.9</td><td>31.6</td><td>189.0</td><td>593.0</td><td>115.1</td></tr><tr><td>v0.1.5</td><td>600.0</td><td>314.1</td><td>446.1</td><td>273.1</td><td>33.0</td><td>223.0</td><td>653.3</td><td>120.6</td></tr><tr><td>v0.1.10</td><td>468.6</td><td>294.2</td><td>444.8</td><td>268.9</td><td>31.7</td><td>168.2</td><td>514.1</td><td>108.4</td></tr><tr><td>v0.1.11</td><td>750.9</td><td>353.6</td><td>542.1</td><td>342.9</td><td>38.7</td><td>615.2</td><td>820.0</td><td>127.1</td></tr><tr><td>v0.1.12</td><td>734.3</td><td>359.4</td><td>531.7</td><td>329.5</td><td>39.3</td><td>703.2</td><td>926.0</td><td>119.2</td></tr><tr><td>v0.2.0</td><td>891.8</td><td>357.4</td><td>650.1</td><td>304.4</td><td>39.3</td><td>605.5</td><td>933.7</td><td>120.0</td></tr><tr><td>v0.2.1</td><td>881.9</td><td>397.9</td><td>619.1</td><td>335.7</td><td>39.4</td><td>696.5</td><td>978.3</td><td>117.8</td></tr><tr><td>v0.2.2</td><td>794.6</td><td>378.8</td><td>672.6</td><td>341.6</td><td>39.6</td><td>679.3</td><td>904.0</td><td>123.6</td></tr><tr><td>v0.2.3</td><td>849.1</td><td>383.4</td><td>656.9</td><td>343.1</td><td>39.6</td><td>720.3</td><td>860.1</td><td>114.4</td></tr><tr><td>v0.2.4</td><td>1092.6</td><td>415.7</td><td>879.5</td><td>381.5</td><td>41.8</td><td>849.6</td><td>1291.7</td><td>110.0</td></tr>
+</table>
+<p class="mini">Back to <a href="/docs/performance">Performance documentation</a>.</p>
+</body></html>

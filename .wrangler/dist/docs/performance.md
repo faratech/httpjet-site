@@ -30,12 +30,12 @@ Loopback removes network, handshakes, CDN. It isolates server code for compariso
 
 ## Performance across builds — interactive presentation
 
-You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (`0.0.1`, June 2026) through `0.2.2`. CSV receipts stay outside the public export at github.com/faratech/httpjet .
+You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (`0.0.1`, June 2026) through `0.2.4`. CSV receipts stay outside the public export at github.com/faratech/httpjet .
 
-Compare v0.0.1–v0.2.2 in the **Release Speed Curve**. Every release was re-measured on 2026-11-12 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: release-sweep-2026-11-12.tsv ; raw `h2load` logs, server logs and the bench driver: release-sweep-2026-11-12/ . (Earlier sweeps stay archived: 2026-11-11 and 2026-10-26 .) Then step through **19 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
+Compare v0.0.1–v0.2.4 in the **Release Speed Curve**. Every release was re-measured on 2026-11-21 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: release-sweep-2026-11-21.tsv ; raw `h2load` logs and checks: release-sweep-2026-11-21/ . (Earlier sweeps stay archived: 2026-11-12 , 2026-11-11 and 2026-10-26 .) Then step through **21 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
 
         ⎁   One test, every version
-To keep this page simple, every version-to-version number comes from **one run under one set of conditions**: a dedicated lab VM (c4-highmem-8, the production machine type), loopback only, server pinned to 4 cores, `h2load` on the other 4, each release PGO-built from its tag the same way, same flags, same eight workloads, 3 rounds each, median shown. Before benching, every binary also had to pass the **same functional checks** (start, static file, `.htaccess` page, PHP page, cache hit, empty and 64 KiB files, config lint): lab-checks-2026-11-08.tsv . Numbers from *other* regimes — the dedicated-client server comparison, production telemetry, the dated build-history slides — are always labelled with their own conditions and are never mixed into the curve.
+To keep this page simple, every version-to-version number comes from **one run under one set of conditions**: a dedicated lab VM (c4-highmem-8, the production machine type), loopback only, server pinned to 4 cores, `h2load` on the other 4, each release PGO-built from its tag the same way, same flags, same eight workloads, 3 rounds each, median shown. Before benching, every binary also had to pass the **same functional checks** (start, static file, `.htaccess` page, PHP page, cache hit, empty and 64 KiB files, config lint) — 15 of 15 pass: lab-checks-2026-11-21.tsv . Numbers from *other* regimes — the dedicated-client server comparison, production telemetry, the dated build-history slides — are always labelled with their own conditions and are never mixed into the curve.
 
 ## Where the time actually goes
 
@@ -132,7 +132,7 @@ Instructions show less native cache-hit work here. They count user-mode PMU over
 
 ## Release 0.2.4: transport, pipeline, and backend optimizations (Waves 1–11)
 
-`0.2.4` (November 20, 2026) ships 11 waves of hot-path performance work and 36 reliability fixes across transport, page cache, rewrite, proxy, and lifecycle paths (following `0.2.3` on November 16, which added progressive stream-fill for unframed misses, single-encode streamed zstd caching, `--buffered-work-min-bytes`, and a full dependency refresh). Verification: **3,237 workspace tests** green, panic-lint ratchet down to 567 sites (from 572), wire and flags unchanged.
+`0.2.4` (November 20, 2026) ships 11 waves of hot-path performance work and 36 reliability fixes across transport, page cache, rewrite, proxy, and lifecycle paths. Verification: **3,237 workspace tests** green, panic-lint ratchet down to 567 sites (from 572), 15/15 release functional checks pass, wire and flags unchanged.
 
 - **Transport & framing (H1/H2/H3):** stack-local zero-map fast path for single-frame H2 requests; small-body coalescing into inline/head buffers across H1, H2, and H3; direct HPACK and QPACK encoding without scratch copies; compile-time QPACK static lookup; single-pass HPACK static/dynamic lookups; inherited listener TCP socket options.
 
@@ -140,22 +140,33 @@ Instructions show less native cache-hit work here. They count user-mode PMU over
 
 - **Rewrite, compression & backends:** borrowed zero-alloc header and path lookups across `.htaccess` and `mod_rewrite` evaluation; pooled plain-zstd and streamed-gzip codecs; borrowed LSAPI CGI builders and zero-alloc log escaping.
 
-Controlled 3-way A/B/C loopback comparison on the x86_64 host (2026-11-20, native release builds with `-Ctarget-cpu=native`, 4 workers vs 4 `h2load` threads, 1 s warmup + 5 s measured, median of 3 interleaved rounds, 100% `2xx`):
+Dedicated lab VM, 2026-11-21 (c4-highmem-8, loopback, server on 4 cores, `h2load` on 4, every release Unified-PGO-built from its tag, 3 rotated rounds, median; all 15 releases re-measured in one run: release-sweep-2026-11-21.tsv ):
 
-| Workload | 0.2.3 (req/s) | 0.2.4 (req/s) | Delta vs 0.2.3 | p50 latency (0.2.3 → 0.2.4) |
+| Workload | 0.2.2 (k req/s) | 0.2.3 (k req/s) | 0.2.4 (k req/s) | 0.2.4 vs 0.2.3 |
 
-| HTTP/2 `fast_memo` (64 B, TLS) | 1,084,102 | **1,346,816** | **+24.23%** | 929 µs → **610 µs** |
+| HTTP/2 empty body (`c=32 × 10`) | 904.0k | 860.1k | **1,291.7k** | **+50.2%** |
 
-| HTTP/2 `--no-fast-memo` heavy `.htaccess` (64 B, TLS) | 273,773 | **331,930** | **+21.24%** | 3.85 ms → **3.02 ms** |
+| HTTP/2 static 1 KiB (`c=32 × 10`) | 794.6k | 849.1k | **1,092.6k** | **+28.7%** |
 
-| HTTP/1.1 `--no-fast-memo` heavy `.htaccess` (64 B) | 180,417 | **220,519** | **+22.23%** | 244 µs → **245 µs** (p99 1.02 ms → 770 µs) |
+| Heavy 806-line `.htaccess` H2 (`c=32 × 10`) | 672.6k | 656.9k | **879.5k** | **+33.9%** |
 
-| HTTP/2 `fast_memo` (8 KiB HTML, TLS, gzip/br) | 561,555 | **620,061** | **+10.42%** | 819 µs → **641 µs** |
+| Page-cache hit H2 (37 KB, `c=32 × 32`) | 679.3k | 720.3k | **849.6k** | **+18.0%** |
 
-| HTTP/1.1 `fast_memo` (64 B, plaintext) | 489,413 | 502,602 (peak 542,918) | +2.69% (client/scheduler-bound) | 115 µs → **107 µs** |
+| HTTP/1.1 static 1 KiB (`c=100`) | 378.8k | 383.4k | **415.7k** | **+8.4%** |
 
-        ⎁   Regime & honest caveats
-This table is a same-host loopback A/B/C between identical native release builds (non-PGO) on isolated alternate ports with a self-contained 150-rule `.htaccess` fixture; it is not mixed into the dedicated-VM PGO release curve above. Plaintext HTTP/1.1 `fast_memo` saturates loopback/client scheduling near ~520k req/s on 8 shared cores (4 workers + 4 loadgen threads).
+| Heavy 806-line `.htaccess` H1 (`c=100`) | 341.6k | 343.1k | **381.5k** | **+11.2%** |
+
+| PHP/LSAPI H1 (`c=40`) | 39.6k | 39.6k | **41.8k** | **+5.6%** |
+
+| HTTP/2 static 64 KiB (`c=32 × 10`) | 123.6k | 114.4k | 110.0k | −3.8% (noise) |
+
+> [Benchmark Chart: lab-threeway — Lab three-way, same-host loopback (httpjet vs nginx) (dedicated lab VM c4-highmem-8 · server cores 0-3 / loadgen cores 4-7 · h2load c=32 x10 (64 KiB: n=20k) · median of 3 rounds · 2026-11-21 · req/s)]
+
+In the same lab run, `nginx` reached 311.7k (H2 empty), 215.3k (H2 1 KiB), 265.5k (H2 `/robots.txt` without `.htaccess`), 269.3k (H1 1 KiB), and 333.7k (`wrk` H1) against httpjet `0.2.4`'s **1,161.2k** (3.73×), **932.6k** (4.33×), **940.1k** (3.54×), **415.7k** (1.54×), and **486.4k** (1.46×). Per-round data: lab-threeway-2026-11-21.tsv ; perf software counters: lab-perf-2026-11-21.tsv .
+
+## Release 0.2.3: progressive stream-fill, single-encode zstd, buffered-work slicing
+
+`0.2.3` (November 16, 2026) added progressive stream-fill for unframed cacheable misses (streaming to the client while a backend-paced task stores at the end), single-encode streamed zstd caching, `--buffered-work-min-bytes` (64 KiB yielding slices for large buffered encodes), borrowed static fast-path request heads, ordered proxy-pool idle expiry, lazy PHP slow-log record identity, and a dependency refresh (`aws-lc-rs 1.19`, `brotli 9.1.3`, `zstd-safe 8.3`, `io-uring 0.7.16`, `openssl 0.10.82`, `nix 0.32`). In the 2026-11-21 lab sweep, `0.2.3` vs `0.2.2` moved H2 1 KiB **794.6k → 849.1k** (+6.9%) and page-cache hits **679.3k → 720.3k** (+6.0%), with H1 static (378.8k → 383.4k), heavy `.htaccess` (672.6k → 656.9k H2, 341.6k → 343.1k H1), and PHP/LSAPI (39.6k → 39.6k) flat within round spread.
 
 ## Release 0.2.1 / 0.2.2: admission fix, second review pass
 
@@ -163,7 +174,7 @@ This table is a same-host loopback A/B/C between identical native release builds
 
 Lab VM, 2026-11-12 (loopback, server on 4 cores, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median; all thirteen releases re-measured in this one run). The version comparisons: 0.2.0 → 0.2.1, H2 1 KiB **699.3k → 669.1k**, heavy `.htaccess` H2 **518.9k → 545.7k**, page-cache hit **604.2k → 540.9k**, PHP/LSAPI **32.3k → 32.6k**; 0.2.1 → 0.2.2, H2 1 KiB **669.1k → 665.6k**, heavy H2 **545.7k → 537.8k**, page-cache **540.9k → 542.4k**, PHP **32.6k → 32.5k**. In the same lab nginx reached 185k (H2 1 KiB) against httpjet 0.2.2's 728k three-way cell (639.7k median sweep cell; the three-way cell is noisier).
 
-> [Benchmark Chart: lab-threeway — Lab three-way, same-host loopback (httpjet vs nginx vs OpenLiteSpeed) (dedicated lab VM c4-highmem-8 · server cores 0-3 / loadgen cores 4-7 · h2load c=32 x10 (64 KiB: n=20k) · median of 3 rounds · 2026-11-12 · req/s)]
+> [Benchmark Chart: lab-threeway — Lab three-way, same-host loopback (httpjet vs nginx) (dedicated lab VM c4-highmem-8 · server cores 0-3 / loadgen cores 4-7 · h2load c=32 x10 (64 KiB: n=20k) · median of 3 rounds · 2026-11-21 · req/s)]
 
 ## Release 0.2.0: security audit fixes and cold-start latency
 
@@ -203,7 +214,7 @@ Dedicated load-generator VM (c4-highcpu-8, same zone) against the production hos
 
 Lab VM, 2026-11-11 (loopback, server on 4 cores, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median). Use it to compare httpjet releases against each other: 0.2.0 vs 0.1.12 measured in the same run, H2 1 KiB **591.8k → 625.5k**, H1 1 KiB **273.3k → 311.2k**, heavy `.htaccess` H2 **402.9k → 515.3k**, PHP/LSAPI **27.8k → 32.3k**, page-cache hit **410.5k → 544.5k**, H2 empty **563.1k → 717.2k**; H2 64 KiB is flat (92.4k → 89.7k). Raw logs and the per-round TSV: release-sweep-2026-11-11/ . In the same lab nginx reached 196k (H2 1 KiB) against httpjet 0.2.0's 656k.
 
-> [Benchmark Chart: lab-threeway — Lab three-way, same-host loopback (httpjet vs nginx vs OpenLiteSpeed) (dedicated lab VM c4-highmem-8 · server cores 0-3 / loadgen cores 4-7 · h2load c=32 x10 (64 KiB: n=20k) · median of 3 rounds · 2026-11-12 · req/s)]
+> [Benchmark Chart: lab-threeway — Lab three-way, same-host loopback (httpjet vs nginx) (dedicated lab VM c4-highmem-8 · server cores 0-3 / loadgen cores 4-7 · h2load c=32 x10 (64 KiB: n=20k) · median of 3 rounds · 2026-11-21 · req/s)]
 
         ⎁   Honest caveats
 The production-host rows share a machine with live traffic, and the same servers swing ±10–20% between runs there: nginx's H2 1 KiB moved from 180,940 (2026-11-08) to 153,485 (this run) with no change on its side. Read them as the shape of the comparison, not as a precise delta against 0.1.12. The lab table, where both builds ran back to back on an idle VM, is the version-to-version comparison. The 0.1.12 dedicated load-generator table below was not re-run for 0.2.0 and still describes 0.1.12. The cache rows used a non-forum `/help/` page through the real origin cache (metrics endpoint not verified in this run; each page was primed and confirmed as `x-litespeed-cache: hit`). Raw CSVs for this run are on the benchmark page .
@@ -328,7 +339,9 @@ Filter all 14 benchmarked eras by tag, commit, workload, regime, receipt:
 
 | `v0.1.12` · Hot-Path Allocation & Contention Reductions 2026-11-08 · `85b99e16` | lab re-run dedicated lab VM, server 4 cores / loadgen 4 cores, all 10 releases | See Release 0.1.12 : lab medians vs v0.1.11 — H2 1 KiB **443.2k → 549.7k**, H1 1 KiB **267.2k → 284.3k**, page-cache **396.0k → 485.7k**; dedicated-client three-way H2 **371,540**. Receipts: release-sweep-2026-11-08.tsv + raw logs ; three-way CSVs on the benchmark page |
 
-| `v0.2.4` · Transport, Pipeline & Backend Optimizations (Waves 1–11) 2026-11-20 · `6b6f1c6` | 3-way loopback A/B/C 4 workers / 4 h2load threads, native release, 3 interleaved rounds | See Release 0.2.4 : vs v0.2.3 — H2 `fast_memo` 64 B **1,084k → 1,347k** (**+24.2%**, p50 929 µs → 610 µs), heavy `.htaccess` H2 **273.8k → 331.9k** (**+21.2%**), heavy `.htaccess` H1 **180.4k → 220.5k** (**+22.2%**), H2 8 KiB gzip/br **561.6k → 620.1k** (**+10.4%**). 3,237 tests green; 36 reliability fixes. |
+| `v0.2.4` · Transport, Pipeline & Backend Optimizations (Waves 1–11) 2026-11-20 · `6b6f1c6` | lab re-run dedicated lab VM, server 4 cores / loadgen 4 cores, all 15 releases | See Release 0.2.4 : lab medians vs v0.2.3 in the same run — H2 empty **860.1k → 1,291.7k** (**+50.2%**), H2 1 KiB **849.1k → 1,092.6k** (**+28.7%**), heavy `.htaccess` H2 **656.9k → 879.5k** (**+33.9%**), page-cache **720.3k → 849.6k** (**+18.0%**), PHP **39.6k → 41.8k** (**+5.6%**); lab three-way vs nginx H2 1 KiB **932.6k vs 215.3k** (4.33×). Receipts: release-sweep-2026-11-21.tsv + raw logs + lab-threeway-2026-11-21.tsv |
+
+| `v0.2.3` · Stream-Fill & Buffered Work 2026-11-16 · `0a9899c7` | lab re-run dedicated lab VM, server 4 cores / loadgen 4 cores, all 15 releases | See Release 0.2.3 : lab medians vs v0.2.2 in the same run — H2 1 KiB **794.6k → 849.1k** (+6.9%), page-cache **679.3k → 720.3k** (+6.0%), H1 1 KiB **378.8k → 383.4k**, heavy `.htaccess` H2 **672.6k → 656.9k**, PHP **39.6k → 39.6k**. Receipts: release-sweep-2026-11-21.tsv + raw logs |
 
 | `v0.2.2` · Second Review Pass 2026-11-12 · `d59a6379` | See Release 0.2.1 / 0.2.2 : lab medians flat vs v0.2.1 in the same run — H2 1 KiB **669.1k → 665.6k**, heavy `.htaccess` H2 **545.7k → 537.8k**, page-cache **540.9k → 542.4k**, PHP **32.6k → 32.5k**. Receipts: release-sweep-2026-11-12.tsv + raw logs ; loopback CSVs on the benchmark page |
 

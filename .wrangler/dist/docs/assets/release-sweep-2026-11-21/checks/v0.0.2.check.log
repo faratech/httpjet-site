@@ -1,0 +1,39 @@
+httpjet config check — root: /usr/local/lsws
+  server name : localhost
+  run as      : nobody:nobody
+  QUIC enabled: true
+  tuning      : maxConn=65000 keepAlive=5s maxBody=100MiB
+  per-IP throttle: disabled
+  listeners (2):
+    - Default @ *:80 (8 maps)
+    - TLS @ *:443 (8 maps) TLS[clientVerify=2 stapling=requested(requires --features ocsp and --ocsp-responder) ca=/etc/cloudflare/authenticated_origin_pull_ca.pem]
+  ext processors (5):
+    - fastapi [proxy] -> Tcp(127.0.0.1:8000)
+    - ai-api [proxy] -> Tcp(127.0.0.1:8001)
+    - status [proxy] -> Tcp(127.0.0.1:8003)
+    - php8 [lsapi] -> Uds("/usr/local/lsws/extapp-sock/php8.sock")
+    - mcp-api [proxy] -> Tcp(127.0.0.1:8002)
+  php         : /usr/local/lsws/lsphp8/bin/lsphp suffixes=["php", "html"] detached=true
+  vhosts (8, 8 files loaded):
+    - windowsforum.com             -> /web/public_html
+      fast_memo: eligible [vary: origin, cookie, ua-class]
+    - test.windowsforum.com        -> /web/public_html2
+    - search.windowsforum.com      -> /web/search
+    - ai.windowsforum.com          -> /web/ai
+    - bigfoot.windowsforum.com     -> /web/bigfoot
+    - status.windowsforum.com      -> /web/stats
+    - mcp.windowsforum.com         -> /web/mcp-static
+      fast_memo: eligible
+    - dieselfall.faratech.dev      -> /web/dieselfall
+  lint WARN : element <lsrecaptcha> in /usr/local/lsws/conf/httpd_config.xml is not implemented by httpjet — it is ignored (e.g. reCAPTCHA/censorship protection is NOT active)
+  lint WARN : element <censorshipControl> in /usr/local/lsws/conf/httpd_config.xml is not implemented by httpjet — it is ignored (e.g. reCAPTCHA/censorship protection is NOT active)
+  lint WARN : element <requiredPermissionMask> in /usr/local/lsws/conf/httpd_config.xml is not implemented by httpjet — it is ignored (e.g. reCAPTCHA/censorship protection is NOT active)
+  lint WARN : element <restrictedPermissionMask> in /usr/local/lsws/conf/httpd_config.xml is not implemented by httpjet — it is ignored (e.g. reCAPTCHA/censorship protection is NOT active)
+  vhost-map-fingerprint: fnv1a64:355a1f3b6afdd201
+  lint WARN : vhost 'windowsforum.com' has no exact vhostMap domain on any listener
+  lint ERROR: vhost 'ai.windowsforum.com' docroot /web/ai does not exist — every request to it would 404
+  lint ERROR: vhost 'bigfoot.windowsforum.com' docroot /web/bigfoot does not exist — every request to it would 404
+  lint ERROR: vhost 'dieselfall.faratech.dev' docroot /web/dieselfall does not exist — every request to it would 404
+  lint ERROR: vhost 'search.windowsforum.com' docroot /web/search does not exist — every request to it would 404
+  lint ERROR: vhost 'status.windowsforum.com' docroot /web/stats does not exist — every request to it would 404
+  lint ERROR: vhost 'test.windowsforum.com' docroot /web/public_html2 does not exist — every request to it would 404

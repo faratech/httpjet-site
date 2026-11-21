@@ -1,0 +1,144 @@
+2026-11-21T01:42:08.557371Z  INFO httpjet: HTTP/3 GSO segment limit selected segments=Ten
+2026-11-21T01:42:08.557391Z  INFO httpjet: HTTP/3 request engine selected engine=Legacy
+2026-11-21T01:42:08.557396Z  WARN httpjet: --no-mtls: client-cert verification DISABLED (local testing / explicit rollback only)
+2026-11-21T01:42:08.557409Z  INFO httpjet: kTLS startup policy resolved mode=Auto enabled=false interface="none" driver="none" reason=auto-disabled: binary was built without the ktls feature
+2026-11-21T01:42:08.557429Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:08.557442Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=test.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:08.557450Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=search.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:08.557459Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=ai.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:08.557467Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=mcp.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:08.571039Z  INFO hj_lsapi::registry: lsphp pool started (monitor up) vhost=<default> socket=/tmp/sweep-bench.dC6XOG/php/php.sock default_pool=true
+2026-11-21T01:42:08.571049Z  INFO httpjet: lsphp default pool started (registry up) socket=/tmp/sweep-bench.dC6XOG/php/php.sock children=16
+2026-11-21T01:42:08.571054Z  INFO httpjet: origin page cache ENABLED (--page-cache) mem_bytes=134217728 default_ttl_secs=900 vary_cookies=xf_style_variation,xf_style_id,xf_language_id
+2026-11-21T01:42:08.571103Z  INFO httpjet: page-cache purge endpoint enabled (loopback-only)
+2026-11-21T01:42:08.572156Z  INFO httpjet::state: per-vhost access log active (LSWS <logging><accessLog useServer=0>) vhost=windowsforum.com path=/usr/local/lsws/logs/windowsforum_access.log
+2026-11-21T01:42:08.588633Z  INFO httpjet: docroot access files parsed before serving files=2 elapsed_ms=15
+2026-11-21T01:42:08.590266Z  INFO httpjet: plain HTTP up (io_uring thread-per-core transport) args.http_addr=127.0.0.1:18080 listener=Default workers=4
+2026-11-21T01:42:08.591637Z  INFO httpjet: TLS up (io_uring thread-per-core transport; H1/H2 over rustls-on-monoio; mTLS required for external peers when client_verify=2, loopback/private-LAN exempt) addr=127.0.0.1:18443 listener=TLS client_verify=0 workers=4 ktls=false
+2026-11-21T01:42:08.592857Z  WARN httpjet: h3/QUIC up (io_uring quinn-proto driver → real pipeline; mTLS required for external peers when client_verify=2, loopback/private-LAN exempt) addr=127.0.0.1:18443 listener=TLS client_verify=0
+2026-11-21T01:42:08.592872Z  INFO httpjet: httpjet serving. Ctrl-C to stop. workers=4 vhosts=8
+2026-11-21T01:42:08.592891Z  INFO httpjet::memtrim: mimalloc periodic OS-trim enabled secs=120 threshold_mib=768
+2026-11-21T01:42:08.592896Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=1
+2026-11-21T01:42:08.592908Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=2
+2026-11-21T01:42:08.592925Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=0
+2026-11-21T01:42:08.592925Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=1
+2026-11-21T01:42:08.592930Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=2
+2026-11-21T01:42:08.592951Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=0
+2026-11-21T01:42:08.593818Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=3
+2026-11-21T01:42:08.593851Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=3
+2026-11-21T01:42:12.151657Z  INFO httpjet: shutdown signal received; draining connections
+2026-11-21T01:42:12.151694Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=3 secure=false in_flight=0
+2026-11-21T01:42:12.151840Z  INFO httpjet::uring: uring core: drained cleanly core=3 secure=false
+2026-11-21T01:42:12.151851Z  INFO httpjet: connections drained; stopping drained_ms=0
+2026-11-21T01:42:12.151866Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=0 secure=true in_flight=0
+2026-11-21T01:42:12.151867Z  INFO httpjet::uring: uring core: drained cleanly core=0 secure=true
+2026-11-21T01:42:12.151707Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=1 secure=false in_flight=0
+2026-11-21T01:42:12.152014Z  INFO httpjet::uring: uring core: drained cleanly core=1 secure=false
+2026-11-21T01:42:12.151720Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=1 secure=true in_flight=0
+2026-11-21T01:42:12.152072Z  INFO httpjet::uring: uring core: drained cleanly core=1 secure=true
+2026-11-21T01:42:12.151729Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=2 secure=true in_flight=0
+2026-11-21T01:42:12.152083Z  INFO httpjet::uring: uring core: drained cleanly core=2 secure=true
+2026-11-21T01:42:12.151832Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=0 secure=false in_flight=0
+2026-11-21T01:42:12.152089Z  INFO httpjet::uring: uring core: drained cleanly core=0 secure=false
+2026-11-21T01:42:12.151835Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=3 secure=true in_flight=0
+2026-11-21T01:42:12.152095Z  INFO httpjet::uring: uring core: drained cleanly core=3 secure=true
+2026-11-21T01:42:12.151706Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=2 secure=false in_flight=0
+2026-11-21T01:42:12.152215Z  INFO httpjet::uring: uring core: drained cleanly core=2 secure=false
+2026-11-21T01:42:12.917785Z  INFO hj_lsapi::registry: lsphp pool drained socket=/tmp/sweep-bench.dC6XOG/php/php.sock default_pool=true
+2026-11-21T01:42:12.917796Z  INFO httpjet: lsphp pools drained
+2026-11-21T01:42:14.962999Z  INFO httpjet: HTTP/3 GSO segment limit selected segments=Ten
+2026-11-21T01:42:14.963016Z  INFO httpjet: HTTP/3 request engine selected engine=Legacy
+2026-11-21T01:42:14.963020Z  WARN httpjet: --no-mtls: client-cert verification DISABLED (local testing / explicit rollback only)
+2026-11-21T01:42:14.963032Z  INFO httpjet: kTLS startup policy resolved mode=Auto enabled=false interface="none" driver="none" reason=auto-disabled: binary was built without the ktls feature
+2026-11-21T01:42:14.963052Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:14.963066Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=test.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:14.963073Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=search.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:14.963085Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=ai.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:14.963094Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=mcp.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:42:14.976713Z  INFO hj_lsapi::registry: lsphp pool started (monitor up) vhost=<default> socket=/tmp/sweep-bench.YJP9O0/php/php.sock default_pool=true
+2026-11-21T01:42:14.976721Z  INFO httpjet: lsphp default pool started (registry up) socket=/tmp/sweep-bench.YJP9O0/php/php.sock children=16
+2026-11-21T01:42:14.976728Z  INFO httpjet: origin page cache ENABLED (--page-cache) mem_bytes=134217728 default_ttl_secs=900 vary_cookies=xf_style_variation,xf_style_id,xf_language_id
+2026-11-21T01:42:14.976779Z  INFO httpjet: page-cache purge endpoint enabled (loopback-only)
+2026-11-21T01:42:14.977801Z  INFO httpjet::state: per-vhost access log active (LSWS <logging><accessLog useServer=0>) vhost=windowsforum.com path=/usr/local/lsws/logs/windowsforum_access.log
+2026-11-21T01:42:14.994423Z  INFO httpjet: docroot access files parsed before serving files=2 elapsed_ms=15
+2026-11-21T01:42:14.995883Z  INFO httpjet: plain HTTP up (io_uring thread-per-core transport) args.http_addr=127.0.0.1:18080 listener=Default workers=4
+2026-11-21T01:42:14.997605Z  INFO httpjet: TLS up (io_uring thread-per-core transport; H1/H2 over rustls-on-monoio; mTLS required for external peers when client_verify=2, loopback/private-LAN exempt) addr=127.0.0.1:18443 listener=TLS client_verify=0 workers=4 ktls=false
+2026-11-21T01:42:14.998740Z  WARN httpjet: h3/QUIC up (io_uring quinn-proto driver → real pipeline; mTLS required for external peers when client_verify=2, loopback/private-LAN exempt) addr=127.0.0.1:18443 listener=TLS client_verify=0
+2026-11-21T01:42:14.998756Z  INFO httpjet: httpjet serving. Ctrl-C to stop. workers=4 vhosts=8
+2026-11-21T01:42:14.998778Z  INFO httpjet::memtrim: mimalloc periodic OS-trim enabled secs=120 threshold_mib=768
+2026-11-21T01:42:14.998788Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=3
+2026-11-21T01:42:14.998797Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=0
+2026-11-21T01:42:14.998811Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=1
+2026-11-21T01:42:14.998938Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=0
+2026-11-21T01:42:14.998949Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=1
+2026-11-21T01:42:14.998820Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=2
+2026-11-21T01:42:14.999034Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=3
+2026-11-21T01:42:14.999038Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=2
+2026-11-21T01:42:18.600124Z  INFO httpjet: shutdown signal received; draining connections
+2026-11-21T01:42:18.600169Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=2 secure=false in_flight=0
+2026-11-21T01:42:18.600179Z  INFO httpjet::uring: uring core: drained cleanly core=2 secure=false
+2026-11-21T01:42:18.600277Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=0 secure=false in_flight=0
+2026-11-21T01:42:18.600288Z  INFO httpjet::uring: uring core: drained cleanly core=0 secure=false
+2026-11-21T01:42:18.600308Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=2 secure=true in_flight=0
+2026-11-21T01:42:18.600431Z  INFO httpjet::uring: uring core: drained cleanly core=2 secure=true
+2026-11-21T01:42:18.600312Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=3 secure=true in_flight=0
+2026-11-21T01:42:18.600440Z  INFO httpjet::uring: uring core: drained cleanly core=3 secure=true
+2026-11-21T01:42:18.600317Z  INFO httpjet: connections drained; stopping drained_ms=0
+2026-11-21T01:42:18.600321Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=3 secure=false in_flight=0
+2026-11-21T01:42:18.600455Z  INFO httpjet::uring: uring core: drained cleanly core=3 secure=false
+2026-11-21T01:42:18.600332Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=1 secure=false in_flight=0
+2026-11-21T01:42:18.600346Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=1 secure=true in_flight=0
+2026-11-21T01:42:18.600461Z  INFO httpjet::uring: uring core: drained cleanly core=1 secure=true
+2026-11-21T01:42:18.600358Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=0 secure=true in_flight=0
+2026-11-21T01:42:18.600466Z  INFO httpjet::uring: uring core: drained cleanly core=0 secure=true
+2026-11-21T01:42:18.600569Z  INFO httpjet::uring: uring core: drained cleanly core=1 secure=false
+2026-11-21T01:42:19.310593Z  INFO hj_lsapi::registry: lsphp pool drained socket=/tmp/sweep-bench.YJP9O0/php/php.sock default_pool=true
+2026-11-21T01:42:19.310604Z  INFO httpjet: lsphp pools drained
+2026-11-21T01:54:59.839957Z  INFO httpjet: HTTP/3 GSO segment limit selected segments=Ten
+2026-11-21T01:54:59.839980Z  INFO httpjet: HTTP/3 request engine selected engine=Legacy
+2026-11-21T01:54:59.839985Z  WARN httpjet: --no-mtls: client-cert verification DISABLED (local testing / explicit rollback only)
+2026-11-21T01:54:59.840000Z  INFO httpjet: kTLS startup policy resolved mode=Auto enabled=false interface="none" driver="none" reason=auto-disabled: binary was built without the ktls feature
+2026-11-21T01:54:59.840023Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:54:59.840037Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=test.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:54:59.840047Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=search.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:54:59.840055Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=ai.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:54:59.840064Z ERROR hj_tls: failed to load vhost TLS certificate; skipping (its domains fall back to the default cert) vhost=mcp.windowsforum.com cert=/var/tmp/lab-tls/cert.pem error=loading server chain material from /etc/letsencrypt/live/windowsforum.com/chain.pem
+2026-11-21T01:54:59.853887Z  INFO hj_lsapi::registry: lsphp pool started (monitor up) vhost=<default> socket=/tmp/sweep-bench.fcsmFW/php/php.sock default_pool=true
+2026-11-21T01:54:59.853899Z  INFO httpjet: lsphp default pool started (registry up) socket=/tmp/sweep-bench.fcsmFW/php/php.sock children=16
+2026-11-21T01:54:59.853906Z  INFO httpjet: origin page cache ENABLED (--page-cache) mem_bytes=134217728 default_ttl_secs=900 vary_cookies=xf_style_variation,xf_style_id,xf_language_id
+2026-11-21T01:54:59.853960Z  INFO httpjet: page-cache purge endpoint enabled (loopback-only)
+2026-11-21T01:54:59.855059Z  INFO httpjet::state: per-vhost access log active (LSWS <logging><accessLog useServer=0>) vhost=windowsforum.com path=/usr/local/lsws/logs/windowsforum_access.log
+2026-11-21T01:54:59.871595Z  INFO httpjet: docroot access files parsed before serving files=2 elapsed_ms=15
+2026-11-21T01:54:59.873410Z  INFO httpjet: plain HTTP up (io_uring thread-per-core transport) args.http_addr=127.0.0.1:18080 listener=Default workers=4
+2026-11-21T01:54:59.874715Z  INFO httpjet: TLS up (io_uring thread-per-core transport; H1/H2 over rustls-on-monoio; mTLS required for external peers when client_verify=2, loopback/private-LAN exempt) addr=127.0.0.1:18443 listener=TLS client_verify=0 workers=4 ktls=false
+2026-11-21T01:54:59.876031Z  WARN httpjet: h3/QUIC up (io_uring quinn-proto driver → real pipeline; mTLS required for external peers when client_verify=2, loopback/private-LAN exempt) addr=127.0.0.1:18443 listener=TLS client_verify=0
+2026-11-21T01:54:59.876046Z  INFO httpjet: httpjet serving. Ctrl-C to stop. workers=4 vhosts=8
+2026-11-21T01:54:59.876065Z  INFO httpjet::memtrim: mimalloc periodic OS-trim enabled secs=120 threshold_mib=768
+2026-11-21T01:54:59.876075Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=1
+2026-11-21T01:54:59.876087Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=0
+2026-11-21T01:54:59.876097Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=2
+2026-11-21T01:54:59.876110Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=1
+2026-11-21T01:54:59.876111Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=0
+2026-11-21T01:54:59.876118Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=2
+2026-11-21T01:54:59.876818Z  INFO httpjet::uring: uring serve: per-core runtime serving (H1/h2c → real pipeline) core=3
+2026-11-21T01:54:59.876847Z  INFO httpjet::uring: uring tls: per-core runtime serving (H1/H2 over TLS → real pipeline) core=3
+2026-11-21T01:55:03.445787Z  INFO httpjet: shutdown signal received; draining connections
+2026-11-21T01:55:03.445832Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=0 secure=false in_flight=0
+2026-11-21T01:55:03.445844Z  INFO httpjet: connections drained; stopping drained_ms=0
+2026-11-21T01:55:03.445846Z  INFO httpjet::uring: uring core: drained cleanly core=0 secure=false
+2026-11-21T01:55:03.445849Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=1 secure=true in_flight=0
+2026-11-21T01:55:03.445853Z  INFO httpjet::uring: uring core: drained cleanly core=1 secure=true
+2026-11-21T01:55:03.445865Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=2 secure=false in_flight=0
+2026-11-21T01:55:03.445868Z  INFO httpjet::uring: uring core: drained cleanly core=2 secure=false
+2026-11-21T01:55:03.445967Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=0 secure=true in_flight=0
+2026-11-21T01:55:03.445969Z  INFO httpjet::uring: uring core: drained cleanly core=0 secure=true
+2026-11-21T01:55:03.445974Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=2 secure=true in_flight=0
+2026-11-21T01:55:03.445976Z  INFO httpjet::uring: uring core: drained cleanly core=2 secure=true
+2026-11-21T01:55:03.446003Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=3 secure=true in_flight=0
+2026-11-21T01:55:03.445835Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=1 secure=false in_flight=0
+2026-11-21T01:55:03.446012Z  INFO httpjet::uring: uring core: drained cleanly core=1 secure=false
+2026-11-21T01:55:03.445832Z  INFO httpjet::uring: uring core: shutdown signalled — draining in-flight connections core=3 secure=false in_flight=0
+2026-11-21T01:55:03.446023Z  INFO httpjet::uring: uring core: drained cleanly core=3 secure=false
+2026-11-21T01:55:03.446007Z  INFO httpjet::uring: uring core: drained cleanly core=3 secure=true
+2026-11-21T01:55:04.181669Z  INFO hj_lsapi::registry: lsphp pool drained socket=/tmp/sweep-bench.fcsmFW/php/php.sock default_pool=true
+2026-11-21T01:55:04.181678Z  INFO httpjet: lsphp pools drained

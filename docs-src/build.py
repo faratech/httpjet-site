@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261120b'
+VERSION = '20261121a'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -135,10 +135,10 @@ CHARTS = {
    ['httpjet', 'OpenLiteSpeed', 'nginx'],
    [('h2 empty', [1182.7, 892.1, 388.0]), ('h2 1 KiB', [1097.1, 740.3, 319.2]), ('h1 1 KiB (h2load)', [427.0, 302.6, 346.8])],
    'Same tools and topology as the published LiteSpeed/nginx benchmarks: h2load on a separate client, servers unpinned on the full host. wrk cross-check (h1 1 KiB, c=100, 15 s): httpjet 540,911, nginx 439,433, OpenLiteSpeed 341,344 req/s.'),
- 'lab-threeway': ('Lab three-way, same-host loopback (httpjet vs nginx vs OpenLiteSpeed)', 'dedicated lab VM c4-highmem-8 \u00b7 server cores 0-3 / loadgen cores 4-7 \u00b7 h2load c=32 x10 (64 KiB: n=20k) \u00b7 median of 3 rounds \u00b7 2026-11-12 \u00b7 req/s', 'k rps',
-   ['httpjet v0.2.1', 'httpjet v0.2.2', 'nginx'],
-   [('h2 empty', [682.6, 694.6, 295.4]), ('h2 1 KiB', [639.7, 728.0, 184.7]), ('h2 64 KiB', [95.6, 102.0, 43.7]), ('h1 1 KiB (h2load)', [317.5, 304.6, 219.8]), ('h2 /robots.txt (.htaccess chain*)', [561.8, 468.7, 234.6])],
-   'Loopback lab numbers, not a capacity claim. *Only httpjet runs the full 806-line .htaccess chain; nginx ignores .htaccess and OpenLiteSpeed applies its subset, so that row is not like-for-like. wrk cross-check (h1 1 KiB, c=100, 15 s): httpjet v0.2.1 356,683, httpjet v0.2.2 356,118, nginx 271,236 req/s. Raw logs: assets/release-sweep-2026-11-12/ ../extended in the lab results; per-round data: assets/lab-threeway-2026-11-12.tsv.'),
+ 'lab-threeway': ('Lab three-way, same-host loopback (httpjet vs nginx)', 'dedicated lab VM c4-highmem-8 \u00b7 server cores 0-3 / loadgen cores 4-7 \u00b7 h2load c=32 x10 (64 KiB: n=20k) \u00b7 median of 3 rounds \u00b7 2026-11-21 \u00b7 req/s', 'k rps',
+   ['httpjet v0.2.3', 'httpjet v0.2.4', 'nginx'],
+   [('h2 empty', [881.4, 1161.2, 311.7]), ('h2 1 KiB', [858.9, 932.6, 215.3]), ('h2 64 KiB', [126.0, 117.1, 53.4]), ('h1 1 KiB (h2load)', [364.6, 415.7, 269.3]), ('h2 /robots.txt (.htaccess chain*)', [637.7, 940.1, 265.5])],
+   'Loopback lab numbers, not a capacity claim. *Only httpjet runs the full 806-line .htaccess chain; nginx ignores .htaccess, so that row is not like-for-like. wrk cross-check (h1 1 KiB, c=100, 15 s): httpjet v0.2.3 438,357, httpjet v0.2.4 486,377, nginx 333,738 req/s. Per-round data: assets/lab-threeway-2026-11-21.tsv.'),
  'cache-vs-php': ('One forum page: cache hit vs full PHP render', 'HTTPS loopback · PGO · 152 KB page · req/s', 'rps',
    ['requests / s'],
    [('page-cache HIT (p50 2 ms)', [19215]), ('full DB-backed PHP render (p50 34 ms)', [480])],
@@ -445,7 +445,7 @@ def pager(i):
         out += f'<a class="next" href="{href}"{" style=\"margin-left:auto\"" if not prev else ""}><div class="dir">Next →</div><div class="ttl">{nxt[1]}</div></a>'
     return out + '</nav>'
 
-FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-11-12 (v0.2.2).<br>'
+FOOT = ('<p class="docfoot">httpjet · documentation · synced to the source tree on 2026-11-21 (v0.2.4).<br>'
         'Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>')
 
 SLUGS = None
@@ -619,7 +619,7 @@ def main():
     llms = [
         '# httpjet',
         '',
-        '> httpjet is a from-scratch Linux web server written in Rust (v0.2.2, Rust 1.99.1+, edition 2024, GPL-3.0-only) built as a drop-in replacement for LiteSpeed Web Server (LSWS 6.3.5) and OpenLiteSpeed. It reads the same LiteSpeed XML configuration (`httpd_config.xml` + per-vhost XML), speaks native LSAPI to `lsphp`, evaluates Apache `.htaccess` (`mod_rewrite`, Basic auth, access control, headers, expires, LSCache directives) with a dense-DFA prefilter and on-core `fast_memo`, and serves HTTP/1.1, HTTP/2 (146/146 `h2spec`), and HTTP/3 (QUIC) over a single pure-`io_uring` (`monoio`) transport with an LSCache-equivalent origin page cache.',
+        '> httpjet is a from-scratch Linux web server written in Rust (v0.2.4, Rust 1.99.1+, edition 2024, GPL-3.0-only) built as a drop-in replacement for LiteSpeed Web Server (LSWS 6.3.5) and OpenLiteSpeed. It reads the same LiteSpeed XML configuration (`httpd_config.xml` + per-vhost XML), speaks native LSAPI to `lsphp`, evaluates Apache `.htaccess` (`mod_rewrite`, Basic auth, access control, headers, expires, LSCache directives) with a dense-DFA prefilter and on-core `fast_memo`, and serves HTTP/1.1, HTTP/2 (146/146 `h2spec`), and HTTP/3 (QUIC) over a single pure-`io_uring` (`monoio`) transport with an LSCache-equivalent origin page cache.',
         '',
         '## Key Facts & Benchmarks',
         '',
@@ -629,6 +629,7 @@ def main():
         '- **PHP over LSAPI (HTTP/1.1, c=40, PGO):** 44.8k req/s vs LiteSpeed 6.3.5 38.5k req/s (41.2k at c=60)',
         '- **Production Latency Attribution:** June 2026 telemetry: httpjet request phases ~0.2% of wall time (~138 µs/req) and PHP renders 86.5–98.8%; 2026-08-30 sample: mean 9.99 ms, LSAPI TTFB 8.96 ms, rewrite + cache lookup 0.09%',
         '- **Release 0.1.10 vs 0.1.5 (controlled loopback A/B, relative change, not production throughput):** 0 of 80 metric rows worse; page-cache miss-to-store CPU per request −61% (throughput +16%), warmer burst CPU −38%, open-loop mix p99 −29%, uncached PHP +6% throughput / −6% CPU, RSS −8% to −10%; static-file CPU +1–2% (within noise)',
+        '- **Release 0.2.4 (2026-11-20) & 0.2.3 (2026-11-16):** 0.2.3 added progressive stream-fill for unframed cacheable misses, single-encode streamed zstd storage, `--buffered-work-min-bytes` (64 KiB yielding slices), borrowed static fast-path heads, ordered proxy-pool expiry, and a full dependency refresh. 0.2.4 shipped 11 waves of hot-path optimizations (zero-map single-frame H2 fast path, H1/H2/H3 small-body coalescing, direct HPACK/QPACK encoding, shared `Arc<HeaderMap>` `fast_memo` egress, 50 ms coarse HTTP Date cache, single-probe router resolution, compact ACL bitmasks + TLS peer cache, cached static `RootDir` descriptors, borrowed `.htaccess`/rewrite/LSAPI paths) plus 36 reliability fixes (3,237 tests green). Dedicated lab VM (2026-11-21, 15 tags, 4 server / 4 loadgen cores, Unified PGO, median of 3): 0.2.4 vs 0.2.3 — H2 empty 1,291.7k vs 860.1k (+50.2%), H2 1 KiB 1,092.6k vs 849.1k (+28.7%), heavy `.htaccess` H2 879.5k vs 656.9k (+33.9%), heavy `.htaccess` H1 381.5k vs 343.1k (+11.2%), page-cache hits 849.6k vs 720.3k (+18.0%), H1 1 KiB 415.7k vs 383.4k (+8.4%), PHP/LSAPI 41.8k vs 39.6k (+5.6%); lab three-way vs nginx: H2 empty 1,161k vs 312k (3.73x), H2 1 KiB 933k vs 215k (4.33x), `wrk` H1 486k vs 334k (1.46x). Details: [https://httpjet.net/docs/performance#release-0-2-4](https://httpjet.net/docs/performance#release-0-2-4)',
         '- **Release 0.2.2 / 0.2.1 (2026-11-12):** 0.2.1 sized the page-cache store-admission filter so a never-requested URL reads zero (threshold 2 had decayed into storing every cacheable response), kept LSAPI length-prefix guards in release builds, and added fuzz targets; 0.2.2 closed a QUIC flood-guard bypass (handshake slot re-serviced by a second datagram), re-parses access files on ctime/size/inode change, asks proxied upstreams for identity under subFilter, drops refused ACME orders, and cuts admission false positives. Lab VM, same run, flat within noise: 0.2.1 vs 0.2.0 (H2 1 KiB 669.1k vs 699.3k, heavy .htaccess H2 545.7k vs 518.9k, page-cache 540.9k vs 604.2k, PHP 32.6k vs 32.3k); 0.2.2 vs 0.2.1 (H2 1 KiB 665.6k vs 669.1k, heavy H2 537.8k vs 545.7k, page-cache 542.4k vs 540.9k, PHP 32.5k vs 32.6k). Details: [https://httpjet.net/docs/performance#release-0-2-2](https://httpjet.net/docs/performance#release-0-2-2)',
         '- **Release 0.2.0 (2026-11-11):** security audit fixes and cold-start latency — upstream WebSocket handshake validation, no credentials in capsule revalidation, every gzip member of a backend response decoded, out-of-order LSAPI packets refused, control characters escaped in the text error log, QUIC Initials that close themselves no longer leave a connection behind, shared cache bodies charged to their HTTP/3 connection only, CPU steering gated on NIC receive queues; the `.htaccess` chain is parsed once before the first connection with its rewrite prefilter built off the request path (slowest request of a 64-way burst after boot 508 ms to 3 ms). Lab VM, same run, 0.2.0 vs 0.1.12: HTTP/2 1 KiB 625.5k vs 591.8k req/s, heavy `.htaccess` HTTP/2 515.3k vs 402.9k, page-cache hit 544.5k vs 410.5k, PHP/LSAPI 32.3k vs 27.8k. Production-host loopback is noisy (±10-20% between runs); the lab run is the version comparison. Details: [https://httpjet.net/docs/performance#release-0-2-0](https://httpjet.net/docs/performance#release-0-2-0)',
         '- **Release 0.1.12 (2026-11-08):** hot-path allocation and contention reductions — borrowed vhost routing, a single-pass fast-serve header scan, HPACK header-name reuse, batched request IDs, sharded telemetry counters, page-cache diskstore/metablob refinements. Loopback on the production x86_64 host (PGO): HTTP/2 1 KiB static 371,540 req/s at c50 (nginx 180,940; OpenLiteSpeed 399,505); heavy-.htaccess HTTP/2 271,118 req/s (nginx 131,955); warm page-cache hits 110,158 req/s over HTTP/2.',
@@ -648,7 +649,7 @@ def main():
         f.write('\n'.join(llms))
 
     llms_full = [
-        '# httpjet — Complete Technical Documentation (v0.2.2)',
+        '# httpjet — Complete Technical Documentation (v0.2.4)',
         '',
         'Canonical URL: https://httpjet.net/docs/',
         'Source Repository: https://github.com/faratech/httpjet',
