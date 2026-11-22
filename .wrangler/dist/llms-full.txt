@@ -3120,12 +3120,9 @@ Loopback removes network, handshakes, CDN. It isolates server code for compariso
 
 ## Performance across builds — interactive presentation
 
-You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (`0.0.1`, June 2026) through `0.2.4`. CSV receipts stay outside the public export at github.com/faratech/httpjet .
+The **Release Speed Curve** shows the 15 versions measured together on November 21, 2026, and the separate 0.2.5 run from November 22. The dashed segment marks the change in runs.
 
-Compare v0.0.1–v0.2.4 in the **Release Speed Curve**. Every release was re-measured on 2026-11-21 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: release-sweep-2026-11-21.tsv ; raw `h2load` logs and checks: release-sweep-2026-11-21/ . (Earlier sweeps stay archived: 2026-11-12 , 2026-11-11 and 2026-10-26 .) Then step through **21 build slides**, **Workload Trajectories**, **Build-vs-Build Diff**.
-
-        ⎁   One test, every version
-To keep this page simple, every version-to-version number comes from **one run under one set of conditions**: a dedicated lab VM (c4-highmem-8, the production machine type), loopback only, server pinned to 4 cores, `h2load` on the other 4, each release PGO-built from its tag the same way, same flags, same eight workloads, 3 rounds each, median shown. Before benching, every binary also had to pass the **same functional checks** (start, static file, `.htaccess` page, PHP page, cache hit, empty and 64 KiB files, config lint) — 15 of 15 pass: lab-checks-2026-11-21.tsv . Numbers from *other* regimes — the dedicated-client server comparison, production telemetry, the dated build-history slides — are always labelled with their own conditions and are never mixed into the curve.
+Both runs used dedicated `c4-highmem-8` VMs, loopback traffic, four vCPUs per side, the same eight workloads and median of three rounds. Explore the build slides and use the comparison view to inspect earlier measurements.
 
 ## Where the time actually goes
 
@@ -3219,6 +3216,20 @@ Memo alone, instructions/request, frozen non-PGO binary, SINGULARITY loopback, 1
 | H3 | 98,293 | 68,024 | **−30.8%** |
 
 Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: `docs/pagecache-response-memo-experiment.md` in the source tree.
+
+## 0.2.5 production build: dedicated lab benchmarks
+
+The November 22, 2026 run measured the 0.2.5 production source snapshot with Unified PGO. All **1,710,000 sweep requests** succeeded across eight workloads and three rounds. The lab functional checks passed.
+
+Throughput and response-time graphs compare the new measurements with the historical November 21 run. The static server chart also shows nginx from November 21. These are loopback measurements.
+
+> [Benchmark Chart: v025-throughput — Dedicated lab throughput by build (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+
+> [Benchmark Chart: v025-p99 — Dedicated lab p99 response time by build (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+
+> [Benchmark Chart: v025-static-servers — Static throughput across dedicated lab runs (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+
+Per-round sweep TSV · Extended static TSV · Functional checks · Raw results and hashes
 
 ## Release 0.2.4: transport, pipeline, and backend optimizations (Waves 1–11)
 
@@ -3326,6 +3337,8 @@ Loopback, production x86_64 host, PGO, 8 cores, live traffic shared, 2026-11-08,
 | Heavy `.htaccess` vhost, HTTP/2 (c100) | **271,118 req/s** | 131,955 req/s | 333,519 req/s |
 
 | Warm page-cache hit, HTTP/2 (c32/m32) | **110,158 req/s** | — | — |
+
+| `v0.2.5` · Dedicated lab benchmarks 2026-11-22 | Dedicated VM, 4 server / 4 load-generator vCPUs | 0.2.5 results · H2 empty 1,242.7k, static 1 KiB 1,166.5k, heavy rewrite 840.7k, cache hit 900.3k req/s. Separate run with the November 21 lab protocol. |
 
 | Warm page-cache hit, HTTP/1.1 (c100) | **80,025 req/s** | — | — |
 

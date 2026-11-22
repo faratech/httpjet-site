@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261121a'
+VERSION = '20261122a'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -111,6 +111,18 @@ def diagram(m):
 # Horizontal grouped bar charts as inline SVG. {name: (title, subtitle, unit, series, rows, foot)}
 # rows = [(label, [v0, v1, ...])]; None = no bar (annotated).
 CHARTS = {
+ 'v025-throughput': ('Dedicated lab throughput by build', 'Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds', 'k req/s',
+   ['0.2.4 · Nov 21', '0.2.5 · Nov 22'],
+   [('H2 empty body', [1291.7, 1242.7]), ('H2 static 1 KiB', [1092.6, 1166.5]), ('H2 static 64 KiB', [110.0, 114.2]), ('H2 heavy .htaccess', [879.5, 840.7]), ('H2 page-cache hit', [849.6, 900.3]), ('H1 static 1 KiB', [415.7, 406.2]), ('H1 heavy .htaccess', [381.5, 382.6]), ('H1 PHP/LSAPI', [41.8, 42.1])],
+   'Measurements come from separate VMs. Placement and run-to-run variance can affect differences.'),
+ 'v025-p99': ('Dedicated lab p99 response time by build', 'Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds', 'ms',
+   ['0.2.4 · Nov 21', '0.2.5 · Nov 22'],
+   [('H2 empty body', [0.29, 0.348]), ('H2 static 1 KiB', [0.322, 0.318]), ('H2 static 64 KiB', [4.22, 3.82]), ('H2 heavy .htaccess', [0.366, 0.391]), ('H2 page-cache hit', [1.37, 1.65]), ('H1 static 1 KiB', [0.309, 0.313]), ('H1 heavy .htaccess', [0.343, 0.346]), ('H1 PHP/LSAPI', [1.78, 1.81])],
+   'Measurements come from separate VMs. Placement and run-to-run variance can affect differences.'),
+ 'v025-static-servers': ('Static throughput across dedicated lab runs', 'Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds', 'k req/s',
+   ['nginx · Nov 21', '0.2.4 · Nov 21', '0.2.5 · Nov 22'],
+   [('H2 empty body', [311.7, 1161.2, 1210.1]), ('H2 static 1 KiB', [215.3, 932.6, 1039.1]), ('H2 static 64 KiB', [53.4, 117.1, 117.4]), ('H1 static 1 KiB', [269.3, 415.7, 398.1]), ('H1 static 1 KiB (wrk)', [333.7, 486.4, 484.4])],
+   'Measurements come from separate VMs. Placement and run-to-run variance can affect differences.'),
  'h2-static': ('HTTP/2 static throughput by concurrency', 'dedicated load-generator client · 2026-08-27 · empty bodies · mean of 2 interleaved pairs · req/s', 'k rps',
    ['httpjet', 'OpenLiteSpeed', 'nginx'],
    [('c=1 (1 KB)', [59, 50, None]), ('c=50', [891, 838, None]), ('c=200', [852, 736, None]), ('c=1000', [872, 882, 118])],

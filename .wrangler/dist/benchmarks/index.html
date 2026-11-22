@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="canonical" href="https://httpjet.net/benchmarks/">
 <title>httpjet — Performance Benchmarks</title>
-<meta name="description" content="httpjet benchmark suite: HTTP/1.1, HTTP/2 and HTTP/3 static, rewrite, PHP/LSAPI and page-cache results with raw CSV/TSV data, against nginx and OpenLiteSpeed. Latest release 0.2.4.">
+<meta name="description" content="httpjet benchmark suite: HTTP/1.1, HTTP/2 and HTTP/3 static, rewrite, PHP/LSAPI and page-cache results with raw CSV/TSV data, against nginx and OpenLiteSpeed. Includes dedicated lab measurements for the 0.2.5 production build.">
 <link rel="icon" href="/docs/assets/favicon.svg" type="image/svg+xml">
 <style>
 :root{--bg:#0b1020;--card:#141b2e;--fg:#e7ecf5;--mut:#9aa6bf;--acc:#3b82f6;--line:#243049}
@@ -28,7 +28,7 @@ ul{margin:6px 0}
 <h1>httpjet — Performance Benchmarks</h1>
 <div class="sub">A from-scratch Rust drop-in LiteSpeed replacement · comprehensive loopback benchmark suite</div>
 <div class="sub">Generated 2026-11-21 · 8-core host · release build</div>
-<div class="sub">Latest release <b>0.2.4</b> (2026-11-20; lab sweep 2026-11-21): lab results, release notes and the interactive 15-release speed curve are on <a href="/docs/performance#release-0-2-4">httpjet.net/docs/performance</a>. Sections below are dated; raw files in <code>data/</code> include the 0.2.3/0.2.4 lab sweep (<a href="data/release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a>, <a href="data/lab-threeway-2026-11-21.tsv">lab-threeway-2026-11-21.tsv</a>) and earlier 0.2.0 CSVs.</div>
+<div class="sub">Latest benchmark results for <b>0.2.5</b> · dedicated lab · November 22, 2026. <a href="/docs/performance#release-0-2-5">Interactive comparisons and release curves</a>.</div>
 </div></header>
 <div class="wrap">
 
@@ -38,6 +38,25 @@ driven by <code>ab</code> (IP literal + Host header); HTTP/2 by <code>h2load</co
 ~no rewrite rules; the "heavy" vhost runs the production ~130-rule <code>.htaccess</code> front controller.
 PHP is served through httpjet's native LSAPI to an isolated <code>lsphp</code> pool. Static file-size
 fixtures are random blobs. RPS = requests/sec (higher is better); latency in ms. 
+</div>
+
+<h2 id="v0-2-5">0.2.5 production build · Dedicated lab · November 22, 2026</h2>
+<div class="card">
+<p>Dedicated GCE <code>c4-highmem-8</code>, loopback, four server and four load-generator vCPUs, Unified PGO, and median of three rounds. All 1,710,000 sweep requests succeeded. The 0.2.4 values are from the November 21 run under the same protocol on a separate VM.</p>
+<div class="grid"><figure><img src="charts/v025-throughput.png" alt="Median request throughput for builds 0.2.4 and 0.2.5 across eight workloads" width="1000" height="760"><figcaption>Throughput, higher is better</figcaption></figure>
+<figure><img src="charts/v025-p99.png" alt="Median p99 response time for builds 0.2.4 and 0.2.5 across eight workloads" width="1000" height="760"><figcaption>Response time, lower is better</figcaption></figure></div>
+<table><thead><tr><th>Workload</th><th>0.2.4 req/s</th><th>0.2.5 req/s</th><th>0.2.4 p99 (ms)</th><th>0.2.5 p99 (ms)</th></tr></thead>
+<tbody>
+<tr><td>H2 empty body</td><td>1,291,706</td><td><strong>1,242,715</strong></td><td>0.290</td><td>0.348</td></tr>
+<tr><td>H2 static 1 KiB</td><td>1,092,634</td><td><strong>1,166,453</strong></td><td>0.322</td><td>0.318</td></tr>
+<tr><td>H2 static 64 KiB</td><td>110,026</td><td><strong>114,202</strong></td><td>4.220</td><td>3.820</td></tr>
+<tr><td>H2 heavy .htaccess</td><td>879,484</td><td><strong>840,654</strong></td><td>0.366</td><td>0.391</td></tr>
+<tr><td>H2 page-cache hit</td><td>849,642</td><td><strong>900,306</strong></td><td>1.370</td><td>1.650</td></tr>
+<tr><td>H1 static 1 KiB</td><td>415,709</td><td><strong>406,195</strong></td><td>0.309</td><td>0.313</td></tr>
+<tr><td>H1 heavy .htaccess</td><td>381,454</td><td><strong>382,553</strong></td><td>0.343</td><td>0.346</td></tr>
+<tr><td>H1 PHP/LSAPI</td><td>41,810</td><td><strong>42,115</strong></td><td>1.780</td><td>1.810</td></tr>
+</tbody></table>
+<p><a href="data/release-sweep-2026-11-22.tsv">Per-round sweep TSV</a> · <a href="data/lab-extended-2026-11-22.tsv">Extended static TSV</a> · <a href="data/lab-checks-2026-11-22.tsv">Functional checks</a> · <a href="data/lab-receipts-2026-11-22.tar.gz">Raw logs and hashes</a> · <a href="/docs/performance#release-0-2-5">Static server comparison</a></p>
 </div>
 
 <h2>Release 0.2.4 &amp; 0.2.3 — Dedicated Lab VM Sweep (2026-11-21)</h2>

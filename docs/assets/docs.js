@@ -2069,7 +2069,117 @@
           "3,237 workspace tests green; panic-lint ratchet down from 572 to 567 sites; 15/15 release functional checks pass.",
           "Deployed to both production origins (x86_64 and ARM64) on 2026-11-21."
         ]
-      }
+      },
+{
+  "id": "b22",
+  "tag": "v0.2.5",
+  "short": "Dedicated lab benchmarks",
+  "date": "2026-11-22",
+  "commit": "source SHA-256 b8d6ffdc0de4",
+  "era": 3,
+  "eraName": "CPU, TLS & Zero-Fault Campaign",
+  "regime": "dedicated VM · 4 server / 4 load-generator vCPUs · Unified PGO",
+  "title": "0.2.5 production build — dedicated lab benchmarks",
+  "summary": "Eight workloads ran over loopback in three rounds. All 1,710,000 sweep requests succeeded, and the build passed the lab functional checks.",
+  "kpis": [
+    {
+      "v": "1,242.7k rps",
+      "d": "p99 0.348 ms",
+      "n": false,
+      "l": "H2 empty body"
+    },
+    {
+      "v": "1,166.5k rps",
+      "d": "p99 0.318 ms",
+      "n": false,
+      "l": "H2 static 1 KiB"
+    },
+    {
+      "v": "900.3k rps",
+      "d": "p99 1.650 ms",
+      "n": false,
+      "l": "H2 page-cache hit"
+    },
+    {
+      "v": "840.7k rps",
+      "d": "p99 0.391 ms",
+      "n": false,
+      "l": "H2 heavy .htaccess"
+    }
+  ],
+  "chart": {
+    "title": "Lab throughput by build",
+    "sub": "Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds",
+    "unit": "k req/s",
+    "series": [
+      "0.2.4 · Nov 21",
+      "0.2.5 · Nov 22"
+    ],
+    "rows": [
+      [
+        "H2 empty body",
+        [
+          1291.7,
+          1242.7
+        ]
+      ],
+      [
+        "H2 static 1 KiB",
+        [
+          1092.6,
+          1166.5
+        ]
+      ],
+      [
+        "H2 static 64 KiB",
+        [
+          110.0,
+          114.2
+        ]
+      ],
+      [
+        "H2 heavy .htaccess",
+        [
+          879.5,
+          840.7
+        ]
+      ],
+      [
+        "H2 page-cache hit",
+        [
+          849.6,
+          900.3
+        ]
+      ],
+      [
+        "H1 static 1 KiB",
+        [
+          415.7,
+          406.2
+        ]
+      ],
+      [
+        "H1 heavy .htaccess",
+        [
+          381.5,
+          382.6
+        ]
+      ],
+      [
+        "H1 PHP/LSAPI",
+        [
+          41.8,
+          42.1
+        ]
+      ]
+    ],
+    "foot": "Measurements come from separate VMs. Placement and run-to-run variance can affect differences."
+  },
+  "notes": [
+    "0.2.5 was measured on November 22. The historic versions retain their November 21 measurements.",
+    "Source and binary hashes, per-round output and functional check results are linked in the benchmark receipts."
+  ]
+}
     ];
 
     var LENSES = [
@@ -2224,11 +2334,10 @@
       return out.join("");
     }
 
-    var curIdx = BUILDS.length - 1; /* start on latest build v0.2.0 or allow user to step from 0 */
-    curIdx = 0; /* start at slide 1 (0.0.1) so the user can step chronologically through the story */
+    var curIdx = 0; /* Start at the first build in the timeline. */
     var curMode = "deck";
     var curLens = 0;
-    var cmpA = 0, cmpB = BUILDS.length - 1;
+    var cmpA = BUILDS.length - 2, cmpB = BUILDS.length - 1;
 
     var mount = bexp.querySelector(".bexp__interactive");
     var renderExplorer = null;
@@ -2237,8 +2346,8 @@
         var h = [];
         h.push('<div class="bexp__top">');
         h.push('<div class="bexp__modes" role="tablist" aria-label="Presentation view mode">');
-        h.push('<button type="button" class="bexp__mode" role="tab" data-bmode="deck" aria-selected="' + (curMode === "deck") + '">1 · Build Slide Deck (13)</button>');
-        h.push('<button type="button" class="bexp__mode" role="tab" data-bmode="traj" aria-selected="' + (curMode === "traj") + '">2 · Workload Trajectories (5)</button>');
+        h.push('<button type="button" class="bexp__mode" role="tab" data-bmode="deck" aria-selected="' + (curMode === "deck") + '">1 · Build Slide Deck</button>');
+        h.push('<button type="button" class="bexp__mode" role="tab" data-bmode="traj" aria-selected="' + (curMode === "traj") + '">2 · Workload Trajectories</button>');
         h.push('<button type="button" class="bexp__mode" role="tab" data-bmode="cmp" aria-selected="' + (curMode === "cmp") + '">3 · Build-vs-Build Diff</button>');
         h.push('</div>');
         if (curMode === "deck") {
@@ -2385,20 +2494,21 @@
             { idx: 17, tag: "v0.2.1", h2: 619.1, h1: 335.7, note: "Admission fix + fuzz" },
             { idx: 18, tag: "v0.2.2", h2: 672.6, h1: 341.6, note: "Second review pass" },
             { idx: 19, tag: "v0.2.3", h2: 656.9, h1: 343.1, note: "Stream-fill + buffered work" },
-            { idx: 20, tag: "v0.2.4", h2: 879.5, h1: 381.5, note: "Waves 1–11 optimizations" }
+            { idx: 20, tag: "v0.2.4", h2: 879.5, h1: 381.5, note: "Waves 1–11 optimizations" },
+            {"idx": 21, "tag": "v0.2.5", "h2": 840.7, "h1": 382.6, "note": "Separate November 22 dedicated lab run", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/."
+          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. The dashed segment leads to the separate November 22 v0.2.5 run under the same protocol."
         },
         {
           id: "c-static",
           name: "2 · H2 & H1 Static Small-Object (RPS)",
           title: "Release Speed Curve — HTTP/2 & HTTP/1.1 Static 1 KiB",
-          sub: "1 KiB static file · h2 c=32 m=10, h1 c=100 · k req/s · lab VM 2026-11-21",
+          sub: "1 KiB static file · h2 c=32 m=10, h1 c=100 · k req/s · dedicated labs 2026-11-21 and 2026-11-22",
           unit: "k rps",
           ymax: 1200,
           ystep: 300,
@@ -2417,20 +2527,21 @@
             { idx: 17, tag: "v0.2.1", h2: 881.9, h1: 397.9, note: "Admission fix + fuzz" },
             { idx: 18, tag: "v0.2.2", h2: 794.6, h1: 378.8, note: "Second review pass" },
             { idx: 19, tag: "v0.2.3", h2: 849.1, h1: 383.4, note: "Stream-fill + buffered work" },
-            { idx: 20, tag: "v0.2.4", h2: 1092.6, h1: 415.7, note: "Waves 1–11 optimizations" }
+            { idx: 20, tag: "v0.2.4", h2: 1092.6, h1: 415.7, note: "Waves 1–11 optimizations" },
+            {"idx": 21, "tag": "v0.2.5", "h2": 1166.5, "h1": 406.2, "note": "Separate November 22 dedicated lab run", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/."
+          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. The dashed segment leads to the separate November 22 v0.2.5 run under the same protocol."
         },
         {
           id: "c-php",
           name: "3 · PHP/LSAPI & Origin Page Cache (RPS)",
           title: "Release Speed Curve — PHP over LSAPI & Origin Page-Cache Hits",
-          sub: "PHP fixture over LSAPI (h1 c=40) and page-cache hits on a 37 KB PHP fixture page (h2 c=32 m=32) · k req/s · lab VM 2026-11-21",
+          sub: "PHP fixture over LSAPI (h1 c=40) and page-cache hits on a 37 KB PHP fixture page (h2 c=32 m=32) · k req/s · dedicated labs 2026-11-21 and 2026-11-22",
           unit: "k rps",
           ymax: 1000,
           ystep: 250,
@@ -2449,14 +2560,15 @@
             { idx: 17, tag: "v0.2.1", php: 39.4, cache: 696.5, note: "Admission fix + fuzz" },
             { idx: 18, tag: "v0.2.2", php: 39.6, cache: 679.3, note: "Second review pass" },
             { idx: 19, tag: "v0.2.3", php: 39.6, cache: 720.3, note: "Stream-fill + buffered work" },
-            { idx: 20, tag: "v0.2.4", php: 41.8, cache: 849.6, note: "Waves 1–11 optimizations" }
+            { idx: 20, tag: "v0.2.4", php: 41.8, cache: 849.6, note: "Waves 1–11 optimizations" },
+            {"idx": 21, "tag": "v0.2.5", "php": 42.1, "cache": 900.3, "note": "Separate November 22 dedicated lab run", "separateRun": true}
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
             { key: "cache", label: "httpjet page-cache hit H2 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. PHP for v0.0.1–v0.0.3 is cold-pool-ramp-bound (warm, v0.0.1 sustains ~32k req/s). Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/."
+          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. PHP for v0.0.1–v0.0.3 is cold-pool-ramp-bound (warm, v0.0.1 sustains ~32k req/s). Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. The dashed segment leads to the separate November 22 v0.2.5 run under the same protocol."
         }
       ];
 
@@ -2522,10 +2634,18 @@
           var coords = c.pts.map(function (pt, i) { return [xOf(i), pt[sr.key] == null ? null : yOf(pt[sr.key]), pt[sr.key], pt, i]; })
             .filter(function (p) { return p[2] != null; });
           if (!coords.length) return;
-          var poly = coords.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
-          var area = coords[0][0].toFixed(1) + "," + (padT + plotH).toFixed(1) + " " + poly + " " + coords[coords.length - 1][0].toFixed(1) + "," + (padT + plotH).toFixed(1);
+          function point(p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }
+          var last = coords.length - 1;
+          var separate = last > 0 && coords[last][3].separateRun;
+          var sameRun = separate ? coords.slice(0, last) : coords;
+          var poly = sameRun.map(point).join(" ");
+          var floor = (padT + plotH).toFixed(1);
+          var area = sameRun[0][0].toFixed(1) + "," + floor + " " + poly + " " + sameRun[sameRun.length - 1][0].toFixed(1) + "," + floor;
           h.push('<polygon points="' + area + '" fill="url(#cfill' + (sIdx % 2) + ')"/>');
           h.push('<polyline points="' + poly + '" fill="none" stroke="' + sr.color + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>');
+          if (separate) {
+            h.push('<polyline points="' + point(coords[last - 1]) + " " + point(coords[last]) + '" fill="none" stroke="' + sr.color + '" stroke-width="2.4" stroke-dasharray="4 4"/>');
+          }
           coords.forEach(function (p) {
             var isSel = (p[3].idx === curIdx);
             var r = isSel ? 5.5 : 3.8;

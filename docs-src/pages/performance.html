@@ -24,18 +24,16 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>You find every campaign below with regime, commit, and receipt name. The curve covers Phase 1–7 (<code>0.0.1</code>, June 2026) through <code>0.2.4</code>. CSV receipts stay outside the public export at <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a>.</p>
-      <p>Compare v0.0.1–v0.2.4 in the <strong>Release Speed Curve</strong>. Every release was re-measured on 2026-11-21 under identical conditions on a dedicated lab VM — no production host was loaded. Per-round data: <a href="assets/release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a>; raw <code>h2load</code> logs and checks: <a href="assets/release-sweep-2026-11-21/">release-sweep-2026-11-21/</a>. (Earlier sweeps stay archived: <a href="assets/release-sweep-2026-11-12.tsv">2026-11-12</a>, <a href="assets/release-sweep-2026-11-08.tsv">2026-11-11</a> and <a href="assets/release-sweep-2026-10-26.tsv">2026-10-26</a>.) Then step through <strong>21 build slides</strong>, <strong>Workload Trajectories</strong>, <strong>Build-vs-Build Diff</strong>.</p>
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">One test, every version</span><p>To keep this page simple, every version-to-version number comes from <strong>one run under one set of conditions</strong>: a dedicated lab VM (c4-highmem-8, the production machine type), loopback only, server pinned to 4 cores, <code>h2load</code> on the other 4, each release PGO-built from its tag the same way, same flags, same eight workloads, 3 rounds each, median shown. Before benching, every binary also had to pass the <strong>same functional checks</strong> (start, static file, <code>.htaccess</code> page, PHP page, cache hit, empty and 64 KiB files, config lint) — 15 of 15 pass: <a href="assets/lab-checks-2026-11-21.tsv">lab-checks-2026-11-21.tsv</a>. Numbers from <em>other</em> regimes — the dedicated-client server comparison, production telemetry, the dated build-history slides — are always labelled with their own conditions and are never mixed into the curve.</p></div></div>
-
-      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve: every release from v0.0.1 to v0.2.4, re-measured 2026-11-21 on a dedicated lab VM">
+      <p>The <strong>Release Speed Curve</strong> shows the 15 versions measured together on November 21, 2026, and the separate 0.2.5 run from November 22. The dashed segment marks the change in runs.</p>
+      <p>Both runs used dedicated <code>c4-highmem-8</code> VMs, loopback traffic, four vCPUs per side, the same eight workloads and median of three rounds. Explore the build slides and use the comparison view to inspect earlier measurements.</p>
+      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve through 0.2.5 with separate November 21 and November 22 runs">
         <div class="bexp__curve"></div>
       </div>
 
       <div class="bexp" id="build-explorer" tabindex="0" aria-label="Interactive performance across builds presentation">
         <div class="bexp__interactive"></div>
         <div class="bexp__fallback">
-          <p class="mini">Enable JavaScript for the interactive slide deck, cross-build trajectory charts, and build-vs-build comparator. All 21 builds are listed in the <a href="#build-ledger">complete receipts ledger</a> below.</p>
+          <p class="mini">Enable JavaScript for the interactive slide deck, cross-build trajectory charts, and build-vs-build comparator. The measured builds are listed in the <a href="#build-ledger">complete receipts ledger</a> below.</p>
         </div>
       </div>
     </section>
@@ -113,6 +111,16 @@
         </table>
       </div>
       <p class="mini">Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: <code>docs/pagecache-response-memo-experiment.md</code> in the source tree.</p>
+    </section>
+
+    <section>
+      <h2 id="release-0-2-5">0.2.5 production build: dedicated lab benchmarks</h2>
+      <p>The November 22, 2026 run measured the 0.2.5 production source snapshot with Unified PGO. All <strong>1,710,000 sweep requests</strong> succeeded across eight workloads and three rounds. The lab functional checks passed.</p>
+      <p>Throughput and response-time graphs compare the new measurements with the historical November 21 run. The static server chart also shows nginx from November 21. These are loopback measurements.</p>
+      <!--chart:v025-throughput-->
+      <!--chart:v025-p99-->
+      <!--chart:v025-static-servers-->
+      <p><a href="assets/release-sweep-2026-11-22.tsv">Per-round sweep TSV</a> · <a href="assets/lab-extended-2026-11-22.tsv">Extended static TSV</a> · <a href="assets/lab-checks-2026-11-22.tsv">Functional checks</a> · <a href="/benchmarks/data/lab-receipts-2026-11-22.tar.gz">Raw results and hashes</a></p>
     </section>
 
     <section>
@@ -196,6 +204,11 @@
             <tr><td>HTTP/2 static 64 KiB</td><td><strong>68,689 req/s</strong></td><td>35,063 req/s</td><td>—</td></tr>
             <tr><td>Heavy <code>.htaccess</code> vhost, HTTP/2 (c100)</td><td><strong>271,118 req/s</strong></td><td>131,955 req/s</td><td>333,519 req/s</td></tr>
             <tr><td>Warm page-cache hit, HTTP/2 (c32/m32)</td><td><strong>110,158 req/s</strong></td><td>—</td><td>—</td></tr>
+            <tr>
+              <th><code>v0.2.5</code> &middot; Dedicated lab benchmarks<span class="mini">2026-11-22</span></th>
+              <td>Dedicated VM, 4 server / 4 load-generator vCPUs</td>
+              <td class="wrap"><a href="#release-0-2-5">0.2.5 results</a> · H2 empty 1,242.7k, static 1 KiB 1,166.5k, heavy rewrite 840.7k, cache hit 900.3k req/s. Separate run with the November 21 lab protocol.</td>
+            </tr>
             <tr><td>Warm page-cache hit, HTTP/1.1 (c100)</td><td><strong>80,025 req/s</strong></td><td>—</td><td>—</td></tr>
           </tbody>
         </table>
