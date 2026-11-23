@@ -26,7 +26,7 @@ The dependency graph is acyclic, with several independent root crates including 
 
 `hj-config` parses LiteSpeed XML into one normalized model. `hj-core` re-exports that model for crates using the shared handler contract.
 
-> [Diagram: crate-map] Workspace relationships. Arrows show selected dependencies, not every edge. The binary assembles the server; optional certificate crates require build features. See the source architecture map for the complete overview.
+> [Diagram: crate-map] Workspace relationships. Arrows show selected dependencies, not every edge. The binary assembles the server; optional certificate crates require build features. See the public source tree for the crate manifests.
 
 ## Crate map
 
@@ -107,7 +107,7 @@ Register new handlers in `pipeline/mod.rs::dispatch()`. Register new transforms 
 
 ## The request pipeline
 
-`pipeline::handle()` is the integration point. It resolves the vhost first. It then applies trust, ACL, geo and throttle checks. It runs optional WAF and extension pre-handlers. It then calls `dispatch()` and applies transforms. It finally writes logs, metrics and spans. `dispatch()` mirrors OpenLiteSpeed ordering. It inserts page-cache seams after rewrite and access resolve. The pinned `LsapiScript` extension keeps the resolved script separate. It pushes `SCRIPT_NAME`/`QUERY_STRING` into `ctx.env` for front controllers.
+`pipeline::handle()` is the integration point. It resolves the vhost first. It then applies trust, ACL, geo and throttle checks. Optional extension pre-handlers can return a response or continue to `dispatch()`. Dispatch checks the context body limit and runs any configured WAF sidecar before rewrite or cache lookup. The request handler then applies response transforms. It finally writes logs, metrics and spans. `dispatch()` mirrors OpenLiteSpeed ordering. It inserts page-cache seams after rewrite and access resolve. The pinned `LsapiScript` extension keeps the resolved script separate. It pushes `SCRIPT_NAME`/`QUERY_STRING` into `ctx.env` for front controllers.
 
 Terminals use an explicit `if/return` chain, not a uniform registry. A failed proxy context falls through to static. A script with no pool **hard-fails 503**. It must never fall through to source.
 
@@ -142,4 +142,4 @@ The full ownership inventory and the transactional replacement sequence are on A
 
 - **Allocator:** Use mimalloc globally with threshold-gated trim (`--mimalloc-trim-*`). Production sets `MIMALLOC_PURGE_DELAY=0`, so you pool transient buffers in `hj_core::recycle`.
 
-> [Diagram: recycle-pools] Zero-fault buffer and task recycling (v0.1.2–v0.1.5). Under MIMALLOC_PURGE_DELAY=0, unpooled transient allocations in sparse size classes fault back in on every request. hj_core::recycle pools H2 stream futures, bridge futures, tiered body buffers (frozen into ref-counted Bytes via Bytes::from_owner and returned when the last slice drops), LSAPI read/BEGIN buffers, and per-core 64 KiB TLS record buffers.
+> [Diagram: recycle-pools] Buffer and task recycling. Under MIMALLOC_PURGE_DELAY=0, unpooled transient allocations in sparse size classes can incur minor page faults when reused. hj_core::recycle pools H2 stream futures, bridge futures, tiered body buffers (frozen into ref-counted Bytes via Bytes::from_owner and returned when the last slice drops), LSAPI read/BEGIN buffers, and per-core 64 KiB TLS record buffers.

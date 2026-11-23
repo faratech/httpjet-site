@@ -518,7 +518,7 @@
             <tr data-group="zerofault">
               <th><code>experiment</code> &middot; H3 GSO Segment Cap<span class="mini">SINGULARITY &middot; same-binary A/B</span></th>
               <td class="def">H3 32 KiB, 100k req/arm<br><span class="mini">GSO cap 10 vs 20</span></td>
-              <td class="wrap">Static <code>6,052 &rarr; 7,816/6,552 rps</code>, <code>sendmsg</code> <code>&minus;44.6%</code>, instr <code>&lt;1%</code>; default stays 10. <span class="mini">Receipt: <code>docs/h3-gso-segment-experiment.md</code> in the source tree</span></td>
+              <td class="wrap">Static <code>6,052 &rarr; 7,816/6,552 rps</code>, <code>sendmsg</code> <code>&minus;44.6%</code>, instr <code>&lt;1%</code>; the default in this historical test was 10. See <a href="cli#serve">current CLI defaults</a>. <span class="mini">Receipt: <code>docs/h3-gso-segment-experiment.md</code> in the source tree</span></td>
             </tr>
           </tbody>
         </table>
@@ -526,7 +526,7 @@
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="cli"><div class="dir">← Prev</div><div class="ttl">CLI reference</div></a><a class="next" href="conformance"><div class="dir">Next →</div><div class="ttl">Conformance &amp; testing</div></a></nav>
-<p class="docfoot">httpjet · documentation updated 2026-11-23; measurements and historical results are dated on their pages.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · release behavior reviewed against <a href="https://github.com/faratech/httpjet/tree/v0.2.6-3">v0.2.6-3</a>; measurements and historical results are dated on their pages.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
 <aside class="tocwrap">
   <div class="toc-title">On this page</div>
@@ -539,6 +539,6 @@
     <div class="search-res"></div>
   </div>
 </div>
-<script defer src="assets/docs.min.js?v=20261123b"></script>
+<script defer src="assets/docs.min.js?v=20261123c"></script>
 </body>
 </html>

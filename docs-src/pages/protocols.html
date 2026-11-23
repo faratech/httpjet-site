@@ -94,8 +94,8 @@
         <li><strong>Abuse bounds.</strong> HTTP/2 Bomb (CVE-2026-49975) and no-progress stay bounded. See rapid-reset budget.</li>
         <li><strong>Pacing.</strong> Per-connection at OutQueue flush. Server-wide rate only; H3 unpaced.</li>
       </ul>
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>You pass <strong>146 of 146</strong> h2spec 2.6.0 cases over TLS. Three consecutive runs is the gate; h2c records 145/146, with generic §3.5/2 structurally unsatisfiable on the sniffing port.</p><span class="regime">scripts/h2spec_check.sh · scripts/ci-h2spec.py</span></div></div>
-      <div class="callout"><div class="ico">i</div><div class="body"><span class="tag">HPACK</span><p>RFC 7541 HPACK lives in the <code>hpack</code> submodule of <code>hj-h2</code>, zero-allocation and pure safe Rust (<code>#![forbid(unsafe_op_in_unsafe_fn)]</code>). Huffman codes to 11 bits resolve from a 4 KiB root table. Three 32-entry sub-tables cover 12–16-bit codes (0.1.7; replaced 256 KiB flat; cold decode 16.6 → 4.6 µs). The encoder remembers eight long literals (257+ bytes) per thread (0.1.10; 4.73 → 1.34 µs per block). Decoder and round-trip are <a href="conformance.html#fuzz">fuzz targets</a>. See the <a href="#hpack">HPACK stub</a>.</p></div></div>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>You pass <strong>146 of 146</strong> h2spec 2.6.0 cases over TLS. Three consecutive runs is the gate; h2c records 145/146, with generic §3.5/2 structurally unsatisfiable on the sniffing port.</p><span class="regime">Historical result · public harness: scripts/ci-h2spec.py</span></div></div>
+      <div class="callout"><div class="ico">i</div><div class="body"><span class="tag">HPACK</span><p>RFC 7541 HPACK lives in the <code>hpack</code> submodule of <code>hj-h2</code>, with bounded header decoding (<code>#![forbid(unsafe_op_in_unsafe_fn)]</code>). Huffman codes to 11 bits resolve from a 4 KiB root table. Three 32-entry sub-tables cover 12–16-bit codes (0.1.7; replaced 256 KiB flat; cold decode 16.6 → 4.6 µs). The encoder remembers eight long literals (257+ bytes) per thread (0.1.10; 4.73 → 1.34 µs per block). Decoder and round-trip are <a href="conformance.html#fuzz">fuzz targets</a>. See the <a href="#hpack">HPACK stub</a>.</p></div></div>
     </section>
 
     <section>
@@ -110,10 +110,10 @@
         <li><strong>Intake and parsing.</strong> You use <code>quinn-udp</code> metadata (GSO/GRO, live GSO cap) and parse streams incrementally. QUIC DATAGRAM disabled; QPACK head bytes charge <code>total_req_bytes</code> and the body budget.</li>
         <li><strong>Bodies and stalls.</strong> Small, cached, and sub-threshold bodies go whole; large, SSE, and proxy bodies stream HEADERS-first. Backpressured DATA; send-stalled streams reset; retained memory bounded per connection (2026-09-06).</li>
         <li><strong>Budget.</strong> Charge at <code>Connected</code>, after validation. Spoofed Initials cannot hold budget; full budget closes <code>H3_EXCESSIVE_LOAD</code>.</li>
-        <li><strong>Handshake slots.</strong> One of 256 per-core slots per unvalidated connection. Above 64 per core, stateless <strong>Retry</strong>; token-bearing Initials pass; handshakes close after 10 s.</li>
+        <li><strong>Handshake slots.</strong> All pending handshakes share 256 slots per core. Starting at 64 pending handshakes, an unvalidated Initial must complete stateless Retry when available. The hard cap applies even after address validation. The handshake deadline is 10 seconds.</li>
         <li><strong>Discovery and trust.</strong> Advertise via <strong>Alt-Svc</strong> (last TLS transform); pin trust/mTLS at acceptance. Migration disabled; <a href="admin-api.html#reload">reloads</a> affect future handshakes only.</li>
       </ul>
-      <!--diagram:h3-admission|<strong>HTTP/3 UDP intake.</strong> Unvalidated Initials pass per-core slot caps (256 max, Retry above 64) before charging <code>maxConnections</code> at <code>Connected</code>. QPACK heads charge <code>total_req_bytes</code> and <code>BodyBufferBudget</code>.-->
+      <!--diagram:h3-admission|<strong>HTTP/3 UDP intake.</strong> Incoming connections check admission before taking a per-core handshake slot. The global active connection permit is acquired at <code>Connected</code>. QPACK heads charge <code>total_req_bytes</code> and <code>BodyBufferBudget</code>.-->
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Publish UDP too</span><p>You must publish the same numeric HTTPS port over TCP and UDP. Publishing <code>8443/tcp</code> alone gives you no HTTP/3.</p></div></div>
     </section>
 
@@ -139,7 +139,7 @@
 
     <section>
       <h2 id="sendfile">File egress: sendfile &amp; kTLS</h2>
-      <p>An uncached <code>Body::File</code> keeps its pinned inode and byte range across the bridge. You send it with bounded nonblocking <code>sendfile(2)</code> on plain TCP HTTP/1.</p>
+      <p>An uncached <code>Body::File</code> keeps its pinned inode and byte range across the bridge. Plain TCP HTTP/1 attempts bounded, nonblocking <code>sendfile(2)</code> when it has a suitable output descriptor. Otherwise the server uses buffered file reads.</p>
       <ul>
         <li>Unsupported pairs resume at the exact offset via positional io_uring reads. Short files or aborts close, never a wrong <code>Content-Length</code>.</li>
         <li>Stalled sendfile backs off 100 µs → 12.8 ms. 16 KiB per <code>connTimeout</code> progress rule still applies.</li>

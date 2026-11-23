@@ -10,5 +10,5 @@ flowchart LR
   end
   IDX -- "lookup" --> HOT
   HOT -- "cold" --> F
-  F -- "~µs MAP_POPULATE read + per-thread DCtx decode" --> HOT
-  IDX -- "teardown (evict · expire · purge · replace)<br/>synchronous under the shard lock: index + file + hot + tags" --> F
+  F -- "read body and decode if needed" --> HOT
+  IDX -- "teardown (evict · expire · purge · replace)<br/>retire metadata under lock, unlink after release" --> F

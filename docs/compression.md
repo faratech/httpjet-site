@@ -9,7 +9,7 @@
 
 # Compression
 
-`hj-compress` encodes responses with gzip, brotli and zstd. You get **gzip on by default; br/zstd are opt-in**. Server priority picks the codec, bounded by the client's `Accept-Encoding`.
+`hj-compress` encodes responses with gzip, brotli and zstd. Response compression enables gzip, brotli and zstd by default. The server chooses among enabled codecs the client accepts. For request decompression , gzip is enabled by default and brotli and zstd require opt-in.
 
         resolve    acl    rewrite    cache    dispatch    finalize    store
 
@@ -23,25 +23,25 @@
 
 | gzip | `flate2` | 6 (1–9) | `enableGzipCompress`, `enableDynGzipCompress`, `gzipCompressLevel` |
 
-> [Diagram: compression-negotiation] Choosing an encoder. Bodies of 200 bytes or fewer are never compressed (OpenLiteSpeed parity), the compressible-type set matches LiteSpeed's compressibleTypes, already-encoded and 206 responses are skipped, and every encoded response carries Vary: Accept-Encoding.
+> [Diagram: compression-negotiation] Choosing an encoder. The dynamic response transform checks content type, cache directives, range and encoding headers. Known-size bodies need at least 201 bytes. Stream compression has separate per-codec gates.
 
 **What gets compressed** — check each item:
 
-- Bodies over 200 bytes. 200 bytes or fewer never compress.
+- Known-size bodies need at least 201 bytes. Streamed bodies are checked against the selected codec’s streaming switch.
 
 - Types in LiteSpeed's `compressibleTypes`. Other types pass through.
 
-- Unencoded, non-206 responses. Already-encoded and 206 responses skip.
+- Unencoded responses with no range and no `Cache-Control: no-transform`. The transform also skips 204, 206 and 304 responses.
 
-- Buffered bodies in one shot. Streamed bodies stay streaming.
+- Buffered bodies can encode in one shot or in cooperative slices when configured. Eligible streams encode incrementally.
 
 - Every encoded response. It carries `Vary: Accept-Encoding`.
 
-zstd uses a per-thread `ZSTD_CCTX` pool and pooled buffers (`hj_core::recycle::BODY_BUFS`). Streamed bodies (`Body::Stream`) wrap in a lazy `CompressStream`, so SSE stays real-time.
+zstd uses a per-thread `ZSTD_CCTX` pool and pooled buffers (`hj_core::recycle::BODY_BUFS`). Streamed bodies (`Body::Stream`) wrap in a lazy `CompressStream`, while SSE bypasses compression.
 
 ## Trusted-proxy zstd egress
 
-`--cf-send-zstd` (or `CF_SEND_ZSTD=1`) forces zstd to a *trusted-proxy* peer, ignoring forwarded `Accept-Encoding`. Cloudflare re-encodes per browser at its edge, so browser bytes stay unchanged (cheapest-to-produce form; officially unsupported CDN↔origin). Off by default; enabled in production. It never applies to untrusted clients.
+`--cf-send-zstd` (or `CF_SEND_ZSTD=1`) forces zstd to a *trusted-proxy* peer, ignoring forwarded `Accept-Encoding`. Cloudflare re-encodes per browser at its edge, so browser bytes stay unchanged (cheapest-to-produce form; officially unsupported CDN↔origin). Off by default. Enable it only when every peer classified as a trusted proxy can accept zstd. It never applies to untrusted clients.
 
 ## Precompressed siblings
 

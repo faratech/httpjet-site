@@ -1,5 +1,5 @@
     <h1>Admin API &amp; reload</h1>
-    <p class="lede">You change a running httpjet three ways: SIGHUP, read-only status API, transactional write API. One publication coordinator serves all writers. Each change publishes fully, or not at all.</p>
+    <p class="lede">Inspect the running generation with the read-only API. SIGHUP reloads on-disk settings and the optional write API publishes a volatile configuration. Both writers share one publication coordinator.</p>
 
     <div class="tablewrap"><table>
       <thead><tr><th>Way</th><th>Does</th><th>Limit</th></tr></thead>
@@ -45,7 +45,7 @@
   --admin-write-addr 127.0.0.1:9092 \
   --admin-token-file /operator/private/token \       <span class="t-c"># 64 lowercase hex chars (32 random bytes), mode 0400/0600, one hard link, root or service uid</span>
   --admin-resource-root /operator/content \          <span class="t-c"># repeatable; up to 32 existing directories; "/" is refused</span>
-  --admin-resource-root /etc/letsencrypt/live</code></pre></div>
+  --admin-resource-root /operator/certs</code></pre></div>
       <!--diagram:reload-transaction|<strong>Validate, then publish with an exact precondition.</strong> Every write carries <code>If-Match</code> with the revision it read; a stale revision or an out-of-band publication (SIGHUP included) loses with a conflict rather than silently rebuilding against newer state. Publication is volatile: the on-disk XML is never rewritten and a restart returns to it.-->
       <h3 id="endpoints">Endpoints and contract</h3>
       <div class="tablewrap"><table>
@@ -58,7 +58,7 @@
       <p>Frame each write exactly:</p>
       <ul>
         <li><code>Authorization: Bearer &lt;token&gt;</code>: missing/duplicate/malformed → 401, body unread, constant-time compare, token never logged.</li>
-        <li>Exact quoted <code>If-Match</code>: missing → 428, stale → conflict.</li>
+        <li>Exact quoted <code>If-Match</code>. Missing returns 428, stale returns 412, and a change requiring restart returns 409.</li>
         <li><code>Content-Type: application/json</code>, one <code>Content-Length</code> ≤ 1 MiB, headers ≤ 8 KiB / 32, deadline 5 s.</li>
         <li>Host: bound loopback, or <code>localhost:&lt;port&gt;</code>. Rejected: encodings, Origin, Expect, Upgrade, Trailer.</li>
         <li>One request per connection, never pipelined. Max four connections, one build. Lock ≤ 5 s, candidate ≤ 10 s. Late builds never publish.</li>
@@ -107,7 +107,5 @@
     <section>
       <h2 id="checks">Reproducible checks</h2>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>tests</b> · isolated loopback listeners and temporary trees</span></div><pre><code>cargo test --locked -p httpjet admin
-python3 -B scripts/admin-runtime-test.py --binary target/debug/httpjet                       <span class="t-c"># served-file replacement, validate-only non-mutation, stale writes, SIGHUP restoration, restart incarnation</span>
-python3 -B scripts/admin-runtime-test.py --binary target/debug/httpjet --memo-parity         <span class="t-c"># 48-cell memo parity across a publication</span>
-python3 -B scripts/admin-runtime-test.py --binary target/debug/httpjet --persistent-cache    <span class="t-c"># authenticated on-disk containers, hits across publication, boot-scan restoration</span></code></pre></div>
+cargo test --locked -p httpjet resource_generation</code></pre></div>
     </section>

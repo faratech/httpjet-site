@@ -5,7 +5,9 @@ stateDiagram-v2
   Cold --> Eligible: rise consecutive probe successes
   Eligible --> Down: fall consecutive probe failures
   Eligible --> Broken: 3 consecutive dial failures (passive breaker)
-  Broken --> Eligible: successful dial
+  Broken --> Trial: 10-second cooldown
+  Trial --> Eligible: successful fresh dial and health permits
+  Trial --> Broken: failed fresh dial
   Down --> Eligible: rise successes (no user traffic needed)
   note right of Cold
     ineligible until the rise

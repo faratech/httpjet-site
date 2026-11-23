@@ -9,7 +9,7 @@
 
 # Extending httpjet
 
-Extend httpjet two ways: linked Rust crates, or a WAF sidecar. No dynamic plugin ABI exists. No in-process sandbox exists. This page states that once.
+Extend httpjet with linked Rust crates or connect a WAF sidecar for request inspection.
 
 Rust offers no stable trait-object ABI across shared libraries. Native modules would share allocator, signals, threads anyway. No workload needs untrusted in-process code. No WASM runtime ships. Route untrusted inspection via the sidecar. Future untrusted designs must define capabilities, memory, fuel, deadlines, cancellation, body access, state, network access, versioning, fail semantics first.
 
@@ -69,7 +69,7 @@ httpjet embeds no rules engine. Ignored `lsrecaptcha`/`censorshipControl` stay i
 --waf-fail-open                       # weaker policy: continue on sidecar failure (every bypass is logged; 403 still blocks)
 ```
 
-> [Diagram: waf-sidecar] One inspection per request. Inspection runs after URI decoding/normalization and body-limit enforcement but before rewrite, cache lookup and any backend — background cache refreshes go through the same dispatch and are inspected too. Only two replies are valid; everything else is a sidecar failure.
+> [Diagram: waf-sidecar] Inspection before dispatch. Inspection runs after URI decoding/normalization and body-limit enforcement but before rewrite, cache lookup and any backend — background cache refreshes go through the same dispatch and are inspected too. A parsed 403 always blocks. A 204 allows the request only when it has valid, bodyless framing.
 
 ### Document
 
@@ -85,7 +85,7 @@ Concurrency cap plus shared 64 MiB serialization budget. Each inspection reserve
 
 ### Transport
 
-One close-delimited HTTP/1.1 POST per inspection. Never reused. Response head ≤ 4 KiB. Only 204/403 valid. Failures: duplicate/nonzero Content-Length, Transfer-Encoding, malformed status, EOF, other statuses.
+Each inspection uses a fresh HTTP/1.1 connection and accepts a response head of up to 4 KiB. A parsed 403 blocks regardless of its body framing. A 204 requires no Transfer-Encoding and may omit Content-Length or supply one zero value. Invalid allow responses and other statuses follow the configured failure policy.
 
            **tests**
 ```
@@ -96,4 +96,4 @@ cargo test -p hj-extension
 
 ## Why there is no dynamic or sandboxed plugin ABI
 
-See lede note. Choice stated once there. Untrusted inspection: WAF sidecar .
+Linked extensions share the server’s process and authority. Use a separate process for inspection code that needs isolation. WAF sidecar .

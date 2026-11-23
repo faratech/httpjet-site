@@ -52,7 +52,7 @@ httpjet --root /abs/root serve … --lsphp-external /run/httpjet/php.sock \
 
 <span class="t-c"># opcache/PHP recycle without dropping the listener</span>
 httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-secs 90</code></pre></div>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Generation file and socket are trust anchors</span><p>The 16-byte file (epoch + promoted-family marker fingerprint) identifies your pool. Supplying <code>--lsphp-generation-file</code> aborts startup if it is missing or malformed; its parent must not be group/other-writable, and test pools default files beside their own socket.</p><p>Never restart <code>httpjet-lsphp.socket</code> during a reload: it preserves the listener inode and 8192-deep queue. Restart only <code>httpjet-lsphp.service</code> (it reapplies the XML backlog via <code>listen(2)</code>); verify socket inode, 16-byte file, and <code>ss -xln</code> Send-Q = 8192 (<code>LIVE=1 scripts/lsphp-reload-test.sh</code>).</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Generation file and socket are trust anchors</span><p>The 16-byte file (epoch + promoted-family marker fingerprint) identifies your pool. Supplying <code>--lsphp-generation-file</code> aborts startup if it is missing or malformed; its parent must not be group/other-writable, and test pools default files beside their own socket.</p><p>If a separate socket unit owns the listener, keep that unit running during a supervisor reload or replacement. Verify the listener inode, 16-byte generation file, and configured backlog with <code>ss -xln</code>.</p></div></div>
     </section>
 
     <section>
@@ -88,7 +88,7 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
         <li><strong>Refusals (2026-09-16).</strong> Workers never run as root, even if suEXEC computes uid/gid 0. A setuid <code>lsphp</code> binary is also refused.</li>
         <li><strong>Deadline.</strong> <code>--php-max-process-time-ms</code> gives a total per-request deadline; exceeded means 504. Spawn mode also kills/restarts the worker; external mode has no web-process monitor, so keep it conservative.</li>
       </ul>
-      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Packaging boundary</span><p>httpjet ships no PHP runtime; you manage the executable, extensions, <code>php.ini</code>, opcache, and writable paths. The repo's hardening runbook (<code>systemd/httpjet-lsphp.service.d/hardening.conf</code>, <code>MemoryDenyWriteExecute=no</code> for opcache JIT) is validated live but off by default.</p></div></div>
+      <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Packaging boundary</span><p>httpjet ships no PHP runtime; you manage the executable, extensions, <code>php.ini</code>, opcache, and writable paths. The public <code>packaging/systemd/httpjet-lsphp.service</code> is a starting point. Test the service sandbox with the PHP extensions and opcache configuration you intend to run.</p></div></div>
     </section>
 
     <section>

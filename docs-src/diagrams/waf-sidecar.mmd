@@ -6,10 +6,10 @@ sequenceDiagram
   J->>J: decode/normalize URI · enforce body limit · resolve client IP
   J->>J: reserve serialization allowance (64 MiB process budget) within --waf-timeout-ms
   J->>W: POST /inspect {"version":1, method, path, query, vhost, client_ip, protocol, tls, headers_hex, body_hex ≤ --waf-body-max | body_omitted:true}
-  alt 204 + Content-Length: 0
+  alt 204 with valid bodyless framing
     W-->>J: allow
     J->>J: continue: rewrite → cache → dispatch
-  else 403 + Content-Length: 0
+  else parsed 403
     W-->>J: block
     J-->>C: 403
   else timeout · EOF · other status · malformed head (> 4 KiB)

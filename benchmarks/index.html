@@ -26,14 +26,13 @@ ul{margin:6px 0}
 </style></head><body>
 <header><div class="wrap">
 <h1>httpjet — Performance Benchmarks</h1>
-<div class="sub">A from-scratch Rust drop-in LiteSpeed replacement · comprehensive loopback benchmark suite</div>
-<div class="sub">Generated 2026-11-21 · 8-core host · release build</div>
+<div class="sub">Measured workloads and raw results for HTTPJet</div>
 <div class="sub">Latest benchmark results for <b>0.2.6</b> · dedicated lab · November 23, 2026. <a href="/docs/performance#release-0-2-6">Interactive comparisons and release curves</a>.</div>
 </div></header>
 <div class="wrap">
 
 <div class="card note">
-<b>Methodology.</b> All traffic is <b>loopback-only</b> (127.0.0.1) — no Cloudflare, no egress. HTTP/1.1 is
+<b>Methodology.</b> The June archive below used <b>loopback-only</b> (127.0.0.1) — no Cloudflare, no egress. HTTP/1.1 is
 driven by <code>ab</code> (IP literal + Host header); HTTP/2 by <code>h2load</code>. The "light" vhost has
 ~no rewrite rules; the "heavy" vhost runs the production ~130-rule <code>.htaccess</code> front controller.
 PHP is served through httpjet's native LSAPI to an isolated <code>lsphp</code> pool. Static file-size
@@ -82,14 +81,14 @@ fixtures are random blobs. RPS = requests/sec (higher is better); latency in ms.
 <h2>Release 0.2.4 &amp; 0.2.3 — Dedicated Lab VM Sweep (2026-11-21)</h2>
 <div class="card">
 All 15 releases (<code>v0.0.1</code>–<code>v0.2.4</code>) re-measured under identical conditions on a dedicated GCE
-<code>c4-highmem-8</code> VM (server pinned to 4 cores, <code>h2load</code> on 4 cores, Unified PGO per tag, median of 3
+<code>c4-highmem-8</code> VM (server pinned to 4 vCPUs, <code>h2load</code> on 4 vCPUs, Unified PGO per tag, median of 3
 rotated rounds, 15/15 functional checks pass). Raw TSVs:
 <a href="data/release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a> ·
 <a href="data/lab-threeway-2026-11-21.tsv">lab-threeway-2026-11-21.tsv</a> ·
 <a href="data/lab-checks-2026-11-21.tsv">lab-checks-2026-11-21.tsv</a> ·
 <a href="data/lab-perf-2026-11-21.tsv">lab-perf-2026-11-21.tsv</a>.
 <table>
-<thead><tr><th>Workload (4 server / 4 loadgen cores, Unified PGO)</th><th>0.2.2 (k req/s)</th><th>0.2.3 (k req/s)</th><th>0.2.4 (k req/s)</th><th>0.2.4 vs 0.2.3</th></tr></thead>
+<thead><tr><th>Workload (4 server / 4 load-generator vCPUs, Unified PGO)</th><th>0.2.2 (k req/s)</th><th>0.2.3 (k req/s)</th><th>0.2.4 (k req/s)</th><th>0.2.4 vs 0.2.3</th></tr></thead>
 <tbody>
 <tr><td>HTTP/2 empty body (c=32 × 10)</td><td>904.0k</td><td>860.1k</td><td><b>1,291.7k</b></td><td><b>+50.2%</b></td></tr>
 <tr><td>HTTP/2 static 1 KiB (c=32 × 10)</td><td>794.6k</td><td>849.1k</td><td><b>1,092.6k</b></td><td><b>+28.7%</b></td></tr>
@@ -143,7 +142,7 @@ raw-serving win. Same-session A/B (loopback <code>ab -k</code>, production live)
 <code>.htaccess</code> vhost <b>+11.8%</b> (≈75k&nbsp;→&nbsp;84k RPS), light vhost <b>+5.2%</b>. The PGO
 profile was later <b>retrained to cover HTTP/2 + page-cache hits</b> (the dominant prod workload the
 first profile missed), which nearly doubled h2 static throughput. The
-<b>httpjet</b> columns in the tables/charts below are this <b>current PGO build (2026-06-07, post-optimization)</b>; the
+<b>httpjet</b> columns in the tables/charts below are this <b>June 7, 2026 PGO build after optimization</b>; the
 <b>LiteSpeed</b> columns are the <b>2026-06-01</b> A/B (LiteSpeed no longer runs here — production is httpjet —
 so it was not re-measured).
 </div>
@@ -180,8 +179,8 @@ diagnosis: that collapse was this bug, not <code>.htaccess</code> CPU or memory 
 <div class="card"><ul>
 <li><b>Origin page cache is the headline:</b> a cacheable guest pageview goes from full-PHP render to a memory serve — see the cache section above (p50 2&nbsp;ms) — turning a DB-bound page into a near-static one. This is the dominant forum workload and matches the LSCache model httpjet replaces.</li>
 <li><b>Codegen tier</b> (target-cpu + mimalloc + PGO) gave the first above-noise raw-serving win: heavy <code>.htaccess</code> +11.8%, light +5.2%, bringing the heavy vhost to ≈ the LiteSpeed baseline.</li>
-<li><b>httpjet leads on most raw-serving axes</b> (current fixed PGO build vs LiteSpeed's 06-01 A/B): <b>HTTP/2 static</b> 1&nbsp;KB c=50 <b>≈251k vs 220k</b>, empty h2 <b>≈267k vs 244k</b>; <b>HTTP/1.1 static</b> ≈95k vs 82k; <b>both rewrite vhosts lead on h1</b> (light ≈96k, heavy ≈87k) and the light vhost leads on h2 (≈230k vs 194k); <b>PHP-GET</b> ≈45k vs 39k h1. The one axis LiteSpeed still leads is the heavy <code>.htaccess</code> <b>h2</b> rewrite (<b>≈161k vs 207k</b>, ~0.8×) — but that is now an <em>achievable</em> rate: under real concurrency it used to collapse (see the single-flight section above), and for cacheable guest traffic the page cache makes it moot anyway.</li>
-<li><b>The heavy <code>.htaccess</code> pipeline is the remaining raw-serving cost</b> — on the current build it is ≈16% cumulative CPU (<code>run_rewrite</code>), with <code>hj_rewrite::evaluate</code> ~11% and the DFA prefilter (<code>find_overlapping_fwd</code>) ~4%; the rest of httpjet&rsquo;s own CPU is allocation (~20%) and the hyper h1 transport. See the heavy-rewrite flamegraph below.</li>
+<li><b>httpjet leads on most raw-serving axes</b> (June 7 PGO build vs the June 1 LiteSpeed baseline): <b>HTTP/2 static</b> 1&nbsp;KB c=50 <b>≈251k vs 220k</b>, empty h2 <b>≈267k vs 244k</b>; <b>HTTP/1.1 static</b> ≈95k vs 82k; <b>both rewrite vhosts lead on h1</b> (light ≈96k, heavy ≈87k) and the light vhost leads on h2 (≈230k vs 194k); <b>PHP-GET</b> ≈45k vs 39k h1. The one axis LiteSpeed still leads is the heavy <code>.htaccess</code> <b>h2</b> rewrite (<b>≈161k vs 207k</b>, ~0.8×) — but that is now an <em>achievable</em> rate: under real concurrency it used to collapse (see the single-flight section above), and for cacheable guest traffic the page cache makes it moot anyway.</li>
+<li><b>The heavy <code>.htaccess</code> pipeline is the remaining raw-serving cost</b> — on the June 7 build it was ≈16% cumulative CPU (<code>run_rewrite</code>), with <code>hj_rewrite::evaluate</code> ~11% and the DFA prefilter (<code>find_overlapping_fwd</code>) ~4%; the rest of httpjet&rsquo;s own CPU is allocation (~20%) and the hyper h1 transport. See the heavy-rewrite flamegraph below.</li>
 <li><b>PHP/LSAPI is strong for small requests</b> (~45k RPS h1 at pool-matched concurrency, p50 ≈ 1 ms, 0 failures; HTTP/2 PHP still trails LiteSpeed — the LSAPI path is the next target) but <b>64 KB POST collapses to ~0.9k RPS — on BOTH servers</b>, so request-body/LSAPI framing is an ecosystem bottleneck, not unique to httpjet.</li>
 <li><b>HTTP/2 multiplexing</b> beats HTTP/1.1 keep-alive at small sizes on both servers; large payloads converge (loopback-bandwidth-bound).</li>
 <li><b>Cold connections</b> are far cheaper to avoid — argues for connection reuse + TLS session resumption on the real CF→origin path.</li>
@@ -208,7 +207,7 @@ traffic runs the identical inline path — unchanged by construction.</li>
 <li><b>Static-file serve cache.</b> Serving a static file re-ran the full secure resolution
 (<code>open</code>/<code>fstat</code>/<code>close</code> beneath the doc-root fd) every request. A 1s
 TTL memo now skips it: <b>openat per request 20,000 → 0</b> within the window, for <b>+11%
-heavy-rewrite and +12% static</b> serving throughput. Visible in the current flamegraphs —
+heavy-rewrite and +12% static</b> serving throughput. Visible in the June flamegraphs —
 <code>open_beneath</code> fell from ~8.5% of CPU to ~0%.</li>
 <li><b>Rewrite-engine allocations.</b> The ~130-rule front controller allocated a fresh 10-slot capture
 <code>Vec</code> per matched rule and condition; these are now fixed-size stack arrays, removing up to
@@ -239,11 +238,11 @@ offload ratio over a full PHP render is unchanged.
 <li><b>TLS</b>: stateless session ticketer (the stateful 32&nbsp;Ki session cache is already enabled) for an extra slice of cold-connection resumption.</li>
 </ul></div>
 
-<h2>LiteSpeed comparison (head-to-head A/B)</h2>
+<h2>Historical LiteSpeed comparison (separate June runs)</h2>
 <div class="card">
-<b>httpjet = current fixed PGO build (2026-06-07, post single-flight fix); LiteSpeed = 2026-06-01 A/B</b> (same box, loopback HTTPS;
+<b>httpjet = June 7, 2026 PGO build after the single-flight fix. LiteSpeed = June 1, 2026 baseline</b> (same box, loopback HTTPS;
 LiteSpeed no longer runs here, so its columns are the historical comparison). The charts above plot both.
-<b>Verdict: httpjet now leads on nearly every axis — including the HTTP/2 static path it used to trail:</b>
+<b>Selected results from the two June runs:</b>
 <ul>
 <li><b>HTTP/2 static</b> (the former gap, now <b>reversed</b>): 1&nbsp;KB c=50 httpjet <b>≈251k</b> vs LiteSpeed ≈220k; empty ≈267k vs ≈244k. Before the retrained PGO this was ≈128k (a 1.7× deficit); the static-serve cache + PGO lifted it past LiteSpeed.</li>
 <li><b>HTTP/1.1 static</b>: httpjet ≈95k vs LiteSpeed ≈82k (1&nbsp;KB c=50); LiteSpeed's 1&nbsp;KB h1 runs were failure-laden on this box, so h1 small-object is httpjet-favorable.</li>
@@ -253,8 +252,8 @@ LiteSpeed no longer runs here, so its columns are the historical comparison). Th
 <li><b>Guest pageviews</b> (the dominant forum workload): the origin page cache serves them from memory (~40×, above) — parity with the LSCache model LiteSpeed itself relies on, so even the heavy-h2 rewrite gap is moot for cacheable traffic.</li>
 </ul>
 <b>Caveat:</b> the httpjet numbers are a fresh isolated loopback run of the deployed PGO build; the LiteSpeed
-numbers are the 06-01 A/B (measured while it was also the live prod server, so if anything conservative) and
-were <i>not</i> re-run. The comparison is current-httpjet vs dated-LiteSpeed, not a simultaneous A/B.
+numbers are the 06-01 A/B (measured while LiteSpeed also served production traffic) and
+were <i>not</i> re-run. These measurements came from separate runs.
 </div>
 
 <h2>Raw data (all measured cells)</h2>

@@ -1,5 +1,5 @@
     <h1>Compression</h1>
-    <p class="lede"><code>hj-compress</code> encodes responses with gzip, brotli and zstd. You get <strong>gzip on by default; br/zstd are opt-in</strong>. Server priority picks the codec, bounded by the client's <code>Accept-Encoding</code>.</p>
+    <p class="lede"><code>hj-compress</code> encodes responses with gzip, brotli and zstd. Response compression enables gzip, brotli and zstd by default. The server chooses among enabled codecs the client accepts. For <a href="#request">request decompression</a>, gzip is enabled by default and brotli and zstd require opt-in.</p>
 
     <div class="rail locator" role="img" aria-label="You are here: finalize."><div class="rail__track"><span class="stage"><span class="k">resolve</span></span><span class="stage"><span class="k">acl</span></span><span class="stage"><span class="k">rewrite</span></span><span class="stage"><span class="k">cache</span></span><span class="stage"><span class="k">dispatch</span></span><span class="stage on"><span class="k">finalize</span></span><span class="stage"><span class="k">store</span></span></div></div>
 
@@ -12,21 +12,21 @@
           <tr><td><span class="crate">brotli</span></td><td><code>brotli</code></td><td>5 (0–11). Without <code>brCompressLevel</code>, <code>enableBrCompress</code> level 1–6 sets it, 0 disables.</td><td><code>enableBrCompress</code>, <code>enableDynBrCompress</code>, <code>brCompressLevel</code></td></tr>
           <tr><td><span class="crate">gzip</span></td><td><code>flate2</code></td><td>6 (1–9)</td><td><code>enableGzipCompress</code>, <code>enableDynGzipCompress</code>, <code>gzipCompressLevel</code></td></tr>
         </tbody></table></div>
-      <!--diagram:compression-negotiation|<strong>Choosing an encoder.</strong> Bodies of 200 bytes or fewer are never compressed (OpenLiteSpeed parity), the compressible-type set matches LiteSpeed's <code>compressibleTypes</code>, already-encoded and 206 responses are skipped, and every encoded response carries <code>Vary: Accept-Encoding</code>.-->
+      <!--diagram:compression-negotiation|<strong>Choosing an encoder.</strong> The dynamic response transform checks content type, cache directives, range and encoding headers. Known-size bodies need at least 201 bytes. Stream compression has separate per-codec gates.-->
       <p><strong>What gets compressed</strong> — check each item:</p>
       <ul>
-        <li>Bodies over 200 bytes. 200 bytes or fewer never compress.</li>
+        <li>Known-size bodies need at least 201 bytes. Streamed bodies are checked against the selected codec’s streaming switch.</li>
         <li>Types in LiteSpeed's <code>compressibleTypes</code>. Other types pass through.</li>
-        <li>Unencoded, non-206 responses. Already-encoded and 206 responses skip.</li>
-        <li>Buffered bodies in one shot. Streamed bodies stay streaming.</li>
+        <li>Unencoded responses with no range and no <code>Cache-Control: no-transform</code>. The transform also skips 204, 206 and 304 responses.</li>
+        <li>Buffered bodies can encode in one shot or in cooperative slices when configured. Eligible streams encode incrementally.</li>
         <li>Every encoded response. It carries <code>Vary: Accept-Encoding</code>.</li>
       </ul>
-      <p>zstd uses a per-thread <code>ZSTD_CCTX</code> pool and pooled buffers (<code>hj_core::recycle::BODY_BUFS</code>). Streamed bodies (<code>Body::Stream</code>) wrap in a lazy <code>CompressStream</code>, so SSE stays real-time.</p>
+      <p>zstd uses a per-thread <code>ZSTD_CCTX</code> pool and pooled buffers (<code>hj_core::recycle::BODY_BUFS</code>). Streamed bodies (<code>Body::Stream</code>) wrap in a lazy <code>CompressStream</code>, while SSE bypasses compression.</p>
     </section>
 
     <section>
       <h2 id="cf-zstd">Trusted-proxy zstd egress</h2>
-      <p><code>--cf-send-zstd</code> (or <code>CF_SEND_ZSTD=1</code>) forces zstd to a <em>trusted-proxy</em> peer, ignoring forwarded <code>Accept-Encoding</code>. Cloudflare re-encodes per browser at its edge, so browser bytes stay unchanged (cheapest-to-produce form; officially unsupported CDN↔origin). Off by default; enabled in production. It never applies to untrusted clients.</p>
+      <p><code>--cf-send-zstd</code> (or <code>CF_SEND_ZSTD=1</code>) forces zstd to a <em>trusted-proxy</em> peer, ignoring forwarded <code>Accept-Encoding</code>. Cloudflare re-encodes per browser at its edge, so browser bytes stay unchanged (cheapest-to-produce form; officially unsupported CDN↔origin). Off by default. Enable it only when every peer classified as a trusted proxy can accept zstd. It never applies to untrusted clients.</p>
     </section>
 
     <section>

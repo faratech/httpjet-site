@@ -23,7 +23,7 @@ curl -fsSLo install.sh https://github.com/faratech/httpjet/releases/latest/downl
 sudo sh ./install.sh
 ```
 
-The installer selects signed DEB/APT or RPM packages on supported systemd systems. It can also select a signed portable archive. It verifies the release before installing. It creates a dedicated `httpjet` account. It starts the service on a fresh install. GitHub Releases also provides DEB, RPM and static archives.
+The installer selects signed DEB/APT or RPM packages on supported systemd systems. It can also select a signed portable archive. It verifies the release before installing. It creates a dedicated `httpjet` account. With a supported supervisor, it starts the service on a fresh install. The portable `--init none` route installs without starting a service. GitHub Releases also provides DEB, RPM and static archives.
 
 Fresh installs serve `http://SERVER-IP/` on port 80. They serve `https://SERVER-IP/` on port 443. Each install generates its own self-signed certificate. Browsers warn until you configure a trusted certificate. HTTP does not redirect to HTTPS automatically. Open TCP ports 80 and 443 in your firewall for remote access.
 
@@ -107,7 +107,7 @@ target/release/httpjet --root "$PWD/examples/litespeed" check
 target/release/httpjet --root "$PWD/examples/litespeed" check --strict
 ```
 
-`check --strict` hard-errors on three cases:
+`check --strict` fails on these configuration errors:
 
 - A docroot shared by two vhosts fails.
 
@@ -115,11 +115,13 @@ target/release/httpjet --root "$PWD/examples/litespeed" check --strict
 
 - A mapped vhost whose config did not load fails.
 
+- The first secure listener’s TLS configuration fails to load.
+
 Geo rules without a database fail even a plain `check`. Other findings warn without failing. Always use an absolute `--root`. See Configuration and Capabilities & limits for warnings.
 
 ## 3 · Serve on loopback
 
-The XML holds persistent policy. The `serve` flags hold operational overrides. The example is HTTP-only, PHP-off and cache-off. You can run it safely beside an existing server.
+The XML holds persistent policy. The `serve` flags hold operational overrides. The example is HTTP-only with PHP and page cache disabled. If the HTTP or metrics port is already in use, select a free loopback port and use the same port in your probes.
 
             **serve** · development
 
@@ -139,7 +141,6 @@ Use alternate ports and a separate `--php-socket`. Use low `--php-children` and 
             **verify** · curl
 
 ```
-printf 'hello from httpjet\n' > examples/litespeed/example/public/index.html
 curl -i -H 'Host: example.test' http://127.0.0.1:8080/
 
 # h2c prior knowledge on the same plain port

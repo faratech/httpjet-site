@@ -109,9 +109,9 @@ match sniff_cleartext(&mut stream).await? {
 
         ⎁   Measured
 You pass **146 of 146** h2spec 2.6.0 cases over TLS. Three consecutive runs is the gate; h2c records 145/146, with generic §3.5/2 structurally unsatisfiable on the sniffing port.
- scripts/h2spec_check.sh · scripts/ci-h2spec.py
+ Historical result · public harness: scripts/ci-h2spec.py
         i   HPACK
-RFC 7541 HPACK lives in the `hpack` submodule of `hj-h2`, zero-allocation and pure safe Rust (`#![forbid(unsafe_op_in_unsafe_fn)]`). Huffman codes to 11 bits resolve from a 4 KiB root table. Three 32-entry sub-tables cover 12–16-bit codes (0.1.7; replaced 256 KiB flat; cold decode 16.6 → 4.6 µs). The encoder remembers eight long literals (257+ bytes) per thread (0.1.10; 4.73 → 1.34 µs per block). Decoder and round-trip are fuzz targets . See the HPACK stub .
+RFC 7541 HPACK lives in the `hpack` submodule of `hj-h2`, with bounded header decoding (`#![forbid(unsafe_op_in_unsafe_fn)]`). Huffman codes to 11 bits resolve from a 4 KiB root table. Three 32-entry sub-tables cover 12–16-bit codes (0.1.7; replaced 256 KiB flat; cold decode 16.6 → 4.6 µs). The encoder remembers eight long literals (257+ bytes) per thread (0.1.10; 4.73 → 1.34 µs per block). Decoder and round-trip are fuzz targets . See the HPACK stub .
 
 ## HPACK
 
@@ -127,11 +127,11 @@ HPACK now lives inside Native HTTP/2 as a three-line summary. You keep this stub
 
 - **Budget.** Charge at `Connected`, after validation. Spoofed Initials cannot hold budget; full budget closes `H3_EXCESSIVE_LOAD`.
 
-- **Handshake slots.** One of 256 per-core slots per unvalidated connection. Above 64 per core, stateless **Retry**; token-bearing Initials pass; handshakes close after 10 s.
+- **Handshake slots.** All pending handshakes share 256 slots per core. Starting at 64 pending handshakes, an unvalidated Initial must complete stateless Retry when available. The hard cap applies even after address validation. The handshake deadline is 10 seconds.
 
 - **Discovery and trust.** Advertise via **Alt-Svc** (last TLS transform); pin trust/mTLS at acceptance. Migration disabled; reloads affect future handshakes only.
 
-> [Diagram: h3-admission] HTTP/3 UDP intake. Unvalidated Initials pass per-core slot caps (256 max, Retry above 64) before charging maxConnections at Connected. QPACK heads charge total_req_bytes and BodyBufferBudget.
+> [Diagram: h3-admission] HTTP/3 UDP intake. Incoming connections check admission before taking a per-core handshake slot. The global active connection permit is acquired at Connected. QPACK heads charge total_req_bytes and BodyBufferBudget.
 
         !   Publish UDP too
 You must publish the same numeric HTTPS port over TCP and UDP. Publishing `8443/tcp` alone gives you no HTTP/3.
@@ -165,7 +165,7 @@ Use `unix:/path/sock` (or `uds:`), or `--http-uds`, for plain HTTP over a Unix s
 
 ## File egress: sendfile & kTLS
 
-An uncached `Body::File` keeps its pinned inode and byte range across the bridge. You send it with bounded nonblocking `sendfile(2)` on plain TCP HTTP/1.
+An uncached `Body::File` keeps its pinned inode and byte range across the bridge. Plain TCP HTTP/1 attempts bounded, nonblocking `sendfile(2)` when it has a suitable output descriptor. Otherwise the server uses buffered file reads.
 
 - Unsupported pairs resume at the exact offset via positional io_uring reads. Short files or aborts close, never a wrong `Content-Length`.
 

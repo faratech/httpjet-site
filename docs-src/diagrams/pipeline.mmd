@@ -3,9 +3,11 @@ flowchart TB
   classDef term fill:#0e1424,stroke:#22d3ee,color:#e8ecf6
   classDef gate fill:#1a1f33,stroke:#fbbf73,color:#e8ecf6
   A["resolve<br/>SNI / Host → vhost"] --> B["trust & identity<br/>mTLS gate · client IP · ACL · geo · throttle"]
-  B --> W("WAF sidecar<br/>(opt-in)"):::gate
-  W --> X["extension pre-handlers<br/>(compile-time, optional)"]
-  X --> C[".htaccess chain<br/>SetEnvIf · memoized pre-rewrite access"]
+  B --> X["extension pre-handlers<br/>(compile-time, optional)"]
+  X -- "continue or none registered" --> Y["context body limit"]
+  X -- "respond or error" --> K
+  Y --> W("WAF sidecar<br/>(if configured)"):::gate
+  W -- "allowed or disabled" --> C[".htaccess chain<br/>SetEnvIf · memoized pre-rewrite access"]
   C --> D["rewrite<br/>inline rules, then .htaccess"]
   D --> E["access enforcement<br/>Basic auth · PATH_INFO deny"]
   E --> F("page-cache lookup<br/>(--page-cache · public / private / shared / capsule)"):::on

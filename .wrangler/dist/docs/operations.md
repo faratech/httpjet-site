@@ -21,64 +21,49 @@ For a fresh Linux server, use the signed installer . It selects the native packa
 
 To build and deploy from source instead, install the binary at a stable path *outside* Cargo's `target/` so a later `cargo clean` cannot delete what a running unit depends on:
 
-           source install
+         public static example
 ```
 cargo build --locked --release -p httpjet
-sudo useradd --system --home-dir /var/lib/httpjet --no-create-home --shell /usr/sbin/nologin httpjet
-sudo install -d /usr/local/httpjet/bin /usr/local/httpjet/conf /usr/local/httpjet/logs
-sudo install -m0755 target/release/httpjet /usr/local/httpjet/bin/httpjet
-
-# an existing LiteSpeed tree works as-is — validate it first, as root AND as the service user
-sudo /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
-sudo -u httpjet /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
-
-# minimal loopback example unit (no TLS, no PHP, no cache); it runs /usr/bin/httpjet on /etc/httpjet/litespeed
 sudo install -m0755 target/release/httpjet /usr/bin/httpjet
-sudo install -d /etc/httpjet && sudo cp -a examples/litespeed /etc/httpjet/litespeed
+sudo install -d /etc/httpjet
+sudo cp -a examples/litespeed /etc/httpjet/litespeed
 sudo install -m0644 packaging/systemd/httpjet-example.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now httpjet-example
+sudo systemctl daemon-reload
+sudo systemctl enable --now httpjet-example
+curl -f -H 'Host: example.test' http://127.0.0.1:8080/
 ```
 
         !   Review before start
-The example units bind loopback and use example document roots. Set listeners, domains, docroots, TLS material, writable paths and the service identity deliberately before enabling a public service. A permission-preparing `ExecStartPre` that runs as root and then drops to the unprivileged account is the reference shape.
+The example units bind loopback and use example document roots. Set listeners, domains, docroots, TLS material, writable paths and the service identity deliberately before enabling a public service. The static reference unit uses `DynamicUser=yes` and runs its strict config check under that service identity.
 
 ## Advanced systemd socket activation
 
-The following reference topology is optional. The fresh installer uses a single static service and does not set up these socket, PHP-pool or firewall units.
+The public release includes a packaged static service and two source-based example units. They provide starting points for an operator-managed socket-activated deployment.
 
-> [Diagram: systemd-units] Five core units (plus the optional edge firewall). The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.
+> [Diagram: systemd-units] Service options in the public release. The packaged service and source example serve static files. Attach a separately managed LSAPI pool when the site needs PHP.
 
-| Unit | Role |
+| Public unit | Role |
 
-| `httpjet.socket` | N× `:80` TCP, N× `:443` TCP, N× `:443` UDP with `ReusePort=yes`, `Backlog=8192`. The multiplicity reproduces the per-worker SO_REUSEPORT fan-out, so N must equal `serve --workers`. Static (not enabled under `sockets.target`); pulled in by the service after the gate to avoid a cold-boot ordering cycle. |
+| `packaging/services/systemd/httpjet.service` | Portable installation under the `httpjet` account with a strict pre-start check and startup readiness notification. |
 
-| `httpjet-boot-ready.service` | Boot-only oneshot gate, availability-first: the `Type=notify` LSAPI pool is the one hard dependency; databases/caches are ordered but not required — it waits up to 300 s, then proceeds with a loud warning so a cold boot with a slow database still serves static + warm cache + stale-if-error. Later backend maintenance cannot tear down the sockets. |
+| `packaging/systemd/httpjet-example.service` | Source-build example with a dynamic account, strict validation and loopback HTTP. |
 
-| `httpjet.service` | The web tier under a dedicated user. You check drop-ins before reasoning about flags. |
+| `packaging/systemd/httpjet-lsphp.service` | Optional persistent PHP service with readiness notification and a root-run reload command. |
 
-| `httpjet-lsphp.socket` | Owns the LSAPI Unix listener (mode 0600, backlog 8192, `RemoveOnStop`). Never restart it during a reload or supervisor deploy. |
-
-| `httpjet-lsphp.service` | `httpjet lsphp …`, `Type=notify` (active only after a marker-attributed LSAPI response), `ExecReload=httpjet lsphp-reload …`, its own identity, `RuntimeDirectory=httpjet` for the control socket and generation file. |
-
-| `httpjet-edge-firewall.service` | Optional oneshot edge firewall (`scripts/httpjet-edge-firewall.sh`) for origins without a cloud firewall: restricts new `:80`/`:443` connections to Cloudflare IPv4 + private ranges (keep its list in step with the XML `T` entries). |
-
-**Hardening:** You apply `systemd/httpjet.service.d/zz-hardening.conf` as reference only. It sets `ProtectSystem=strict`, private tmp/devices, and empty capabilities. You enforce `@system-service` seccomp only after a clean soak. Measured score: 9.0 → 1.9.
-
-        i   Scope of the zero-loss guarantee
-Socket activation eliminates RSTs of *new and queued* connections across a deploy. Requests the old process has already accepted — h1/h2 mid-serve and especially h3/QUIC streams — still drain under `TimeoutStopSec`. "Never drops a connection" means never RSTs a new or queued one.
+With operator-configured socket activation, the socket unit can retain its listener while the web process restarts. Accepted connections still belong to the old process and drain under its shutdown policy. Validate listener counts, address families and restart behavior on a staging instance before relying on this setup.
 
 ## The persistent PHP pool
 
-Static and proxy deployments need no PHP. For LSAPI, run the pool as its own unit and point the web tier at it; the units above wire the socket, the root-only control socket and the 16-byte generation file. Routine opcache recycle is `systemctl reload httpjet-lsphp.service` — synchronous and candidate-first. Reserve a hard restart of the pool *service* for supervisor binary/unit changes; verify the listener inode is unchanged before and after. Reference: LSAPI & PHP .
+Static and proxy deployments need no PHP. For LSAPI, run the pool as its own unit and point the web tier at it; the public example configures the listener, root-only control socket and 16-byte generation file. Routine opcache recycle is `systemctl reload httpjet-lsphp.service` — synchronous and candidate-first. Use the restart example below only with an operator-managed socket unit that owns the LSAPI listener. Set the path to the deployed socket. With the standalone example, restarting the pool interrupts its listener. Reference: LSAPI & PHP .
 
            replace the supervisor without closing the listener
 ```
-before=$(stat -Lc '%d:%i' /run/httpjet/php.sock)
+before=$(stat -Lc '%d:%i' /run/httpjet/lsphp.sock)
 systemctl daemon-reload
 systemctl restart httpjet-lsphp.service                 # the SERVICE only — never the .socket
-test "$(stat -Lc '%d:%i' /run/httpjet/php.sock)" = "$before"
+test "$(stat -Lc '%d:%i' /run/httpjet/lsphp.sock)" = "$before"
 test "$(stat -Lc %s /run/httpjet/lsphp.generation)" = 16
-ss -xlnH | awk '$5 == "/run/httpjet/php.sock" {print $4}'    # Send-Q should equal the XML backlog
+ss -xlnH | awk '$5 == "/run/httpjet/lsphp.sock" {print $4}'    # Compare Send-Q with the configured socket backlog
 ```
 
 ## Safe change workflow
@@ -95,7 +80,7 @@ ss -xlnH | awk '$5 == "/run/httpjet/php.sock" {print $4}'    # Send-Q should equ
 
 ## Binary deploy and rollback
 
-> [Diagram: deploy-flow] The deploy gate chain. The repository's scripts/deploy-lscache.sh automates this for one deployment (strict check, co-listener guard, external-lsphp recurrence guard, health probe with automatic revert to the previous binary, capsule purge gate); the shape is what matters for any deployment.
+> [Diagram: deploy-flow] Manual source-build deployment. Validate a candidate, retain a known-good binary and verify representative requests before considering the deployment healthy.
 
 - **Kill switch: cache**: Drop `--page-cache` from the unit (a drop-in override) and restart; the cache code is inert without the flag.
 
@@ -107,9 +92,9 @@ ss -xlnH | awk '$5 == "/run/httpjet/php.sock" {print $4}'    # Send-Q should equ
 
 - **Rollback**: Keep the previous binary beside the current one (`bin/httpjet.prev`); restore and restart. A rollback does not remove bad objects already stored in the origin cache (purge) or at the CDN edge (purge the zone).
 
-- **Start limits**: `StartLimitBurst=5` per 60 s: more than five restarts a minute trips systemd and takes the service down until `systemctl reset-failed`. The persistence gate restarts the service — run it once.
+- **Start limits**: The portable systemd unit allows three starts per 60 seconds. Check the journal and fix the failure before resetting the unit’s failed state.
 
-The production build uses profile-guided optimization (`scripts/build-pgo.sh`: instrument → drive a representative loopback workload → rebuild). PGO scratch data is kept off tmpfs. Never benchmark a non-PGO binary against a PGO one.
+Production examples may use profile-guided optimization. Record the build profile and flags so benchmark comparisons can account for them.
 
 ## What SIGHUP reloads
 
@@ -154,4 +139,6 @@ A seccomp denial is a startup/test failure — do not work around it with `--pri
 
 ## Release and upgrade discipline
 
-A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through `scripts/update-deps.sh` and the full suite. See the changelog/release page for current dependency versions.
+GitHub Releases provides the installer, two static Linux archives, and native DEB and RPM packages for x86-64 and ARM64. The package site hosts signed manifests and repository metadata. A build-only publication records that distribution qualification is incomplete. For a manual source upgrade, retain a known-good binary and validate the candidate before restarting. After dictionary rotation, old entries that need an unavailable dictionary become misses.
+
+See the release process and current downloads .

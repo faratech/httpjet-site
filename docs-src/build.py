@@ -6,6 +6,9 @@ pages/<slug>.html   : the inner content of <main class="content"> (no pager/docf
 Markers inside a body:  <!--diagram:NAME|caption html-->
 """
 import html, json, os, re, subprocess, sys
+from pathlib import Path
+
+from validate_sources import validate_benchmarks, validate_cli, validate_pages
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PAGES = os.path.join(HERE, 'pages')
@@ -17,7 +20,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261123b'
+VERSION = '20261123c'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -477,7 +480,7 @@ def pager(i):
         out += f'<a class="next" href="{href}"{" style=\"margin-left:auto\"" if not prev else ""}><div class="dir">Next →</div><div class="ttl">{nxt[1]}</div></a>'
     return out + '</nav>'
 
-FOOT = ('<p class="docfoot">httpjet · documentation updated 2026-11-23; measurements and historical results are dated on their pages.<br>'
+FOOT = ('<p class="docfoot">httpjet · release behavior reviewed against <a href="https://github.com/faratech/httpjet/tree/v0.2.6-3">v0.2.6-3</a>; measurements and historical results are dated on their pages.<br>'
         'Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>')
 
 SLUGS = None
@@ -595,6 +598,9 @@ def headings(body):
     return hs
 
 def main():
+    validate_pages(Path(HERE), [entry[0] for entry in ORDER], CHARTS)
+    validate_cli(Path(HERE))
+    validate_benchmarks(Path(ASSETS), CHARTS)
     load_state()
     # minify docs.css first so we can inline docs.min.css into every page <head>
     subprocess.run([ESBUILD, os.path.join(ASSETS, 'docs.css'), '--minify', '--log-level=warning', '--outfile=' + os.path.join(ASSETS, 'docs.min.css')], check=True)

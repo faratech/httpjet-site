@@ -5,7 +5,7 @@
   "use strict";
   var doc = document, root = doc.documentElement;
   var AUDIO_STORAGE_KEY = "hj_epic_audio_v1";
-  var DOCS_ASSET_VER = "20261123b";
+  var DOCS_ASSET_VER = "20261123c";
 
   var makeRng = function (seed) {
     return function () {
@@ -2588,9 +2588,8 @@
           id: "c-rewrite",
           name: "1 · Heavy .htaccess (H1 & H2 RPS)",
           title: "Release Speed Curve — Heavy .htaccess Static (/robots.txt, 806-line forum chain)",
-          sub: "/robots.txt through the full forum .htaccess chain · h2 c=32 m=10, h1 c=100 · k req/s · lab VM 2026-11-21 (click any node to inspect that build)",
+          sub: "/robots.txt through the full forum .htaccess chain · h2 c=32 m=10, h1 c=100 · k req/s · dedicated labs 2026-11-21, 2026-11-22 and 2026-11-23",
           unit: "k rps",
-          ymax: 1000,
           ystep: 250,
           pts: [
             { idx: 6, tag: "v0.0.1", h2: 405.2, h1: 276.0, note: "fast_memo + 3-way" },
@@ -2624,7 +2623,6 @@
           title: "Release Speed Curve — HTTP/2 & HTTP/1.1 Static 1 KiB",
           sub: "1 KiB static file · h2 c=32 m=10, h1 c=100 · k req/s · dedicated labs 2026-11-21, 2026-11-22 and 2026-11-23",
           unit: "k rps",
-          ymax: 1200,
           ystep: 300,
           pts: [
             { idx: 6, tag: "v0.0.1", h2: 539.3, h1: 357.5, note: "fast_memo + 3-way" },
@@ -2658,7 +2656,6 @@
           title: "Release Speed Curve — PHP over LSAPI & Origin Page-Cache Hits",
           sub: "PHP fixture over LSAPI (h1 c=40) and page-cache hits on a 37 KB PHP fixture page (h2 c=32 m=32) · k req/s · dedicated labs 2026-11-21, 2026-11-22 and 2026-11-23",
           unit: "k rps",
-          ymax: 1000,
           ystep: 250,
           pts: [
             { idx: 6, tag: "v0.0.1", php: 0.6, cache: 118.5, note: "fast_memo + 3-way" },
@@ -2694,8 +2691,13 @@
         var W = 860, H = 370, padL = 64, padR = 235, padT = 24, padB = 58;
         var plotW = W - padL - padR, plotH = H - padT - padB;
         var n = c.pts.length;
+        var values = c.pts.flatMap(function (point) {
+          return c.series.map(function (series) { return point[series.key]; });
+        }).filter(Number.isFinite);
+        var maxValue = Math.max.apply(null, values.concat(c.refs.map(function (ref) { return ref.val; })));
+        var axisMax = Math.max(c.ystep, Math.ceil(maxValue / c.ystep) * c.ystep);
         function xOf(i) { return padL + (i / (n - 1)) * plotW; }
-        function yOf(v) { return padT + plotH - (Math.min(v, c.ymax) / c.ymax) * plotH; }
+        function yOf(v) { return padT + plotH - (v / axisMax) * plotH; }
 
         var h = [];
         h.push('<div class="bexp__top">');
@@ -2717,7 +2719,7 @@
         h.push('</defs>');
 
         /* horizontal y-axis gridlines */
-        for (var yv = 0; yv <= c.ymax; yv += c.ystep) {
+        for (var yv = 0; yv <= axisMax; yv += c.ystep) {
           var gy = yOf(yv);
           h.push('<line class="grid" x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + gy.toFixed(1) + '"/>');
           h.push('<text class="lbl" x="' + (padL - 8) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" style="font-size:10.5px;fill:#8b95ad">' + fmtVal(yv) + ' ' + esc(c.unit) + '</text>');

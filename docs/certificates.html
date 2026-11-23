@@ -122,7 +122,7 @@
         <tbody>
           <tr><td><code>secure</code>, <code>keyFile</code>, <code>certFile</code></td><td>Listener default identity (PEM). <code>certChain=1</code> appends <code>CACertFile</code> as served chain.</td></tr>
           <tr><td>Per-vhost <code>&lt;vhssl&gt;</code></td><td>SNI identity for that vhost. Chain material only, never a client-verify root; pair ECDSA+RSA for smaller modern chains.</td></tr>
-          <tr><td><code>clientVerify</code> 0–3, <code>CACertFile</code>, <code>verifyDepth</code></td><td>mTLS: 0 none, 1 optional, 2 required, 3 as 1. Verifier uses the listener CA only; verdicts memoized off the hot path.</td></tr>
+          <tr><td><code>clientVerify</code> 0–3, <code>CACertFile</code>, <code>verifyDepth</code></td><td>Mode 0 disables verification. Modes 1 and 3 optionally request a certificate and validate any certificate presented against the listener CA. Mode 2 also enforces the certificate requirement after the handshake for non-internal peers.</td></tr>
           <tr><td><code>crlFile</code> <span class="badge hj">httpjet</span></td><td>PEM CRL or bundle for the webpki verifier. Absent means no revocation checking; rotate via trust-generation reload.</td></tr>
           <tr><td><code>enableStapling</code></td><td>Parsed for compatibility only. Fetching needs the <code>ocsp</code> feature and <code>--ocsp-responder</code>; <code>check</code> says so.</td></tr>
           <tr><td><code>--ktls</code> (feature <code>ktls</code>)</td><td>Kernel TLS for TLS 1.3 H1 file egress. See the <a href="#ktls">kTLS stub</a> and <a href="protocols#sendfile">File egress</a>.</td></tr>
@@ -272,7 +272,7 @@ python3 -B scripts/ocsp-runtime-test.py --binary target/debug/httpjet --optional
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="configuration"><div class="dir">← Prev</div><div class="ttl">Configuration</div></a><a class="next" href="security"><div class="dir">Next →</div><div class="ttl">Security &amp; access control</div></a></nav>
-<p class="docfoot">httpjet · documentation updated 2026-11-23; measurements and historical results are dated on their pages.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · release behavior reviewed against <a href="https://github.com/faratech/httpjet/tree/v0.2.6-3">v0.2.6-3</a>; measurements and historical results are dated on their pages.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
 <aside class="tocwrap">
   <div class="toc-title">On this page</div>
@@ -285,6 +285,6 @@ python3 -B scripts/ocsp-runtime-test.py --binary target/debug/httpjet --optional
     <div class="search-res"></div>
   </div>
 </div>
-<script defer src="assets/docs.min.js?v=20261123b"></script>
+<script defer src="assets/docs.min.js?v=20261123c"></script>
 </body>
 </html>

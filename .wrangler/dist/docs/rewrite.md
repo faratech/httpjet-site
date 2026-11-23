@@ -15,13 +15,13 @@
 
 ## Overview
 
-Run inline ` ` rules first, then the `.htaccess` chain (OpenLiteSpeed order). `evaluate()` returns one outcome per pass: `Rewritten`, `Redirect`, `Proxy`, `Forbidden`, `Gone` or `Unchanged`.
+The server loads the applicable access-file chain, seeds the environment, and checks access on the original path. Within rewrite evaluation, inline XML rules run before per-directory rules. `evaluate()` returns one outcome per pass: `Rewritten`, `Redirect`, `Proxy`, `Forbidden`, `Gone` or `Unchanged`.
 
 > [Diagram: rewrite-eval] One evaluation pass. A rewrite that crosses into another directory reloads the destination chain and evaluates again; a terminal flag stops the walk; an exhausted chain returns Unchanged and dispatch falls through to suffix routing.
 
 ## Per-directory loading
 
-`HtaccessCache` loads each directory's file (`accessFileName`, default `.htaccess`; bare names only). **mtime invalidation** re-stats at most once a second, so edits land within a second. The parsed form holds directives, regexes, scopes, the auth map and the memo verdict. The chain caps at **64** levels, then a deny-all sentinel applies.
+`HtaccessCache` loads each directory's file (`accessFileName`, default `.htaccess`; bare names only). Revalidation coalesces metadata checks for one second and compares device, inode, size, modification time, and change time. The parsed form holds directives, regexes, scopes, the auth map and the memo verdict. The chain caps at **64** levels, then a deny-all sentinel applies.
 
 Since 2026-09-16 an unreadable, unparseable or over-16 MiB `.htaccess` fails closed to that sentinel. Non-UTF-8 bytes decode lossily. Set ` 0` to disable the chain; `autoLoadHtaccess` alone loads without overrides. Each generation owns its caches, so reloads never revive stale results.
 
@@ -167,7 +167,7 @@ Note: the 2026-09-06 review split parsed policy from the effective realm; the ru
 
 | Header echo | partial | Parses without error. Emits nothing. |
 
-| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. See `docs/header-directive-compatibility.md` for the exact boundary. |
+| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. The public `hj-rewrite` header compatibility tests cover the boundary. |
 
 | Header condition expr= / value expr= | partial | Only `%{REQUEST_URI} =~ / !~` conjunctions evaluate. Value expressions are not implemented. |
 
@@ -200,5 +200,5 @@ See Configuration → Contexts . Per-context overrides and `sub_filter` now live
 cargo test -p hj-rewrite                                   # parser, evaluator, access, auth, cache directives
 cargo test -p hj-rewrite --test header_compat              # characterization fixtures for the Header boundary
 cargo test -p hj-rewrite --test redirect_repro
-bash scripts/fast_memo_parity_test.sh                      # memo-on vs memo-off byte identity on a real chain
+cargo test -p httpjet pipeline::fast_memo
 ```

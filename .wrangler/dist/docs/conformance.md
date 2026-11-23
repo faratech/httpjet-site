@@ -9,7 +9,7 @@
 
 # Conformance & testing
 
-Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result: **146 / 146** h2spec 2.6.0 over TLS. Later sections reference this score, not repeat it.
+The table records implemented protocol surfaces and selected test evidence. In the historical TLS run, httpjet passed **146 / 146** h2spec 2.6.0 cases.
 
 ## Conformance matrix
 
@@ -17,11 +17,11 @@ Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result:
 
 | HTTP/1.1 | RFC 9110 · RFC 9111 · RFC 9112 | Strict framing, conditionals, ranges, `Vary`, 103. | Targets below. |
 
-| HTTP/2 | RFC 9113 (native `hj-h2`) | Full TLS pass. See lede. | h2c 145/146, one exception. |
+| HTTP/2 | RFC 9113 (native `hj-h2`) | 146 / 146 h2spec cases in the historical TLS run. | h2c 145/146, one exception. |
 
-| HPACK | RFC 7541 | Zero-allocation codec. | Two fuzz targets. |
+| HPACK | RFC 7541 | Bounded dynamic table and header decoding. | Two fuzz targets. |
 
-| HTTP/3 / QUIC | RFC 9114 over RFC 9000 (quinn-proto), QPACK RFC 9204 | aioquic + OTel fixtures in CI. | Migration disabled. |
+| HTTP/3 / QUIC | RFC 9114 over RFC 9000 (quinn-proto), QPACK RFC 9204 | Public source includes aioquic and telemetry fixtures. | Migration disabled. |
 
 | TLS | rustls + aws-lc-rs · RFC 8446 mandatory suite | SNI mirrors OLS; mTLS + CRLs. | Single-use tickets; 0-RTT off. |
 
@@ -29,7 +29,7 @@ Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result:
 
 | OCSP | RFC 6960 with the lightweight-profile conventions (SHA-256 issuer identity, bounded fetch — not full client conformance) | Bounded fetch. | Behind `--features ocsp`. |
 
-| PROXY protocol | v2 binary + v1 text | Per-listener, fail-closed. | Pre-TLS; loopback refused. |
+| PROXY protocol | v2 binary + v1 text | Per-listener, fail-closed. | Pre-TLS. Relayed source addresses that claim loopback or unspecified are refused. |
 
 | LSAPI | Native wire codec (vendored php-src `lsapidef.h`) | `lsphp` parity. | Header parser fuzzed. |
 
@@ -41,13 +41,13 @@ Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result:
 
 | OpenTelemetry | OTLP HTTP/protobuf, W3C traceparent (version 00) | Protobuf tests pass. | Behind `--features otel`. |
 
-| LiteSpeed parity | Retired differential matrix vs LSWS 6.3.5 | 11 / 11 retained. | Production exercises continuously. |
+| LiteSpeed parity | Retired differential matrix vs LSWS 6.3.5 | 11 / 11 retained. | Historical differential results. |
 
-Intake: origin-form; `*` OPTIONS-only; absolute-form authority replaces Host. CONNECT: 405. Authority-form, raw `#`, bare-LF: 400. HTTP/1.1 requires Host, h2-validated. Target: LSWS 6.3.5, same tree. LiteSpeed choices beat strict readings.
+Intake: origin-form; `*` OPTIONS-only; absolute-form authority replaces Host. CONNECT: 405. Authority-form, raw `#`, bare-LF: 400. HTTP/1.1 requires Host, h2-validated. For application compatibility, verify your own configuration using the migration checklist .
 
 ## LiteSpeed parity and the clean-room boundary
 
-Differential testing hit 11/11 pre-retirement: ETag, `.html`→PHP, LSAPI encoding, rewrite flags. httpjet now serves the live tree as drop-in. Reference: GPL OpenLiteSpeed source, behavior only. Reimplemented from scratch. No OLS code copied. License: **GPL-3.0-only**. No paid edition, no key. Independent, not endorsed by LiteSpeed Technologies.
+Differential testing hit 11/11 pre-retirement: ETag, `.html`→PHP, LSAPI encoding, rewrite flags. Those trials cover selected behaviors. Reference: GPL OpenLiteSpeed source, behavior only. Reimplemented from scratch. No OLS code copied. License: **GPL-3.0-only**. No paid edition, no key. Independent, not endorsed by LiteSpeed Technologies.
 
            **fileETag=28** · byte-for-byte
 ```
@@ -68,23 +68,15 @@ Suffix routing follows OLS order, including disclosure guard. Pool-less script h
 
 | scripts | Real-server fixtures on isolated loopback listeners: h2spec, ACME/OCSP/admin runtime tests, the cache gates, memo parity, OCI smoke. | see each page |
 
-Last runs: 0.1.10 green (3,068 passed / 0 failed; 3,019 at 0.1.5; 2,028 at 0.0.5). Before flipping 0.1.11 defaults: 40 memo tests, purge-revocation pipeline test, 24 H1/H2 + 4 H3 arms recording real hits. Failures count as regressions. Flaky meta-assertions removed June 2026. Tests stay deterministic.
+Historical run: v0.1.10 reported 3,068 passing workspace tests. For a new release, record the exact commit, commands and results you verify.
 
-> [Diagram: verification-pyramid] Four-layer verification stack. Every change passes ~3,068 unit and integration tests, bounded corpus and ASan fuzz targets, protocol interoperability suites (h2spec, aioquic, Pebble ACME, OTel), and live loopback deploy gates before cutover.
+> [Diagram: verification-pyramid] Verification layers. Choose checks for the change and runtime you are qualifying. Release publication status separately records distribution coverage.
 
-**Production gates.** Deploys run cache gates (cross-URL/scheme/host, private, persistence), memo parity, capsule purge, h2spec. Failure classes: Page cache → deploy gates . Flow: Operations → deploy .
+For a deployment, run the checks relevant to its enabled features. See the deployment workflow and the page-cache checks .
 
 ## CI and interoperability jobs
 
-- **Ubuntu 24.04 x86_64**: fmt, builds, config validation, license/DCO, workspace tests, H1 replay.
-
-- **Ubuntu 22.04 x86_64, 24.04 ARM64**: all-features compile, H1 replay, io_uring UDS test. Selected probes only, no kernel matrix.
-
-- **Protocol interoperability**: OTel binary, h2spec 2.6.0 TLS (SHA-256 pinned, exact pass — see lede), WebSocket/H2 tracing, aioquic 1.3.0 venv test.
-
-- **Dependency advisories**: daily RustSec failures, plus newer transport-critical crates (quinn, rustls, aws-lc-rs, tokio, httparse, io-uring, zstd, brotli, h2, hyper, http, mio, socket2, openssl, bcrypt, libc).
-
-- **Weekly/manual fuzz**: eight targets, bounded time/size/memory/retention.
+The public release includes workflows for installer, container and dependency checks. The commands below exercise the public protocol fixtures locally. An available fixture or workflow does not establish that release binaries passed it.
 
            **local reproduction**
 ```
@@ -99,7 +91,7 @@ Hosted execution evidence is tracked separately from local runs; a runner label 
 
 ## Fuzzing
 
-Eight `cargo-fuzz` targets share one invariant: never panic, never allocate unboundedly, agree with reference decoders. Targets: `h1_chunked_decode`, `h1_request_framing`, `hpack_decode`, `hpack_roundtrip`, `lsapi_resp_header`. Added 2026-10-06: `qpack_decode`, `proxy_protocol_parse`, `lscache_control`. ASan smokes (original five): 164,558 chunked, 739,373 framing, 452,899 HPACK-decode, 58,082 roundtrip, 438,582 LSAPI-header executions. No findings.
+The v0.2.6-3 source ships 14 fuzz targets: `fastcgi_records`, `h1_chunked_decode`, `h1_request_framing`, `h2_frames`, `h3_control`, `h3_request_stream`, `hpack_decode`, `hpack_roundtrip`, `lsapi_packet_stream`, `lsapi_resp_header`, `lscache_control`, `pagecache_container`, `proxy_protocol_parse`, `qpack_decode`. Each target checks the invariants documented in the public fuzzing guide .
 
            **bounded fuzz**
 ```
@@ -109,4 +101,4 @@ python3 scripts/fuzz-seeds.py     # regenerate the shared seed corpus
 
 ## Production gates
 
-See Test layers footer. Gates listed once there.
+Use the staged change workflow and record the checks that ran against your candidate.

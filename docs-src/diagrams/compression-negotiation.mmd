@@ -1,15 +1,13 @@
 flowchart TB
-  classDef c fill:#13203a,stroke:#818cf8,color:#fff
-  A["response body"] --> B("compressible?<br/>type in compressibleTypes · > 200 B · not already encoded · not 206")
-  B -- no --> ID["identity"]
-  B -- yes --> T("trusted proxy peer and --cf-send-zstd?")
-  T -- yes --> Z["zstd (forced)"]:::c
-  T -- no --> N("first server-priority codec the client's<br/>Accept-Encoding allows")
-  N -- zstd --> Z2["zstd (level 3)"]:::c
-  N -- br --> BR["brotli (level 5)"]:::c
-  N -- gzip --> GZ["gzip (level 6)"]:::c
-  N -- none --> ID
-  Z & Z2 & BR & GZ --> S("body shape")
-  S -- "Body::Full" --> E1["encode in one shot"]
-  S -- "Body::Stream (proxy, SSE, LSAPI)" --> E2["CompressStream: per-chunk, never buffered"]
-  S -- "static file with .br/.gz sibling" --> E3["serve the precompressed sibling (br preferred)"]
+  A["Response reaches compression transform"] --> B{"Eligible type and headers?"}
+  B -- "no: encoded, ranged, SSE, no-transform, or other gate" --> ID["Pass through"]
+  B -- yes --> N["Choose an enabled codec accepted by the client<br/>or use trusted-proxy zstd policy"]
+  N -- "no mutually acceptable codec" --> ID
+  N --> S{"Body form"}
+  S -- "buffered, 201 bytes or more" --> E1["Encode body"]
+  S -- "stream or cached file" --> D{"Dynamic codec enabled<br/>and body eligible?"}
+  D -- yes --> E2["Encode incrementally when streaming"]
+  D -- no --> ID
+  S -- "other" --> ID
+  E1 --> V["Set Content-Encoding and Vary"]
+  E2 --> V

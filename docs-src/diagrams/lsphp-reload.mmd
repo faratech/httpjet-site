@@ -2,7 +2,7 @@ sequenceDiagram
   autonumber
   participant O as operator<br/>systemctl reload httpjet-lsphp
   participant SV as httpjet lsphp<br/>(supervisor, Type=notify)
-  participant L as LSAPI listener<br/>(systemd-owned socket, backlog 8192)
+  participant L as LSAPI listener<br/>(owned by supervisor or socket unit)
   participant G as generation file<br/>/run/httpjet/lsphp.generation (16 B)
   participant W as httpjet serve<br/>(web tier, --lsphp-external)
   O->>SV: lsphp-reload over root-only control socket (timeout 90 s)

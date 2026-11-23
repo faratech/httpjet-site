@@ -5,7 +5,7 @@ sequenceDiagram
   participant Co as Coordinator<br/>(incarnation + generation = revision)
   participant St as serving generation
   Op->>API: GET /v1/revision
-  API-->>Op: {"revision": "<incarnation>:<generation>"}
+  API-->>Op: {"revision": "<incarnation>-<generation>"}
   Op->>API: POST /v1/config/validate  If-Match: "<revision>"  {server_xml, vhosts[], mime}
   API->>Co: build candidate (bounded: 1 MiB, ≤128 vhosts, ≤64 nesting, no DTD)
   Co-->>API: redacted verdict (nothing published)

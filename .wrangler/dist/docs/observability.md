@@ -121,9 +121,9 @@ Every request gets a 64-bit correlation id (a per-process seed mixed into a lock
 
 ## Telemetry TSV and the PHP slow log
 
-- **`--telemetry-file logs/telemetry.tsv`**: Appends a cumulative snapshot row of the in-RAM aggregates every `--telemetry-flush-secs` (30): durability across restarts and a self-contained time series (~1 MB/day). The `:9090` endpoint works without it.
+- **`--telemetry-file logs/telemetry.tsv`**: Appends a cumulative snapshot row of the in-RAM aggregates every `--telemetry-flush-secs` (30): a time series retained across restarts. Counters reset when the process restarts, so calculate rates only within a single process lifetime. The `:9090` endpoint works without it.
 
-- **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — the per-URL / user-class attribution behind `httpjet_lsapi_ttfb_seconds`. Rolls at 64 MiB, gzip archives, 7-day prune.
+- **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — a separate per-URL and request-class view of backend timings. Rolls at 64 MiB, gzip archives, 7-day prune.
 
 These files produced the 2026-08-30 sample on Performance : mean request 9.99 ms, including 8.96 ms of LSAPI time to first byte. That elapsed interval includes backend wait; it is not PHP CPU time.
 

@@ -8,9 +8,9 @@ flowchart LR
     T2["TieredPool<Vec<u8>> (BODY_BUFS)<br/>buffers ≤ 256 KiB · 2 per thread + 16 shared"]:::pool
     T3["LSAPI pools<br/>BEGIN encode buffers (kept ≤ 16 KiB) + 64 KiB packet read buffers"]:::pool
     T4["per-thread codec scratch<br/>zstd CCtx/DCtx + flate2 Compress"]:::pool
-    T5["monoio-rustls write pool<br/>64 KiB TLS record buffers (cap 32/core, 0 idle RSS)"]:::tls
+    T5["monoio-rustls write pool<br/>64 KiB TLS record buffers (cap 32 per worker)"]:::tls
   end
-  T1 -- "poll stream / bridge" --> H["request & response execution<br/>zero minor page faults in steady state"]:::hot
+  T1 -- "poll stream / bridge" --> H["reuse across request and response work"]:::hot
   T2 -- "take_buf → freeze (Bytes::from_owner)" --> H
   T3 -- "PacketReader::take_body_bytes (zero-copy slice)" --> H
   T4 -- "compress / dict decode" --> H

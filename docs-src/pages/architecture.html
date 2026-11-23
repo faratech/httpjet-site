@@ -17,7 +17,7 @@
     <section>
       <h2 id="dag">Crate dependency graph</h2>
       <p><code>hj-config</code> parses LiteSpeed XML into one normalized model. <code>hj-core</code> re-exports that model for crates using the shared handler contract.</p>
-      <!--diagram:crate-map|<strong>Workspace relationships.</strong> Arrows show selected dependencies, not every edge. The binary assembles the server; optional certificate crates require build features. See <a href="https://github.com/faratech/httpjet/blob/main/ARCHITECTURE.md">the source architecture map</a> for the complete overview.-->
+      <!--diagram:crate-map|<strong>Workspace relationships.</strong> Arrows show selected dependencies, not every edge. The binary assembles the server; optional certificate crates require build features. See <a href="https://github.com/faratech/httpjet/tree/v0.2.6-3/crates">the public source tree</a> for the crate manifests.-->
     </section>
 
     <section>
@@ -80,7 +80,7 @@
 
     <section>
       <h2 id="pipeline">The request pipeline</h2>
-      <p><code>pipeline::handle()</code> is the integration point. It resolves the vhost first. It then applies trust, ACL, geo and throttle checks. It runs optional WAF and extension pre-handlers. It then calls <code>dispatch()</code> and applies transforms. It finally writes logs, metrics and spans. <code>dispatch()</code> mirrors OpenLiteSpeed ordering. It inserts page-cache seams after rewrite and access resolve. The pinned <code>LsapiScript</code> extension keeps the resolved script separate. It pushes <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> into <code>ctx.env</code> for front controllers.</p>
+      <p><code>pipeline::handle()</code> is the integration point. It resolves the vhost first. It then applies trust, ACL, geo and throttle checks. Optional extension pre-handlers can return a response or continue to <code>dispatch()</code>. Dispatch checks the context body limit and runs any configured WAF sidecar before rewrite or cache lookup. The request handler then applies response transforms. It finally writes logs, metrics and spans. <code>dispatch()</code> mirrors OpenLiteSpeed ordering. It inserts page-cache seams after rewrite and access resolve. The pinned <code>LsapiScript</code> extension keeps the resolved script separate. It pushes <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> into <code>ctx.env</code> for front controllers.</p>
       <div class="rail" role="img" aria-label="Dispatch order: htaccess and rewrite, access enforcement, page-cache lookup, WebSocket, proxy, suffix routing, finalize, cache store.">
         <div class="rail__track">
           <span class="stage"><span class="k">resolve</span><span class="d">SNI/Host → vhost</span></span>
@@ -119,5 +119,5 @@
         <li><strong>Hashing:</strong> Use <code>rustc-hash</code> only for trusted or hard-capped keys. The <code>.htaccess</code> memo caps at 16 shards × 512 entries, keys ≤ 1 KiB. Untrusted unbounded maps keep SipHash.</li>
         <li><strong>Allocator:</strong> Use mimalloc globally with threshold-gated trim (<code>--mimalloc-trim-*</code>). Production sets <code>MIMALLOC_PURGE_DELAY=0</code>, so you pool transient buffers in <code>hj_core::recycle</code>.</li>
       </ul>
-      <!--diagram:recycle-pools|<strong>Zero-fault buffer and task recycling (v0.1.2–v0.1.5).</strong> Under <code>MIMALLOC_PURGE_DELAY=0</code>, unpooled transient allocations in sparse size classes fault back in on every request. <code>hj_core::recycle</code> pools H2 stream futures, bridge futures, tiered body buffers (frozen into ref-counted <code>Bytes</code> via <code>Bytes::from_owner</code> and returned when the last slice drops), LSAPI read/BEGIN buffers, and per-core 64 KiB TLS record buffers.-->
+      <!--diagram:recycle-pools|<strong>Buffer and task recycling.</strong> Under <code>MIMALLOC_PURGE_DELAY=0</code>, unpooled transient allocations in sparse size classes can incur minor page faults when reused. <code>hj_core::recycle</code> pools H2 stream futures, bridge futures, tiered body buffers (frozen into ref-counted <code>Bytes</code> via <code>Bytes::from_owner</code> and returned when the last slice drops), LSAPI read/BEGIN buffers, and per-core 64 KiB TLS record buffers.-->
     </section>

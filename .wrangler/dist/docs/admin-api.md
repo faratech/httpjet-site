@@ -9,7 +9,7 @@
 
 # Admin API & reload
 
-You change a running httpjet three ways: SIGHUP, read-only status API, transactional write API. One publication coordinator serves all writers. Each change publishes fully, or not at all.
+Inspect the running generation with the read-only API. SIGHUP reloads on-disk settings and the optional write API publishes a volatile configuration. Both writers share one publication coordinator.
 
 | Way | Does | Limit |
 
@@ -64,7 +64,7 @@ httpjet --root /abs/root serve … \
   --admin-write-addr 127.0.0.1:9092 \
   --admin-token-file /operator/private/token \       # 64 lowercase hex chars (32 random bytes), mode 0400/0600, one hard link, root or service uid
   --admin-resource-root /operator/content \          # repeatable; up to 32 existing directories; "/" is refused
-  --admin-resource-root /etc/letsencrypt/live
+  --admin-resource-root /operator/certs
 ```
 
 > [Diagram: reload-transaction] Validate, then publish with an exact precondition. Every write carries If-Match with the revision it read; a stale revision or an out-of-band publication (SIGHUP included) loses with a conflict rather than silently rebuilding against newer state. Publication is volatile: the on-disk XML is never rewritten and a restart returns to it.
@@ -83,7 +83,7 @@ Frame each write exactly:
 
 - `Authorization: Bearer `: missing/duplicate/malformed → 401, body unread, constant-time compare, token never logged.
 
-- Exact quoted `If-Match`: missing → 428, stale → conflict.
+- Exact quoted `If-Match`. Missing returns 428, stale returns 412, and a change requiring restart returns 409.
 
 - `Content-Type: application/json`, one `Content-Length` ≤ 1 MiB, headers ≤ 8 KiB / 32, deadline 5 s.
 
@@ -170,7 +170,5 @@ TCP trust order: authenticate → check revision → diff (retain unchanged) →
            **tests** · isolated loopback listeners and temporary trees
 ```
 cargo test --locked -p httpjet admin
-python3 -B scripts/admin-runtime-test.py --binary target/debug/httpjet                       # served-file replacement, validate-only non-mutation, stale writes, SIGHUP restoration, restart incarnation
-python3 -B scripts/admin-runtime-test.py --binary target/debug/httpjet --memo-parity         # 48-cell memo parity across a publication
-python3 -B scripts/admin-runtime-test.py --binary target/debug/httpjet --persistent-cache    # authenticated on-disk containers, hits across publication, boot-scan restoration
+cargo test --locked -p httpjet resource_generation
 ```

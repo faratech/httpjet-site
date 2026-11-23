@@ -33,7 +33,7 @@ ACME and OCSP are default-off at build and runtime. Both publish into the same g
 
 | Per-vhost ` ` | SNI identity for that vhost. Chain material only, never a client-verify root; pair ECDSA+RSA for smaller modern chains. |
 
-| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | mTLS: 0 none, 1 optional, 2 required, 3 as 1. Verifier uses the listener CA only; verdicts memoized off the hot path. |
+| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | Mode 0 disables verification. Modes 1 and 3 optionally request a certificate and validate any certificate presented against the listener CA. Mode 2 also enforces the certificate requirement after the handshake for non-internal peers. |
 
 | `crlFile` httpjet | PEM CRL or bundle for the webpki verifier. Absent means no revocation checking; rotate via trust-generation reload. |
 

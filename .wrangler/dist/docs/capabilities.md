@@ -32,7 +32,7 @@ This page lists 25 capabilities, 6 build features and 14 operational bounds. **S
 
 | OCSP stapling | optional | Stapling behind `--features ocsp` with OpenSSL 3.x. Your responder must cover every issuer; not for Let's Encrypt. → |
 
-| kTLS / sendfile | partial | Plain-TCP H1 file bodies always use `sendfile(2)`. TLS 1.3 H1 sendfile needs `--features ktls`, `--ktls=auto` and `tls-hw-tx-offload`. → |
+| kTLS / sendfile | partial | Plain TCP HTTP/1 tries `sendfile(2)` for eligible file bodies and falls back to buffered writes when unavailable. TLS 1.3 HTTP/1 can also use it in a kTLS build. Automatic kTLS requires active `tls-hw-tx-offload` on a supported NIC. → |
 
 | Virtual hosts | supported | Exact Host/SNI maps with parent-domain and bare `*` fallback. Glob patterns like `*.example.test` never match; `check` warns. |
 

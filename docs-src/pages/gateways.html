@@ -47,7 +47,7 @@
     &lt;expectedStatus&gt;200&lt;/expectedStatus&gt;       <span class="t-c">&lt;!-- 200..599 --&gt;</span>
   &lt;/healthCheck&gt;
 &lt;/extProcessor&gt;</code></pre></div>
-      <!--diagram:proxy-selection|<strong>Selection.</strong> Eligibility intersects active health and the passive breaker; policy picks among eligible peers. A pre-head dial failure marks the peer and moves on; sent bodies never replay.-->
+      <!--diagram:proxy-selection|<strong>Selection.</strong> Eligibility intersects active health and the passive breaker; policy picks among eligible peers. A failed dial can move to another eligible peer before sending the request. The HTTP/1 proxy can also retry a failed send once for a bodyless idempotent request.-->
       <!--diagram:upstream-health|<strong>Peer states.</strong> A peer starts cold until <code>rise</code> successes; <code>fall</code> failures take it down; probes restore it. All-ineligible gives 503.-->
       <ul>
         <li><strong>Policies:</strong> <code>primary-first</code> (default), <code>weighted-round-robin</code> (smooth WRR), <code>weighted-least-active</code> (active ÷ weight, WRR tie-break). Invalid policies, weights, or health settings fail config loading.</li>
@@ -61,13 +61,13 @@
 
     <section>
       <h2 id="streaming">Streaming, SSE and timeouts</h2>
-      <p>Upstream responses never buffer (<code>respBuffer</code> parses but always streams; <code>check</code> warns). SSE stays real-time through compression and H1, H2, and H3.</p>
+      <p>The HTTP proxy streams responses after the upstream head arrives. Later response processing, such as body filtering or cache admission, can buffer eligible bodies. <code>respBuffer</code> is parsed for compatibility and does not change that policy. SSE bypasses compression.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>Timeout</th><th>Meaning and limits</th></tr></thead>
         <tbody>
           <tr><td>Backend connect</td><td><code>initTimeout</code> bounds the connect. See your processor configuration.</td></tr>
           <tr><td>Response head</td><td>Processor default bounds the head. A context <code>responseTimeout</code> overrides it.</td></tr>
-          <tr><td>Backend timeout</td><td>An exceeded backend deadline answers 504. Request bodies still stream to h1/h2 upstreams.</td></tr>
+          <tr><td>Backend timeout</td><td>An exceeded backend deadline answers 504. The HTTP proxy can stream request bodies to h1/h2 upstreams. With an upload, the response-head deadline starts after upload EOF.</td></tr>
           <tr><td>Request body size</td><td>A context <code>maxReqBodySize</code> is enforced before dispatch. Before any backend work.</td></tr>
         </tbody></table></div>
     </section>

@@ -378,4 +378,4 @@ Filter all 14 benchmarked eras by tag, commit, workload, regime, receipt:
 
 | `v0.2.0` · Security Audit Fixes & Cold-Start Latency 2026-11-11 · `8fcb4647` | lab re-run dedicated lab VM, server 4 vCPUs / loadgen 4 vCPUs, all 11 releases | See Release 0.2.0 : lab medians vs v0.1.12 in the same run — H2 1 KiB **591.8k → 625.5k**, heavy `.htaccess` H2 **402.9k → 515.3k**, page-cache **410.5k → 544.5k**; slowest request right after boot **508 ms → 3 ms**. Receipts: release-sweep-2026-11-11.tsv + raw logs ; loopback CSVs on the benchmark page |
 
-| `experiment` · H3 GSO Segment Cap SINGULARITY · same-binary A/B | H3 32 KiB, 100k req/arm GSO cap 10 vs 20 | Static `6,052 → 7,816/6,552 rps`, `sendmsg` `−44.6%`, instr ` Receipt: `docs/h3-gso-segment-experiment.md` in the source tree |
+| `experiment` · H3 GSO Segment Cap SINGULARITY · same-binary A/B | H3 32 KiB, 100k req/arm GSO cap 10 vs 20 | Static `6,052 → 7,816/6,552 rps`, `sendmsg` `−44.6%`, instr ` current CLI defaults . Receipt: `docs/h3-gso-segment-experiment.md` in the source tree |

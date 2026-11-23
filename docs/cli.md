@@ -9,7 +9,7 @@
 
 # CLI reference
 
-One binary, four subcommands. You set persistent policy in XML. You set operational overrides on the command line. This page is generated from `httpjet serve --help` of the current release.
+One binary, four subcommands. You set persistent policy in XML. You set operational overrides on the command line. The serve flags are checked against the shipped v0.2.6 binary. Rows for optional features apply to builds that enable them.
 
 ## Subcommands
 

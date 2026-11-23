@@ -9,25 +9,27 @@
 
 # Security & access control
 
-Decide **who the client is** and **who may ask** here. The posture is **fail closed**: a control that cannot evaluate acts restrictive. One exception: the opt-in throttle fails open (see Throttle ).
+Decide **who the client is** and **who may ask** here. Check each control’s trust and failure policy. For example, the opt-in throttle can admit untracked requests under state pressure.
 
         resolve    acl    rewrite    cache    dispatch    finalize    store
 
 ## Client identity
 
-Resolve one client IP at connection admission. Store it in `ReqCtx.client_ip`. Every later gate reads that value.
+Resolve the client IP per request after vhost selection and the plaintext mTLS check. Access policy can evaluate both the peer and the resolved client, while GeoIP, request throttling, and application logging use the resolved address.
 
-> [Diagram: client-ip] From socket peer to client identity. Forwarded headers are evidence, not identity: they count only from a peer an allow rule marks T; from anyone else they are attacker-controlled data and ignored. Every later gate — ACL, geo, throttle, mTLS exemption, logs, the cache key — reads the resolved value.
+> [Diagram: client-ip] From socket peer to client identity. The default setting is mode 2. It reads forwarded client addresses only when peer and TLS requirements are met. The modes below describe other supported policies.
 
 | `useIpInProxyHeader` | Forwarded headers are believed… |
 
 | 0 | never |
 
-| 1 / 4 | always. Only safe when only your proxy can reach the listener. |
+| 1 | Uses the leftmost untrusted X-Forwarded-For address without a peer trust check. Use only behind a restricted listener. |
 
-| 2 (default) | only from trusted peers (`allow … T`). `CF-Connecting-IP` counts on that path. |
+| 4 | Uses the last valid X-Forwarded-For address without a peer trust check. Use only behind a restricted listener. |
 
-| 3 | as 2, for IP purposes only |
+| 2 (default) | Requires a trusted peer and TLS. If the listener requests client certificates, a valid presented certificate is also required. Prefers `CF-Connecting-IP`, then the rightmost untrusted X-Forwarded-For address. |
+
+| 3 | Same address resolution as mode 2. |
 
 The admin write API marks `useIpInProxyHeader` and ` ` **restart-required**. Trust never changes under a running generation.
 
@@ -117,7 +119,7 @@ Configure suEXEC (` `, off by default; uid 0 always rejected), chroot (`chrootMo
 
 | `/__hj_cache_purge`, `/__hj_cache_ready` | Raw TCP peer must be loopback. POST-only purge (405 + `Allow`); ready takes GET/HEAD; a `unix:` listener opens both to local processes. |
 
-| `--metrics-addr` (`/metrics`, `/cache-entries`, `/__mimalloc-stats`, `/__alloc-count`, `/debug/pprof/profile`) | Loopback-only by default. `/metrics` open on loopback; the rest need a Bearer token matching `--profile-token-file` (403 when unset). |
+| `--metrics-addr` (`/metrics`, `/cache-entries`, `/__mimalloc-stats`, `/__alloc-count`, `/debug/pprof/profile`) | Loopback bind required. `/metrics` is available there without a token. Diagnostics require a Bearer token from `--profile-token-file` or `--profile-token` (403 when unset). |
 
 | `--admin-addr` (`/v1/status`) | Loopback TCP only. Loopback Host required; Origin headers and bodies rejected. |
 

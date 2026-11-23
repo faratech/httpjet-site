@@ -98,9 +98,9 @@ A response must pass the request, status, policy, vary, self-redirect, purge-rac
 
 ### W-TinyLFU admission
 
-> [Diagram: admission] For public entries, a fixed-memory frequency sketch rejects one-hit wonders: at the default threshold of 2 an eligible URL can be stored on its second sighting. One request is ONE sighting — the on-core fast path probes uncounted and records only a hit it serves. Size weighting adds +1 per 256 KiB. With dictionaries making storage cheap, --page-cache-admit-threshold 1 caches on first sight. Tune by httpjet_cache_hit_ratio_real and httpjet_cache_admit_ratio.
+> [Diagram: admission] For public entries, a fixed-memory frequency sketch rejects one-hit wonders: at the default threshold of 2 an eligible URL can be stored on its second sighting. One request is ONE sighting — the on-core fast path probes uncounted and records only a hit it serves. Size weighting adds +1 per 256 KiB. With dictionaries making storage cheap, --page-cache-admit-threshold 1 permits a first-sighting store for an eligible public response below 256 KiB. Tune by httpjet_cache_hit_ratio_real and httpjet_cache_admit_ratio.
 
-Reject one-hit wonders with a fixed-memory frequency sketch. For public entries at threshold 2 (default), the second sighting can be stored; one request counts as one sighting. Size weighting adds +1 per 256 KiB. Set `--page-cache-admit-threshold 1` to cache on first sight. Tune by `httpjet_cache_hit_ratio_real` and `httpjet_cache_admit_ratio`.
+Reject one-hit wonders with a fixed-memory frequency sketch. For public entries at threshold 2 (default), the second sighting can be stored; one request counts as one sighting. Size weighting adds +1 per 256 KiB. Set `--page-cache-admit-threshold 1` to permit first-sighting storage for eligible public bodies below 256 KiB. Tune by `httpjet_cache_hit_ratio_real` and `httpjet_cache_admit_ratio`.
 
 Decline a cacheable 3xx whose `Location` is the request's own URL (hosts normalized without port). Re-check that guard at serve time; the XF add-on refuses at a third layer. De-cache cacheable redirects from the CDN via the deny-CDN-cache transform.
 
@@ -108,13 +108,13 @@ Decline a cacheable 3xx whose `Location` is the request's own URL (hosts normali
 
 > [Diagram: cache-tiers] Dual-cap tier model. The RAM index describes every entry; with a file tier, bodies live as immutable HJPC files and are charged metadata-only against --page-cache-mem while their footprint counts against --page-cache-disk-mem. A small hot tier fronts the files. Every teardown path (evict, expire, purge, replace) is synchronous under the shard lock; only the unlink(2) syscall is deferred to just after the lock is released.
 
-Default to in-RAM only; restarts flush it. Set `--page-cache-store-path /dev/shm/jetcache` (or `default`/`jetcache`) for a **tmpfs-primary** tier. `PageStore::store` offloads every body to an immutable file at birth, off the heap. HJPC containers authenticate with `--page-cache-integrity-key`. The LiteSpeed `cacheStorePath` parses but stays unused.
+Default to in-RAM only; restarts flush it. Set `--page-cache-store-path /dev/shm/jetcache` (or `default`/`jetcache`) for a **tmpfs-primary** tier. `PageStore::store` normally writes eligible bodies as immutable files. If the file store cannot open, the cache runs in RAM. An individual persistence failure can also leave that entry in RAM. HJPC containers authenticate with `--page-cache-integrity-key`. The LiteSpeed `cacheStorePath` parses but stays unused.
 
-- **Survives restarts.** A boot scan (up to 8 threads) rebuilds the index — ~300k entries in seconds. `/__hj_cache_ready` returns 503 while scanning, then 200 + `x-hj-cache-ready: 1` + `x-hj-cache-loaded: N`.
+- **Survives restarts.** A boot scan (up to 8 threads) rebuilds the index — scan duration depends on the store contents and host. `/__hj_cache_ready` returns 503 while scanning, then 200 + `x-hj-cache-ready: 1` + `x-hj-cache-loaded: N`.
 
 - **Reclaim invariant.** Live entries resolve to live bodies. A missing file fails closed to a miss and counts `disk_read_err`.
 
-- **Durable purges.** Purges unlink eagerly and keep a purge-all stamp. A restart cannot resurrect purged entries.
+- **Durable purges.** Purges remove matching entries and unlink their files. The file tier persists purge state for restart recovery and logs write failures.
 
 - **Dictionaries compress at store.** A background task dict-recompresses the identity birth copy (~3.5–9× smaller), never inline. Incompressible types never encode; vhosts in `--page-cache-egress-at-rest-vhosts` skip this job (0.1.6).
 
@@ -126,7 +126,7 @@ budget calculator — how many pages fit?
            typical page (KB, identity)
            dictionary ratio ×
 
-Rules of thumb only (≈6 KB metadata per entry, ratio 3.5–9× on forum HTML). tmpfs *is* RAM. Production: disk-mem 2 GiB (x86) and 5.5 GiB (ARM), hot-mem 384 MiB on both.
+Rules of thumb only (≈6 KB metadata per entry, ratio 3.5–9× on forum HTML). tmpfs *is* RAM. The starting values in this calculator match the defaults.
 
 | Flag | Default | Meaning |
 
@@ -189,15 +189,15 @@ Derive an *epoch* from the process-bound revision at first API publication. Key 
 
 ## Microcaching today, and what is missing
 
-Roadmap note: short TTLs already work today (`public,max-age=2` gets every guard; `scripts/microcache_policy_example.sh` proves it). A first-class route-level policy does not exist yet. The proposed ` ` contract sits in `docs/microcache-policy.md`; the parser still ignores it.
+Apps can set short TTLs with an explicit cache header such as `public,max-age=2`. The usual eligibility and admission checks still apply. Route-level XML microcache policy is unimplemented.
 
 ## Observing the cache
 
            **observe** · headers, entries, metrics
 ```
-$ curl -sI -H 'Host: example.test' http://127.0.0.1:8080/ | grep -i x-litespeed-cache
+$ curl -fsS -D - -o /dev/null -H 'Host: example.test' http://127.0.0.1:8080/ | grep -i x-litespeed-cache
 x-litespeed-cache: miss            # ran the backend; stored if admitted
-$ curl -sI -H 'Host: example.test' http://127.0.0.1:8080/ | grep -i x-litespeed-cache
+$ curl -fsS -D - -o /dev/null -H 'Host: example.test' http://127.0.0.1:8080/ | grep -i x-litespeed-cache
 x-litespeed-cache: hit             # served from cache (also: hit,stale-if-error)
 
 $ curl -s -H "Authorization: Bearer $(cat /etc/httpjet/profile.token)" http://127.0.0.1:9090/cache-entries   # totals, per-URL-class counts, top-N by size, ram/disk line, health line

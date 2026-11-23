@@ -109,7 +109,7 @@
       <p>Use a fresh Linux server on <strong>amd64/x86-64 or arm64/aarch64</strong>. Run the installer as root. You need Linux <strong>io_uring</strong> and free ports 80 and 443. You need no Rust toolchain, LiteSpeed, PHP or domain name.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>install</b> · Linux</span></div><pre><code>curl -fsSLo install.sh https://github.com/faratech/httpjet/releases/latest/download/install.sh
 sudo sh ./install.sh</code></pre></div>
-      <p>The installer selects signed DEB/APT or RPM packages on supported systemd systems. It can also select a signed portable archive. It verifies the release before installing. It creates a dedicated <code>httpjet</code> account. It starts the service on a fresh install. <a href="https://github.com/faratech/httpjet/releases/latest">GitHub Releases</a> also provides DEB, RPM and static archives.</p>
+      <p>The installer selects signed DEB/APT or RPM packages on supported systemd systems. It can also select a signed portable archive. It verifies the release before installing. It creates a dedicated <code>httpjet</code> account. With a supported supervisor, it starts the service on a fresh install. The portable <code>--init none</code> route installs without starting a service. <a href="https://github.com/faratech/httpjet/releases/latest">GitHub Releases</a> also provides DEB, RPM and static archives.</p>
       <p>Fresh installs serve <code>http://SERVER-IP/</code> on port 80. They serve <code>https://SERVER-IP/</code> on port 443. Each install generates its own self-signed certificate. Browsers warn until you configure a trusted certificate. HTTP does not redirect to HTTPS automatically. Open TCP ports 80 and 443 in your firewall for remote access.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>check</b> · local welcome page</span></div><pre><code>curl -f http://127.0.0.1/
 <span class="t-c"># Accept the self-signed certificate for this loopback check only</span>
@@ -178,18 +178,19 @@ target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed"
 <span class="t-c"># strict: exit non-zero on lint errors (warnings never fail) — the deploy gate</span>
 target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" check <span class="t-k">--strict</span></code></pre>
       </div>
-      <p><code>check --strict</code> hard-errors on three cases:</p>
+      <p><code>check --strict</code> fails on these configuration errors:</p>
       <ul>
         <li>A docroot shared by two vhosts fails.</li>
         <li>A vhost with a missing docroot fails.</li>
         <li>A mapped vhost whose config did not load fails.</li>
+        <li>The first secure listener’s TLS configuration fails to load.</li>
       </ul>
       <p>Geo rules without a database fail even a plain <code>check</code>. Other findings warn without failing. Always use an absolute <code>--root</code>. See <a href="configuration">Configuration</a> and <a href="capabilities">Capabilities &amp; limits</a> for warnings.</p>
     </section>
 
     <section>
       <h2 id="run">3 · Serve on loopback</h2>
-      <p>The XML holds persistent policy. The <code>serve</code> flags hold operational overrides. The example is HTTP-only, PHP-off and cache-off. You can run it safely beside an existing server.</p>
+      <p>The XML holds persistent policy. The <code>serve</code> flags hold operational overrides. The example is HTTP-only with PHP and page cache disabled. If the HTTP or metrics port is already in use, select a free loopback port and use the same port in your probes.</p>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>serve</b> · development</span></div>
         <pre><code>target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed" serve \
@@ -204,8 +205,7 @@ target/release/httpjet <span class="t-k">--root</span> "$PWD/examples/litespeed"
       <h2 id="verify">4 · Verify</h2>
       <div class="codeframe">
         <div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>verify</b> · curl</span></div>
-        <pre><code>printf 'hello from httpjet\n' &gt; examples/litespeed/example/public/index.html
-curl -i -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/
+        <pre><code>curl -i -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/
 
 <span class="t-c"># h2c prior knowledge on the same plain port</span>
 curl -i --http2-prior-knowledge -H <span class="t-s">'Host: example.test'</span> http://127.0.0.1:8080/
@@ -245,7 +245,7 @@ httpjet <span class="t-k">--root</span> /abs/root serve <span class="t-k">--http
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="./"><div class="dir">← Prev</div><div class="ttl">Overview</div></a><a class="next" href="migration"><div class="dir">Next →</div><div class="ttl">Migrating from LiteSpeed</div></a></nav>
-<p class="docfoot">httpjet · documentation updated 2026-11-23; measurements and historical results are dated on their pages.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · release behavior reviewed against <a href="https://github.com/faratech/httpjet/tree/v0.2.6-3">v0.2.6-3</a>; measurements and historical results are dated on their pages.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
 <aside class="tocwrap">
   <div class="toc-title">On this page</div>
@@ -258,6 +258,6 @@ httpjet <span class="t-k">--root</span> /abs/root serve <span class="t-k">--http
     <div class="search-res"></div>
   </div>
 </div>
-<script defer src="assets/docs.min.js?v=20261123b"></script>
+<script defer src="assets/docs.min.js?v=20261123c"></script>
 </body>
 </html>

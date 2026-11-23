@@ -56,13 +56,15 @@ target/release/httpjet --root /abs/copied-root check --strict
 sudo -u   target/release/httpjet --root /abs/copied-root check --strict
 ```
 
-Treat three errors as blockers:
+Resolve any errors before starting the candidate:
 
 - Shared or missing docroots block you.
 
 - Mapped vhosts whose config did not load block you.
 
-- Geo rules without their database block you.
+- Geo rules require their database.
+
+- The first secure listener requires loadable TLS material.
 
 Run the check as the runtime identity too. Readable-by-root does not prove service access. Review all warnings before you proceed. See Capabilities & limits for ignored directives.
 

@@ -47,7 +47,7 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
         !   Generation file and socket are trust anchors
 The 16-byte file (epoch + promoted-family marker fingerprint) identifies your pool. Supplying `--lsphp-generation-file` aborts startup if it is missing or malformed; its parent must not be group/other-writable, and test pools default files beside their own socket.
 
-Never restart `httpjet-lsphp.socket` during a reload: it preserves the listener inode and 8192-deep queue. Restart only `httpjet-lsphp.service` (it reapplies the XML backlog via `listen(2)`); verify socket inode, 16-byte file, and `ss -xln` Send-Q = 8192 (`LIVE=1 scripts/lsphp-reload-test.sh`).
+If a separate socket unit owns the listener, keep that unit running during a supervisor reload or replacement. Verify the listener inode, 16-byte generation file, and configured backlog with `ss -xln`.
 
 ## The UDS connection pool
 
@@ -95,7 +95,7 @@ In spawn mode (`serve` without `--lsphp-external`) you supervise `lsphp` yoursel
 - **Deadline.** `--php-max-process-time-ms` gives a total per-request deadline; exceeded means 504. Spawn mode also kills/restarts the worker; external mode has no web-process monitor, so keep it conservative.
 
         !   Packaging boundary
-httpjet ships no PHP runtime; you manage the executable, extensions, `php.ini`, opcache, and writable paths. The repo's hardening runbook (`systemd/httpjet-lsphp.service.d/hardening.conf`, `MemoryDenyWriteExecute=no` for opcache JIT) is validated live but off by default.
+httpjet ships no PHP runtime; you manage the executable, extensions, `php.ini`, opcache, and writable paths. The public `packaging/systemd/httpjet-lsphp.service` is a starting point. Test the service sandbox with the PHP extensions and opcache configuration you intend to run.
 
 ## The LSAPI wire codec
 

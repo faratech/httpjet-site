@@ -1,6 +1,5 @@
-flowchart LR
-  A["cacheable miss for key K"] --> B["count K in the frequency sketch<br/>(fixed memory, W-TinyLFU)"]
-  B --> C("freq(K) ≥ threshold + size bonus?<br/>threshold default 2 · +1 per 256 KiB")
-  C -- "no" --> D["render, serve, do not store"]
-  C -- "yes" --> E["render, serve, STORE"]
-  D -- "next request" --> A
+flowchart TB
+  A["Public cache lookup records the request"] --> B["On a miss, render response and check cache eligibility"]
+  B --> C{"Estimated frequency ≥ base threshold<br/>+ one per 256 KiB?"}
+  C -- no --> D["Serve without storing"]
+  C -- yes --> E["Store and serve"]

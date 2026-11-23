@@ -60,11 +60,11 @@ Several ` ` children make a group. Without options you keep ordered primary/fail
 
      GET
 
-/ready application.internal 10 2 2 3 200 ``` > [Diagram: proxy-selection] Selection. Eligibility intersects active health and the passive breaker; policy picks among eligible peers. A pre-head dial failure marks the peer and moves on; sent bodies never replay. > [Diagram: upstream-health] Peer states. A peer starts cold until rise successes; fall failures take it down; probes restore it. All-ineligible gives 503. - **Policies:** `primary-first` (default), `weighted-round-robin` (smooth WRR), `weighted-least-active` (active ÷ weight, WRR tie-break). Invalid policies, weights, or health settings fail config loading. - **Probes:** `connect` tests transport; `GET`/`HEAD` validate TLS, bound the head, compare status exactly, follow no redirects, and consume no body. No cookies, authorization, or body; 16 concurrent probes process-wide; pool permits untouched. - **Groups share one protocol.** Keep credentials, paths, and queries out of group authorities. A `Host` override never overrides TLS identity. - **Reloads:** candidates start no probes; publication starts the new scheduler and retires the old. Unchanged identities keep state; changed endpoints, weights, policies, or TLS identities start fresh. - **Reservations** survive the response head. Streams and WebSocket relays release the active count on completion, error, or drop. Metrics carry scope, group, and ordinal labels only: `httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total}`, `httpjet_proxy_failover_total`, `httpjet_phase_upstream_seconds`. See the status API .
+/ready application.internal 10 2 2 3 200 ``` > [Diagram: proxy-selection] Selection. Eligibility intersects active health and the passive breaker; policy picks among eligible peers. A failed dial can move to another eligible peer before sending the request. The HTTP/1 proxy can also retry a failed send once for a bodyless idempotent request. > [Diagram: upstream-health] Peer states. A peer starts cold until rise successes; fall failures take it down; probes restore it. All-ineligible gives 503. - **Policies:** `primary-first` (default), `weighted-round-robin` (smooth WRR), `weighted-least-active` (active ÷ weight, WRR tie-break). Invalid policies, weights, or health settings fail config loading. - **Probes:** `connect` tests transport; `GET`/`HEAD` validate TLS, bound the head, compare status exactly, follow no redirects, and consume no body. No cookies, authorization, or body; 16 concurrent probes process-wide; pool permits untouched. - **Groups share one protocol.** Keep credentials, paths, and queries out of group authorities. A `Host` override never overrides TLS identity. - **Reloads:** candidates start no probes; publication starts the new scheduler and retires the old. Unchanged identities keep state; changed endpoints, weights, policies, or TLS identities start fresh. - **Reservations** survive the response head. Streams and WebSocket relays release the active count on completion, error, or drop. Metrics carry scope, group, and ordinal labels only: `httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total}`, `httpjet_proxy_failover_total`, `httpjet_phase_upstream_seconds`. See the status API .
 
 ## Streaming, SSE and timeouts
 
-Upstream responses never buffer (`respBuffer` parses but always streams; `check` warns). SSE stays real-time through compression and H1, H2, and H3.
+The HTTP proxy streams responses after the upstream head arrives. Later response processing, such as body filtering or cache admission, can buffer eligible bodies. `respBuffer` is parsed for compatibility and does not change that policy. SSE bypasses compression.
 
 | Timeout | Meaning and limits |
 
@@ -72,7 +72,7 @@ Upstream responses never buffer (`respBuffer` parses but always streams; `check`
 
 | Response head | Processor default bounds the head. A context `responseTimeout` overrides it. |
 
-| Backend timeout | An exceeded backend deadline answers 504. Request bodies still stream to h1/h2 upstreams. |
+| Backend timeout | An exceeded backend deadline answers 504. The HTTP proxy can stream request bodies to h1/h2 upstreams. With an upload, the response-head deadline starts after upload EOF. |
 
 | Request body size | A context `maxReqBodySize` is enforced before dispatch. Before any backend work. |
 

@@ -144,11 +144,12 @@
       <h2 id="check">2 · Validate a copied configuration</h2>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>gate 1</b></span></div><pre><code>target/release/httpjet --root /abs/copied-root check --strict
 sudo -u &lt;service-user&gt; target/release/httpjet --root /abs/copied-root check --strict</code></pre></div>
-      <p>Treat three errors as blockers:</p>
+      <p>Resolve any errors before starting the candidate:</p>
       <ul>
         <li>Shared or missing docroots block you.</li>
         <li>Mapped vhosts whose config did not load block you.</li>
-        <li>Geo rules without their database block you.</li>
+        <li>Geo rules require their database.</li>
+        <li>The first secure listener requires loadable TLS material.</li>
       </ul>
       <p>Run the check as the runtime identity too. Readable-by-root does not prove service access. Review all warnings before you proceed. See <a href="capabilities">Capabilities &amp; limits</a> for ignored directives.</p>
     </section>
@@ -217,7 +218,7 @@ sudo -u &lt;service-user&gt; target/release/httpjet --root /abs/copied-root chec
     </section>
 
 <nav class="pager" aria-label="Pagination"><a class="prev" href="quickstart"><div class="dir">← Prev</div><div class="ttl">Quickstart</div></a><a class="next" href="capabilities"><div class="dir">Next →</div><div class="ttl">Capabilities &amp; limits</div></a></nav>
-<p class="docfoot">httpjet · documentation updated 2026-11-23; measurements and historical results are dated on their pages.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
+<p class="docfoot">httpjet · release behavior reviewed against <a href="https://github.com/faratech/httpjet/tree/v0.2.6-3">v0.2.6-3</a>; measurements and historical results are dated on their pages.<br>Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>
 </main>
 <aside class="tocwrap">
   <div class="toc-title">On this page</div>
@@ -230,6 +231,6 @@ sudo -u &lt;service-user&gt; target/release/httpjet --root /abs/copied-root chec
     <div class="search-res"></div>
   </div>
 </div>
-<script defer src="assets/docs.min.js?v=20261123b"></script>
+<script defer src="assets/docs.min.js?v=20261123c"></script>
 </body>
 </html>

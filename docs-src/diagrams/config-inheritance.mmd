@@ -10,7 +10,7 @@ flowchart TB
   M["parse-time MemoClass verdict (httpjet check)<br/>eligible + vary-set (Origin, UA bitmap) vs ineligible (Remote_Addr, Cookie, IP ACL)"]:::srv
   S -- "vhost defaults + allowSymbolLink fold" --> V
   V -- "URI prefix routing" --> C
-  V -- "allowOverride = 1" --> H
+  V -- "overrides enabled for this vhost" --> H
   H -- "static analysis at load" --> M
   click S "configuration.html#server"
   click V "configuration.html#vhosts"

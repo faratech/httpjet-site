@@ -142,7 +142,7 @@ curl -fsSLo install.sh https://github.com/faratech/httpjet/releases/latest/downl
 sudo sh ./install.sh
 ```
 
-The installer selects signed DEB/APT or RPM packages on supported systemd systems. It can also select a signed portable archive. It verifies the release before installing. It creates a dedicated `httpjet` account. It starts the service on a fresh install. GitHub Releases also provides DEB, RPM and static archives.
+The installer selects signed DEB/APT or RPM packages on supported systemd systems. It can also select a signed portable archive. It verifies the release before installing. It creates a dedicated `httpjet` account. With a supported supervisor, it starts the service on a fresh install. The portable `--init none` route installs without starting a service. GitHub Releases also provides DEB, RPM and static archives.
 
 Fresh installs serve `http://SERVER-IP/` on port 80. They serve `https://SERVER-IP/` on port 443. Each install generates its own self-signed certificate. Browsers warn until you configure a trusted certificate. HTTP does not redirect to HTTPS automatically. Open TCP ports 80 and 443 in your firewall for remote access.
 
@@ -226,7 +226,7 @@ target/release/httpjet --root "$PWD/examples/litespeed" check
 target/release/httpjet --root "$PWD/examples/litespeed" check --strict
 ```
 
-`check --strict` hard-errors on three cases:
+`check --strict` fails on these configuration errors:
 
 - A docroot shared by two vhosts fails.
 
@@ -234,11 +234,13 @@ target/release/httpjet --root "$PWD/examples/litespeed" check --strict
 
 - A mapped vhost whose config did not load fails.
 
+- The first secure listener’s TLS configuration fails to load.
+
 Geo rules without a database fail even a plain `check`. Other findings warn without failing. Always use an absolute `--root`. See Configuration and Capabilities & limits for warnings.
 
 ## 3 · Serve on loopback
 
-The XML holds persistent policy. The `serve` flags hold operational overrides. The example is HTTP-only, PHP-off and cache-off. You can run it safely beside an existing server.
+The XML holds persistent policy. The `serve` flags hold operational overrides. The example is HTTP-only with PHP and page cache disabled. If the HTTP or metrics port is already in use, select a free loopback port and use the same port in your probes.
 
             **serve** · development
 
@@ -258,7 +260,6 @@ Use alternate ports and a separate `--php-socket`. Use low `--php-children` and 
             **verify** · curl
 
 ```
-printf 'hello from httpjet\n' > examples/litespeed/example/public/index.html
 curl -i -H 'Host: example.test' http://127.0.0.1:8080/
 
 # h2c prior knowledge on the same plain port
@@ -356,13 +357,15 @@ target/release/httpjet --root /abs/copied-root check --strict
 sudo -u   target/release/httpjet --root /abs/copied-root check --strict
 ```
 
-Treat three errors as blockers:
+Resolve any errors before starting the candidate:
 
 - Shared or missing docroots block you.
 
 - Mapped vhosts whose config did not load block you.
 
-- Geo rules without their database block you.
+- Geo rules require their database.
+
+- The first secure listener requires loadable TLS material.
 
 Run the check as the runtime identity too. Readable-by-root does not prove service access. Review all warnings before you proceed. See Capabilities & limits for ignored directives.
 
@@ -483,7 +486,7 @@ This page lists 25 capabilities, 6 build features and 14 operational bounds. **S
 
 | OCSP stapling | optional | Stapling behind `--features ocsp` with OpenSSL 3.x. Your responder must cover every issuer; not for Let's Encrypt. → |
 
-| kTLS / sendfile | partial | Plain-TCP H1 file bodies always use `sendfile(2)`. TLS 1.3 H1 sendfile needs `--features ktls`, `--ktls=auto` and `tls-hw-tx-offload`. → |
+| kTLS / sendfile | partial | Plain TCP HTTP/1 tries `sendfile(2)` for eligible file bodies and falls back to buffered writes when unavailable. TLS 1.3 HTTP/1 can also use it in a kTLS build. Automatic kTLS requires active `tls-hw-tx-offload` on a supported NIC. → |
 
 | Virtual hosts | supported | Exact Host/SNI maps with parent-domain and bare `*` fallback. Glob patterns like `*.example.test` never match; `check` warns. |
 
@@ -626,7 +629,7 @@ SUMMARY: Look up every setting in the XML reference.
 
 # Configuration reference
 
-httpjet is configured by a **LiteSpeed-compatible XML tree** selected with `--root`: `conf/httpd_config.xml`, the per-vhost files it references, and `conf/mime.properties`. An existing LiteSpeed or OpenLiteSpeed tree works as-is. On that base httpjet layers its own opt-in directives — marked httpjet — which LiteSpeed ignores. Operational overrides live on the command line , not in the XML.
+httpjet is configured by a **LiteSpeed-compatible XML tree** selected with `--root`: `conf/httpd_config.xml`, the per-vhost files it references, and `conf/mime.properties`. For an existing LiteSpeed or OpenLiteSpeed tree, validate a copy and follow the migration checklist . On that base httpjet layers its own opt-in directives — marked httpjet — which LiteSpeed ignores. Operational overrides live on the command line , not in the XML.
 
 ## The configuration tree
 
@@ -674,7 +677,7 @@ You run check under the service identity too. Readable-by-root does not prove re
 
 | `indexFiles` | `index.html` | Directory-index candidates (vhost may override). |
 
-| `useIpInProxyHeader` | `2` | Client-IP trust mode. 0 never, 1 always, 2 trusted peers, 3 as 2, 4 always. |
+| `useIpInProxyHeader` | `2` | Client-IP trust mode. Mode 0 uses the peer address. Modes 2 and 3 require peer and TLS trust. Modes 1 and 4 use X-Forwarded-For without peer validation. See client identity for how each mode selects an address. |
 
 | ` ` | `0` | HTTP/3 master switch; also drives `Alt-Svc`. Needs the UDP port published. |
 
@@ -732,7 +735,7 @@ You run check under the service identity too. Readable-by-root does not prove re
 
 | `secure`, `keyFile`, `certFile`, `certChain` | off | TLS material; `certChain=1` appends `CACertFile` to the served chain. |
 
-| `CACertFile` · `clientVerify` · `verifyDepth` | none · `0` · `1` | Client-certificate verification (0 none · 1 optional · 2 required · 3 optional without CA) against the listener CA. |
+| `CACertFile` · `clientVerify` · `verifyDepth` | none · `0` · `1` | Mode 0 disables client verification. Modes 1 and 3 optionally request a certificate and validate any certificate presented against the listener CA. Mode 2 also enforces the certificate requirement after the handshake for non-internal peers. |
 
 | `crlFile` httpjet | none | PEM CRL/bundle enforced by the client verifier. |
 
@@ -776,7 +779,7 @@ You define proxy, LSAPI, or FastCGI upstreams here. Unknown legacy types proxy; 
 
 | `initTimeout` / `retryTimeout` / `pcKeepAliveTimeout` | `60` / `0` / `60` s | Connect timeout / bad-mark cooldown (retry dials fresh; a backend timeout is 504) / idle recycle. |
 
-| `respBuffer` | `0` | Parsed; responses always stream (`check` warns if set). |
+| `respBuffer` | `0` | Parsed for compatibility. It does not control buffering, and `check` warns when enabled. Actual buffering depends on the handler and response processing. |
 
 | `clientCertFile` / `clientKeyFile` httpjet | none | Upstream mTLS client identity for `https://`/`h2s://` targets; must lie within an admin resource root when submitted via the API. |
 
@@ -796,7 +799,7 @@ You declare vhosts in `httpd_config.xml`. `restrained` confines to `vhRoot`; `en
 
 | ` ` `enable`, `autoLoadHtaccess`, `base`, `rules` | Inline rules run before the `.htaccess` chain. |
 
-| ` ` `allowOverride`, `accessFileName` | Controls `.htaccess` loading. Only `0` or `31` loads; partial masks refuse. |
+| ` ` `allowOverride`, `accessFileName` | Controls `.htaccess` loading. Vhosts accept `0` or `31`. A server-wide mask, if supplied, must be `31`. Context-level masks are rejected. |
 
 | ` ` `keyFile`, `certFile`, `certChain`, `CACertFile` | The SNI identity for this vhost's domains (chain material, not a client-verify root). |
 
@@ -886,7 +889,7 @@ ACME and OCSP are default-off at build and runtime. Both publish into the same g
 
 | Per-vhost ` ` | SNI identity for that vhost. Chain material only, never a client-verify root; pair ECDSA+RSA for smaller modern chains. |
 
-| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | mTLS: 0 none, 1 optional, 2 required, 3 as 1. Verifier uses the listener CA only; verdicts memoized off the hot path. |
+| `clientVerify` 0–3, `CACertFile`, `verifyDepth` | Mode 0 disables verification. Modes 1 and 3 optionally request a certificate and validate any certificate presented against the listener CA. Mode 2 also enforces the certificate requirement after the handshake for non-internal peers. |
 
 | `crlFile` httpjet | PEM CRL or bundle for the webpki verifier. Absent means no revocation checking; rotate via trust-generation reload. |
 
@@ -1029,25 +1032,27 @@ SUMMARY: Control who can reach your sites.
 
 # Security & access control
 
-Decide **who the client is** and **who may ask** here. The posture is **fail closed**: a control that cannot evaluate acts restrictive. One exception: the opt-in throttle fails open (see Throttle ).
+Decide **who the client is** and **who may ask** here. Check each control’s trust and failure policy. For example, the opt-in throttle can admit untracked requests under state pressure.
 
         resolve    acl    rewrite    cache    dispatch    finalize    store
 
 ## Client identity
 
-Resolve one client IP at connection admission. Store it in `ReqCtx.client_ip`. Every later gate reads that value.
+Resolve the client IP per request after vhost selection and the plaintext mTLS check. Access policy can evaluate both the peer and the resolved client, while GeoIP, request throttling, and application logging use the resolved address.
 
-> [Diagram: client-ip] From socket peer to client identity. Forwarded headers are evidence, not identity: they count only from a peer an allow rule marks T; from anyone else they are attacker-controlled data and ignored. Every later gate — ACL, geo, throttle, mTLS exemption, logs, the cache key — reads the resolved value.
+> [Diagram: client-ip] From socket peer to client identity. The default setting is mode 2. It reads forwarded client addresses only when peer and TLS requirements are met. The modes below describe other supported policies.
 
 | `useIpInProxyHeader` | Forwarded headers are believed… |
 
 | 0 | never |
 
-| 1 / 4 | always. Only safe when only your proxy can reach the listener. |
+| 1 | Uses the leftmost untrusted X-Forwarded-For address without a peer trust check. Use only behind a restricted listener. |
 
-| 2 (default) | only from trusted peers (`allow … T`). `CF-Connecting-IP` counts on that path. |
+| 4 | Uses the last valid X-Forwarded-For address without a peer trust check. Use only behind a restricted listener. |
 
-| 3 | as 2, for IP purposes only |
+| 2 (default) | Requires a trusted peer and TLS. If the listener requests client certificates, a valid presented certificate is also required. Prefers `CF-Connecting-IP`, then the rightmost untrusted X-Forwarded-For address. |
+
+| 3 | Same address resolution as mode 2. |
 
 The admin write API marks `useIpInProxyHeader` and ` ` **restart-required**. Trust never changes under a running generation.
 
@@ -1137,7 +1142,7 @@ Configure suEXEC (` `, off by default; uid 0 always rejected), chroot (`chrootMo
 
 | `/__hj_cache_purge`, `/__hj_cache_ready` | Raw TCP peer must be loopback. POST-only purge (405 + `Allow`); ready takes GET/HEAD; a `unix:` listener opens both to local processes. |
 
-| `--metrics-addr` (`/metrics`, `/cache-entries`, `/__mimalloc-stats`, `/__alloc-count`, `/debug/pprof/profile`) | Loopback-only by default. `/metrics` open on loopback; the rest need a Bearer token matching `--profile-token-file` (403 when unset). |
+| `--metrics-addr` (`/metrics`, `/cache-entries`, `/__mimalloc-stats`, `/__alloc-count`, `/debug/pprof/profile`) | Loopback bind required. `/metrics` is available there without a token. Diagnostics require a Bearer token from `--profile-token-file` or `--profile-token` (403 when unset). |
 
 | `--admin-addr` (`/v1/status`) | Loopback TCP only. Loopback Host required; Origin headers and bodies rejected. |
 
@@ -1195,64 +1200,49 @@ For a fresh Linux server, use the signed installer . It selects the native packa
 
 To build and deploy from source instead, install the binary at a stable path *outside* Cargo's `target/` so a later `cargo clean` cannot delete what a running unit depends on:
 
-           source install
+         public static example
 ```
 cargo build --locked --release -p httpjet
-sudo useradd --system --home-dir /var/lib/httpjet --no-create-home --shell /usr/sbin/nologin httpjet
-sudo install -d /usr/local/httpjet/bin /usr/local/httpjet/conf /usr/local/httpjet/logs
-sudo install -m0755 target/release/httpjet /usr/local/httpjet/bin/httpjet
-
-# an existing LiteSpeed tree works as-is — validate it first, as root AND as the service user
-sudo /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
-sudo -u httpjet /usr/local/httpjet/bin/httpjet --root /usr/local/lsws check --strict
-
-# minimal loopback example unit (no TLS, no PHP, no cache); it runs /usr/bin/httpjet on /etc/httpjet/litespeed
 sudo install -m0755 target/release/httpjet /usr/bin/httpjet
-sudo install -d /etc/httpjet && sudo cp -a examples/litespeed /etc/httpjet/litespeed
+sudo install -d /etc/httpjet
+sudo cp -a examples/litespeed /etc/httpjet/litespeed
 sudo install -m0644 packaging/systemd/httpjet-example.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now httpjet-example
+sudo systemctl daemon-reload
+sudo systemctl enable --now httpjet-example
+curl -f -H 'Host: example.test' http://127.0.0.1:8080/
 ```
 
         !   Review before start
-The example units bind loopback and use example document roots. Set listeners, domains, docroots, TLS material, writable paths and the service identity deliberately before enabling a public service. A permission-preparing `ExecStartPre` that runs as root and then drops to the unprivileged account is the reference shape.
+The example units bind loopback and use example document roots. Set listeners, domains, docroots, TLS material, writable paths and the service identity deliberately before enabling a public service. The static reference unit uses `DynamicUser=yes` and runs its strict config check under that service identity.
 
 ## Advanced systemd socket activation
 
-The following reference topology is optional. The fresh installer uses a single static service and does not set up these socket, PHP-pool or firewall units.
+The public release includes a packaged static service and two source-based example units. They provide starting points for an operator-managed socket-activated deployment.
 
-> [Diagram: systemd-units] Five core units (plus the optional edge firewall). The socket units own the listening fds; the boot gate keeps the public listeners closed until the PHP pool can answer; the web tier adopts the fds and dials the pool. Restarting the web tier or reloading the pool never closes a listener.
+> [Diagram: systemd-units] Service options in the public release. The packaged service and source example serve static files. Attach a separately managed LSAPI pool when the site needs PHP.
 
-| Unit | Role |
+| Public unit | Role |
 
-| `httpjet.socket` | N× `:80` TCP, N× `:443` TCP, N× `:443` UDP with `ReusePort=yes`, `Backlog=8192`. The multiplicity reproduces the per-worker SO_REUSEPORT fan-out, so N must equal `serve --workers`. Static (not enabled under `sockets.target`); pulled in by the service after the gate to avoid a cold-boot ordering cycle. |
+| `packaging/services/systemd/httpjet.service` | Portable installation under the `httpjet` account with a strict pre-start check and startup readiness notification. |
 
-| `httpjet-boot-ready.service` | Boot-only oneshot gate, availability-first: the `Type=notify` LSAPI pool is the one hard dependency; databases/caches are ordered but not required — it waits up to 300 s, then proceeds with a loud warning so a cold boot with a slow database still serves static + warm cache + stale-if-error. Later backend maintenance cannot tear down the sockets. |
+| `packaging/systemd/httpjet-example.service` | Source-build example with a dynamic account, strict validation and loopback HTTP. |
 
-| `httpjet.service` | The web tier under a dedicated user. You check drop-ins before reasoning about flags. |
+| `packaging/systemd/httpjet-lsphp.service` | Optional persistent PHP service with readiness notification and a root-run reload command. |
 
-| `httpjet-lsphp.socket` | Owns the LSAPI Unix listener (mode 0600, backlog 8192, `RemoveOnStop`). Never restart it during a reload or supervisor deploy. |
-
-| `httpjet-lsphp.service` | `httpjet lsphp …`, `Type=notify` (active only after a marker-attributed LSAPI response), `ExecReload=httpjet lsphp-reload …`, its own identity, `RuntimeDirectory=httpjet` for the control socket and generation file. |
-
-| `httpjet-edge-firewall.service` | Optional oneshot edge firewall (`scripts/httpjet-edge-firewall.sh`) for origins without a cloud firewall: restricts new `:80`/`:443` connections to Cloudflare IPv4 + private ranges (keep its list in step with the XML `T` entries). |
-
-**Hardening:** You apply `systemd/httpjet.service.d/zz-hardening.conf` as reference only. It sets `ProtectSystem=strict`, private tmp/devices, and empty capabilities. You enforce `@system-service` seccomp only after a clean soak. Measured score: 9.0 → 1.9.
-
-        i   Scope of the zero-loss guarantee
-Socket activation eliminates RSTs of *new and queued* connections across a deploy. Requests the old process has already accepted — h1/h2 mid-serve and especially h3/QUIC streams — still drain under `TimeoutStopSec`. "Never drops a connection" means never RSTs a new or queued one.
+With operator-configured socket activation, the socket unit can retain its listener while the web process restarts. Accepted connections still belong to the old process and drain under its shutdown policy. Validate listener counts, address families and restart behavior on a staging instance before relying on this setup.
 
 ## The persistent PHP pool
 
-Static and proxy deployments need no PHP. For LSAPI, run the pool as its own unit and point the web tier at it; the units above wire the socket, the root-only control socket and the 16-byte generation file. Routine opcache recycle is `systemctl reload httpjet-lsphp.service` — synchronous and candidate-first. Reserve a hard restart of the pool *service* for supervisor binary/unit changes; verify the listener inode is unchanged before and after. Reference: LSAPI & PHP .
+Static and proxy deployments need no PHP. For LSAPI, run the pool as its own unit and point the web tier at it; the public example configures the listener, root-only control socket and 16-byte generation file. Routine opcache recycle is `systemctl reload httpjet-lsphp.service` — synchronous and candidate-first. Use the restart example below only with an operator-managed socket unit that owns the LSAPI listener. Set the path to the deployed socket. With the standalone example, restarting the pool interrupts its listener. Reference: LSAPI & PHP .
 
            replace the supervisor without closing the listener
 ```
-before=$(stat -Lc '%d:%i' /run/httpjet/php.sock)
+before=$(stat -Lc '%d:%i' /run/httpjet/lsphp.sock)
 systemctl daemon-reload
 systemctl restart httpjet-lsphp.service                 # the SERVICE only — never the .socket
-test "$(stat -Lc '%d:%i' /run/httpjet/php.sock)" = "$before"
+test "$(stat -Lc '%d:%i' /run/httpjet/lsphp.sock)" = "$before"
 test "$(stat -Lc %s /run/httpjet/lsphp.generation)" = 16
-ss -xlnH | awk '$5 == "/run/httpjet/php.sock" {print $4}'    # Send-Q should equal the XML backlog
+ss -xlnH | awk '$5 == "/run/httpjet/lsphp.sock" {print $4}'    # Compare Send-Q with the configured socket backlog
 ```
 
 ## Safe change workflow
@@ -1269,7 +1259,7 @@ ss -xlnH | awk '$5 == "/run/httpjet/php.sock" {print $4}'    # Send-Q should equ
 
 ## Binary deploy and rollback
 
-> [Diagram: deploy-flow] The deploy gate chain. The repository's scripts/deploy-lscache.sh automates this for one deployment (strict check, co-listener guard, external-lsphp recurrence guard, health probe with automatic revert to the previous binary, capsule purge gate); the shape is what matters for any deployment.
+> [Diagram: deploy-flow] Manual source-build deployment. Validate a candidate, retain a known-good binary and verify representative requests before considering the deployment healthy.
 
 - **Kill switch: cache**: Drop `--page-cache` from the unit (a drop-in override) and restart; the cache code is inert without the flag.
 
@@ -1281,9 +1271,9 @@ ss -xlnH | awk '$5 == "/run/httpjet/php.sock" {print $4}'    # Send-Q should equ
 
 - **Rollback**: Keep the previous binary beside the current one (`bin/httpjet.prev`); restore and restart. A rollback does not remove bad objects already stored in the origin cache (purge) or at the CDN edge (purge the zone).
 
-- **Start limits**: `StartLimitBurst=5` per 60 s: more than five restarts a minute trips systemd and takes the service down until `systemctl reset-failed`. The persistence gate restarts the service — run it once.
+- **Start limits**: The portable systemd unit allows three starts per 60 seconds. Check the journal and fix the failure before resetting the unit’s failed state.
 
-The production build uses profile-guided optimization (`scripts/build-pgo.sh`: instrument → drive a representative loopback workload → rebuild). PGO scratch data is kept off tmpfs. Never benchmark a non-PGO binary against a PGO one.
+Production examples may use profile-guided optimization. Record the build profile and flags so benchmark comparisons can account for them.
 
 ## What SIGHUP reloads
 
@@ -1328,7 +1318,9 @@ A seccomp denial is a startup/test failure — do not work around it with `--pri
 
 ## Release and upgrade discipline
 
-A public release must provide portable x86_64 and aarch64 artifacts, checksums, signatures or attestations, an SBOM, the GPL-3.0 license text and a documented Linux/kernel/libc floor; architecture-tuned PGO helpers must not be uploaded as generic binaries (production builds and gathers PGO natively on each architecture). Upgrades preserve the tree, dictionaries and state; stage and validate the new binary before restart; keep a known-good binary. Dictionary rotation: write the new file atomically, validate, restart, expect old-generation cache entries to become safe misses. Dependency upgrades run through `scripts/update-deps.sh` and the full suite. See the changelog/release page for current dependency versions.
+GitHub Releases provides the installer, two static Linux archives, and native DEB and RPM packages for x86-64 and ARM64. The package site hosts signed manifests and repository metadata. A build-only publication records that distribution qualification is incomplete. For a manual source upgrade, retain a known-good binary and validate the candidate before restarting. After dictionary rotation, old entries that need an unavailable dictionary become misses.
+
+See the release process and current downloads .
 
 ==============================================================================
 PAGE: Observability (https://httpjet.net/docs/observability)
@@ -1449,9 +1441,9 @@ Every request gets a 64-bit correlation id (a per-process seed mixed into a lock
 
 ## Telemetry TSV and the PHP slow log
 
-- **`--telemetry-file logs/telemetry.tsv`**: Appends a cumulative snapshot row of the in-RAM aggregates every `--telemetry-flush-secs` (30): durability across restarts and a self-contained time series (~1 MB/day). The `:9090` endpoint works without it.
+- **`--telemetry-file logs/telemetry.tsv`**: Appends a cumulative snapshot row of the in-RAM aggregates every `--telemetry-flush-secs` (30): a time series retained across restarts. Counters reset when the process restarts, so calculate rates only within a single process lifetime. The `:9090` endpoint works without it.
 
-- **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — the per-URL / user-class attribution behind `httpjet_lsapi_ttfb_seconds`. Rolls at 64 MiB, gzip archives, 7-day prune.
+- **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — a separate per-URL and request-class view of backend timings. Rolls at 64 MiB, gzip archives, 7-day prune.
 
 These files produced the 2026-08-30 sample on Performance : mean request 9.99 ms, including 8.96 ms of LSAPI time to first byte. That elapsed interval includes backend wait; it is not PHP CPU time.
 
@@ -1501,7 +1493,7 @@ SUMMARY: Check status and reload configuration safely.
 
 # Admin API & reload
 
-You change a running httpjet three ways: SIGHUP, read-only status API, transactional write API. One publication coordinator serves all writers. Each change publishes fully, or not at all.
+Inspect the running generation with the read-only API. SIGHUP reloads on-disk settings and the optional write API publishes a volatile configuration. Both writers share one publication coordinator.
 
 | Way | Does | Limit |
 
@@ -1556,7 +1548,7 @@ httpjet --root /abs/root serve … \
   --admin-write-addr 127.0.0.1:9092 \
   --admin-token-file /operator/private/token \       # 64 lowercase hex chars (32 random bytes), mode 0400/0600, one hard link, root or service uid
   --admin-resource-root /operator/content \          # repeatable; up to 32 existing directories; "/" is refused
-  --admin-resource-root /etc/letsencrypt/live
+  --admin-resource-root /operator/certs
 ```
 
 > [Diagram: reload-transaction] Validate, then publish with an exact precondition. Every write carries If-Match with the revision it read; a stale revision or an out-of-band publication (SIGHUP included) loses with a conflict rather than silently rebuilding against newer state. Publication is volatile: the on-disk XML is never rewritten and a restart returns to it.
@@ -1575,7 +1567,7 @@ Frame each write exactly:
 
 - `Authorization: Bearer `: missing/duplicate/malformed → 401, body unread, constant-time compare, token never logged.
 
-- Exact quoted `If-Match`: missing → 428, stale → conflict.
+- Exact quoted `If-Match`. Missing returns 428, stale returns 412, and a change requiring restart returns 409.
 
 - `Content-Type: application/json`, one `Content-Length` ≤ 1 MiB, headers ≤ 8 KiB / 32, deadline 5 s.
 
@@ -1662,9 +1654,7 @@ TCP trust order: authenticate → check revision → diff (retain unchanged) →
            **tests** · isolated loopback listeners and temporary trees
 ```
 cargo test --locked -p httpjet admin
-python3 -B scripts/admin-runtime-test.py --binary target/debug/httpjet                       # served-file replacement, validate-only non-mutation, stale writes, SIGHUP restoration, restart incarnation
-python3 -B scripts/admin-runtime-test.py --binary target/debug/httpjet --memo-parity         # 48-cell memo parity across a publication
-python3 -B scripts/admin-runtime-test.py --binary target/debug/httpjet --persistent-cache    # authenticated on-disk containers, hits across publication, boot-scan restoration
+cargo test --locked -p httpjet resource_generation
 ```
 
 ==============================================================================
@@ -1691,7 +1681,7 @@ The dependency graph is acyclic, with several independent root crates including 
 
 `hj-config` parses LiteSpeed XML into one normalized model. `hj-core` re-exports that model for crates using the shared handler contract.
 
-> [Diagram: crate-map] Workspace relationships. Arrows show selected dependencies, not every edge. The binary assembles the server; optional certificate crates require build features. See the source architecture map for the complete overview.
+> [Diagram: crate-map] Workspace relationships. Arrows show selected dependencies, not every edge. The binary assembles the server; optional certificate crates require build features. See the public source tree for the crate manifests.
 
 ## Crate map
 
@@ -1772,7 +1762,7 @@ Register new handlers in `pipeline/mod.rs::dispatch()`. Register new transforms 
 
 ## The request pipeline
 
-`pipeline::handle()` is the integration point. It resolves the vhost first. It then applies trust, ACL, geo and throttle checks. It runs optional WAF and extension pre-handlers. It then calls `dispatch()` and applies transforms. It finally writes logs, metrics and spans. `dispatch()` mirrors OpenLiteSpeed ordering. It inserts page-cache seams after rewrite and access resolve. The pinned `LsapiScript` extension keeps the resolved script separate. It pushes `SCRIPT_NAME`/`QUERY_STRING` into `ctx.env` for front controllers.
+`pipeline::handle()` is the integration point. It resolves the vhost first. It then applies trust, ACL, geo and throttle checks. Optional extension pre-handlers can return a response or continue to `dispatch()`. Dispatch checks the context body limit and runs any configured WAF sidecar before rewrite or cache lookup. The request handler then applies response transforms. It finally writes logs, metrics and spans. `dispatch()` mirrors OpenLiteSpeed ordering. It inserts page-cache seams after rewrite and access resolve. The pinned `LsapiScript` extension keeps the resolved script separate. It pushes `SCRIPT_NAME`/`QUERY_STRING` into `ctx.env` for front controllers.
 
 Terminals use an explicit `if/return` chain, not a uniform registry. A failed proxy context falls through to static. A script with no pool **hard-fails 503**. It must never fall through to source.
 
@@ -1807,7 +1797,7 @@ The full ownership inventory and the transactional replacement sequence are on A
 
 - **Allocator:** Use mimalloc globally with threshold-gated trim (`--mimalloc-trim-*`). Production sets `MIMALLOC_PURGE_DELAY=0`, so you pool transient buffers in `hj_core::recycle`.
 
-> [Diagram: recycle-pools] Zero-fault buffer and task recycling (v0.1.2–v0.1.5). Under MIMALLOC_PURGE_DELAY=0, unpooled transient allocations in sparse size classes fault back in on every request. hj_core::recycle pools H2 stream futures, bridge futures, tiered body buffers (frozen into ref-counted Bytes via Bytes::from_owner and returned when the last slice drops), LSAPI read/BEGIN buffers, and per-core 64 KiB TLS record buffers.
+> [Diagram: recycle-pools] Buffer and task recycling. Under MIMALLOC_PURGE_DELAY=0, unpooled transient allocations in sparse size classes can incur minor page faults when reused. hj_core::recycle pools H2 stream futures, bridge futures, tiered body buffers (frozen into ref-counted Bytes via Bytes::from_owner and returned when the last slice drops), LSAPI read/BEGIN buffers, and per-core 64 KiB TLS record buffers.
 
 ==============================================================================
 PAGE: Protocol stacks (https://httpjet.net/docs/protocols)
@@ -1916,9 +1906,9 @@ match sniff_cleartext(&mut stream).await? {
 
         ⎁   Measured
 You pass **146 of 146** h2spec 2.6.0 cases over TLS. Three consecutive runs is the gate; h2c records 145/146, with generic §3.5/2 structurally unsatisfiable on the sniffing port.
- scripts/h2spec_check.sh · scripts/ci-h2spec.py
+ Historical result · public harness: scripts/ci-h2spec.py
         i   HPACK
-RFC 7541 HPACK lives in the `hpack` submodule of `hj-h2`, zero-allocation and pure safe Rust (`#![forbid(unsafe_op_in_unsafe_fn)]`). Huffman codes to 11 bits resolve from a 4 KiB root table. Three 32-entry sub-tables cover 12–16-bit codes (0.1.7; replaced 256 KiB flat; cold decode 16.6 → 4.6 µs). The encoder remembers eight long literals (257+ bytes) per thread (0.1.10; 4.73 → 1.34 µs per block). Decoder and round-trip are fuzz targets . See the HPACK stub .
+RFC 7541 HPACK lives in the `hpack` submodule of `hj-h2`, with bounded header decoding (`#![forbid(unsafe_op_in_unsafe_fn)]`). Huffman codes to 11 bits resolve from a 4 KiB root table. Three 32-entry sub-tables cover 12–16-bit codes (0.1.7; replaced 256 KiB flat; cold decode 16.6 → 4.6 µs). The encoder remembers eight long literals (257+ bytes) per thread (0.1.10; 4.73 → 1.34 µs per block). Decoder and round-trip are fuzz targets . See the HPACK stub .
 
 ## HPACK
 
@@ -1934,11 +1924,11 @@ HPACK now lives inside Native HTTP/2 as a three-line summary. You keep this stub
 
 - **Budget.** Charge at `Connected`, after validation. Spoofed Initials cannot hold budget; full budget closes `H3_EXCESSIVE_LOAD`.
 
-- **Handshake slots.** One of 256 per-core slots per unvalidated connection. Above 64 per core, stateless **Retry**; token-bearing Initials pass; handshakes close after 10 s.
+- **Handshake slots.** All pending handshakes share 256 slots per core. Starting at 64 pending handshakes, an unvalidated Initial must complete stateless Retry when available. The hard cap applies even after address validation. The handshake deadline is 10 seconds.
 
 - **Discovery and trust.** Advertise via **Alt-Svc** (last TLS transform); pin trust/mTLS at acceptance. Migration disabled; reloads affect future handshakes only.
 
-> [Diagram: h3-admission] HTTP/3 UDP intake. Unvalidated Initials pass per-core slot caps (256 max, Retry above 64) before charging maxConnections at Connected. QPACK heads charge total_req_bytes and BodyBufferBudget.
+> [Diagram: h3-admission] HTTP/3 UDP intake. Incoming connections check admission before taking a per-core handshake slot. The global active connection permit is acquired at Connected. QPACK heads charge total_req_bytes and BodyBufferBudget.
 
         !   Publish UDP too
 You must publish the same numeric HTTPS port over TCP and UDP. Publishing `8443/tcp` alone gives you no HTTP/3.
@@ -1972,7 +1962,7 @@ Use `unix:/path/sock` (or `uds:`), or `--http-uds`, for plain HTTP over a Unix s
 
 ## File egress: sendfile & kTLS
 
-An uncached `Body::File` keeps its pinned inode and byte range across the bridge. You send it with bounded nonblocking `sendfile(2)` on plain TCP HTTP/1.
+An uncached `Body::File` keeps its pinned inode and byte range across the bridge. Plain TCP HTTP/1 attempts bounded, nonblocking `sendfile(2)` when it has a suitable output descriptor. Otherwise the server uses buffered file reads.
 
 - Unsupported pairs resume at the exact offset via positional io_uring reads. Short files or aborts close, never a wrong `Content-Length`.
 
@@ -2007,13 +1997,13 @@ SUMMARY: How .htaccess rules rewrite and protect requests.
 
 ## Overview
 
-Run inline ` ` rules first, then the `.htaccess` chain (OpenLiteSpeed order). `evaluate()` returns one outcome per pass: `Rewritten`, `Redirect`, `Proxy`, `Forbidden`, `Gone` or `Unchanged`.
+The server loads the applicable access-file chain, seeds the environment, and checks access on the original path. Within rewrite evaluation, inline XML rules run before per-directory rules. `evaluate()` returns one outcome per pass: `Rewritten`, `Redirect`, `Proxy`, `Forbidden`, `Gone` or `Unchanged`.
 
 > [Diagram: rewrite-eval] One evaluation pass. A rewrite that crosses into another directory reloads the destination chain and evaluates again; a terminal flag stops the walk; an exhausted chain returns Unchanged and dispatch falls through to suffix routing.
 
 ## Per-directory loading
 
-`HtaccessCache` loads each directory's file (`accessFileName`, default `.htaccess`; bare names only). **mtime invalidation** re-stats at most once a second, so edits land within a second. The parsed form holds directives, regexes, scopes, the auth map and the memo verdict. The chain caps at **64** levels, then a deny-all sentinel applies.
+`HtaccessCache` loads each directory's file (`accessFileName`, default `.htaccess`; bare names only). Revalidation coalesces metadata checks for one second and compares device, inode, size, modification time, and change time. The parsed form holds directives, regexes, scopes, the auth map and the memo verdict. The chain caps at **64** levels, then a deny-all sentinel applies.
 
 Since 2026-09-16 an unreadable, unparseable or over-16 MiB `.htaccess` fails closed to that sentinel. Non-UTF-8 bytes decode lossily. Set ` 0` to disable the chain; `autoLoadHtaccess` alone loads without overrides. Each generation owns its caches, so reloads never revive stale results.
 
@@ -2159,7 +2149,7 @@ Note: the 2026-09-06 review split parsed policy from the effective realm; the ru
 
 | Header echo | partial | Parses without error. Emits nothing. |
 
-| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. See `docs/header-directive-compatibility.md` for the exact boundary. |
+| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. The public `hj-rewrite` header compatibility tests cover the boundary. |
 
 | Header condition expr= / value expr= | partial | Only `%{REQUEST_URI} =~ / !~` conjunctions evaluate. Value expressions are not implemented. |
 
@@ -2192,7 +2182,7 @@ See Configuration → Contexts . Per-context overrides and `sub_filter` now live
 cargo test -p hj-rewrite                                   # parser, evaluator, access, auth, cache directives
 cargo test -p hj-rewrite --test header_compat              # characterization fixtures for the Header boundary
 cargo test -p hj-rewrite --test redirect_repro
-bash scripts/fast_memo_parity_test.sh                      # memo-on vs memo-off byte identity on a real chain
+cargo test -p httpjet pipeline::fast_memo
 ```
 
 ==============================================================================
@@ -2291,9 +2281,9 @@ A response must pass the request, status, policy, vary, self-redirect, purge-rac
 
 ### W-TinyLFU admission
 
-> [Diagram: admission] For public entries, a fixed-memory frequency sketch rejects one-hit wonders: at the default threshold of 2 an eligible URL can be stored on its second sighting. One request is ONE sighting — the on-core fast path probes uncounted and records only a hit it serves. Size weighting adds +1 per 256 KiB. With dictionaries making storage cheap, --page-cache-admit-threshold 1 caches on first sight. Tune by httpjet_cache_hit_ratio_real and httpjet_cache_admit_ratio.
+> [Diagram: admission] For public entries, a fixed-memory frequency sketch rejects one-hit wonders: at the default threshold of 2 an eligible URL can be stored on its second sighting. One request is ONE sighting — the on-core fast path probes uncounted and records only a hit it serves. Size weighting adds +1 per 256 KiB. With dictionaries making storage cheap, --page-cache-admit-threshold 1 permits a first-sighting store for an eligible public response below 256 KiB. Tune by httpjet_cache_hit_ratio_real and httpjet_cache_admit_ratio.
 
-Reject one-hit wonders with a fixed-memory frequency sketch. For public entries at threshold 2 (default), the second sighting can be stored; one request counts as one sighting. Size weighting adds +1 per 256 KiB. Set `--page-cache-admit-threshold 1` to cache on first sight. Tune by `httpjet_cache_hit_ratio_real` and `httpjet_cache_admit_ratio`.
+Reject one-hit wonders with a fixed-memory frequency sketch. For public entries at threshold 2 (default), the second sighting can be stored; one request counts as one sighting. Size weighting adds +1 per 256 KiB. Set `--page-cache-admit-threshold 1` to permit first-sighting storage for eligible public bodies below 256 KiB. Tune by `httpjet_cache_hit_ratio_real` and `httpjet_cache_admit_ratio`.
 
 Decline a cacheable 3xx whose `Location` is the request's own URL (hosts normalized without port). Re-check that guard at serve time; the XF add-on refuses at a third layer. De-cache cacheable redirects from the CDN via the deny-CDN-cache transform.
 
@@ -2301,13 +2291,13 @@ Decline a cacheable 3xx whose `Location` is the request's own URL (hosts normali
 
 > [Diagram: cache-tiers] Dual-cap tier model. The RAM index describes every entry; with a file tier, bodies live as immutable HJPC files and are charged metadata-only against --page-cache-mem while their footprint counts against --page-cache-disk-mem. A small hot tier fronts the files. Every teardown path (evict, expire, purge, replace) is synchronous under the shard lock; only the unlink(2) syscall is deferred to just after the lock is released.
 
-Default to in-RAM only; restarts flush it. Set `--page-cache-store-path /dev/shm/jetcache` (or `default`/`jetcache`) for a **tmpfs-primary** tier. `PageStore::store` offloads every body to an immutable file at birth, off the heap. HJPC containers authenticate with `--page-cache-integrity-key`. The LiteSpeed `cacheStorePath` parses but stays unused.
+Default to in-RAM only; restarts flush it. Set `--page-cache-store-path /dev/shm/jetcache` (or `default`/`jetcache`) for a **tmpfs-primary** tier. `PageStore::store` normally writes eligible bodies as immutable files. If the file store cannot open, the cache runs in RAM. An individual persistence failure can also leave that entry in RAM. HJPC containers authenticate with `--page-cache-integrity-key`. The LiteSpeed `cacheStorePath` parses but stays unused.
 
-- **Survives restarts.** A boot scan (up to 8 threads) rebuilds the index — ~300k entries in seconds. `/__hj_cache_ready` returns 503 while scanning, then 200 + `x-hj-cache-ready: 1` + `x-hj-cache-loaded: N`.
+- **Survives restarts.** A boot scan (up to 8 threads) rebuilds the index — scan duration depends on the store contents and host. `/__hj_cache_ready` returns 503 while scanning, then 200 + `x-hj-cache-ready: 1` + `x-hj-cache-loaded: N`.
 
 - **Reclaim invariant.** Live entries resolve to live bodies. A missing file fails closed to a miss and counts `disk_read_err`.
 
-- **Durable purges.** Purges unlink eagerly and keep a purge-all stamp. A restart cannot resurrect purged entries.
+- **Durable purges.** Purges remove matching entries and unlink their files. The file tier persists purge state for restart recovery and logs write failures.
 
 - **Dictionaries compress at store.** A background task dict-recompresses the identity birth copy (~3.5–9× smaller), never inline. Incompressible types never encode; vhosts in `--page-cache-egress-at-rest-vhosts` skip this job (0.1.6).
 
@@ -2319,7 +2309,7 @@ budget calculator — how many pages fit?
            typical page (KB, identity)
            dictionary ratio ×
 
-Rules of thumb only (≈6 KB metadata per entry, ratio 3.5–9× on forum HTML). tmpfs *is* RAM. Production: disk-mem 2 GiB (x86) and 5.5 GiB (ARM), hot-mem 384 MiB on both.
+Rules of thumb only (≈6 KB metadata per entry, ratio 3.5–9× on forum HTML). tmpfs *is* RAM. The starting values in this calculator match the defaults.
 
 | Flag | Default | Meaning |
 
@@ -2382,15 +2372,15 @@ Derive an *epoch* from the process-bound revision at first API publication. Key 
 
 ## Microcaching today, and what is missing
 
-Roadmap note: short TTLs already work today (`public,max-age=2` gets every guard; `scripts/microcache_policy_example.sh` proves it). A first-class route-level policy does not exist yet. The proposed ` ` contract sits in `docs/microcache-policy.md`; the parser still ignores it.
+Apps can set short TTLs with an explicit cache header such as `public,max-age=2`. The usual eligibility and admission checks still apply. Route-level XML microcache policy is unimplemented.
 
 ## Observing the cache
 
            **observe** · headers, entries, metrics
 ```
-$ curl -sI -H 'Host: example.test' http://127.0.0.1:8080/ | grep -i x-litespeed-cache
+$ curl -fsS -D - -o /dev/null -H 'Host: example.test' http://127.0.0.1:8080/ | grep -i x-litespeed-cache
 x-litespeed-cache: miss            # ran the backend; stored if admitted
-$ curl -sI -H 'Host: example.test' http://127.0.0.1:8080/ | grep -i x-litespeed-cache
+$ curl -fsS -D - -o /dev/null -H 'Host: example.test' http://127.0.0.1:8080/ | grep -i x-litespeed-cache
 x-litespeed-cache: hit             # served from cache (also: hit,stale-if-error)
 
 $ curl -s -H "Authorization: Bearer $(cat /etc/httpjet/profile.token)" http://127.0.0.1:9090/cache-entries   # totals, per-URL-class counts, top-N by size, ram/disk line, health line
@@ -2464,7 +2454,7 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
         !   Generation file and socket are trust anchors
 The 16-byte file (epoch + promoted-family marker fingerprint) identifies your pool. Supplying `--lsphp-generation-file` aborts startup if it is missing or malformed; its parent must not be group/other-writable, and test pools default files beside their own socket.
 
-Never restart `httpjet-lsphp.socket` during a reload: it preserves the listener inode and 8192-deep queue. Restart only `httpjet-lsphp.service` (it reapplies the XML backlog via `listen(2)`); verify socket inode, 16-byte file, and `ss -xln` Send-Q = 8192 (`LIVE=1 scripts/lsphp-reload-test.sh`).
+If a separate socket unit owns the listener, keep that unit running during a supervisor reload or replacement. Verify the listener inode, 16-byte generation file, and configured backlog with `ss -xln`.
 
 ## The UDS connection pool
 
@@ -2512,7 +2502,7 @@ In spawn mode (`serve` without `--lsphp-external`) you supervise `lsphp` yoursel
 - **Deadline.** `--php-max-process-time-ms` gives a total per-request deadline; exceeded means 504. Spawn mode also kills/restarts the worker; external mode has no web-process monitor, so keep it conservative.
 
         !   Packaging boundary
-httpjet ships no PHP runtime; you manage the executable, extensions, `php.ini`, opcache, and writable paths. The repo's hardening runbook (`systemd/httpjet-lsphp.service.d/hardening.conf`, `MemoryDenyWriteExecute=no` for opcache JIT) is validated live but off by default.
+httpjet ships no PHP runtime; you manage the executable, extensions, `php.ini`, opcache, and writable paths. The public `packaging/systemd/httpjet-lsphp.service` is a starting point. Test the service sandbox with the PHP extensions and opcache configuration you intend to run.
 
 ## The LSAPI wire codec
 
@@ -2623,11 +2613,11 @@ Several ` ` children make a group. Without options you keep ordered primary/fail
 
      GET
 
-/ready application.internal 10 2 2 3 200 ``` > [Diagram: proxy-selection] Selection. Eligibility intersects active health and the passive breaker; policy picks among eligible peers. A pre-head dial failure marks the peer and moves on; sent bodies never replay. > [Diagram: upstream-health] Peer states. A peer starts cold until rise successes; fall failures take it down; probes restore it. All-ineligible gives 503. - **Policies:** `primary-first` (default), `weighted-round-robin` (smooth WRR), `weighted-least-active` (active ÷ weight, WRR tie-break). Invalid policies, weights, or health settings fail config loading. - **Probes:** `connect` tests transport; `GET`/`HEAD` validate TLS, bound the head, compare status exactly, follow no redirects, and consume no body. No cookies, authorization, or body; 16 concurrent probes process-wide; pool permits untouched. - **Groups share one protocol.** Keep credentials, paths, and queries out of group authorities. A `Host` override never overrides TLS identity. - **Reloads:** candidates start no probes; publication starts the new scheduler and retires the old. Unchanged identities keep state; changed endpoints, weights, policies, or TLS identities start fresh. - **Reservations** survive the response head. Streams and WebSocket relays release the active count on completion, error, or drop. Metrics carry scope, group, and ordinal labels only: `httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total}`, `httpjet_proxy_failover_total`, `httpjet_phase_upstream_seconds`. See the status API .
+/ready application.internal 10 2 2 3 200 ``` > [Diagram: proxy-selection] Selection. Eligibility intersects active health and the passive breaker; policy picks among eligible peers. A failed dial can move to another eligible peer before sending the request. The HTTP/1 proxy can also retry a failed send once for a bodyless idempotent request. > [Diagram: upstream-health] Peer states. A peer starts cold until rise successes; fall failures take it down; probes restore it. All-ineligible gives 503. - **Policies:** `primary-first` (default), `weighted-round-robin` (smooth WRR), `weighted-least-active` (active ÷ weight, WRR tie-break). Invalid policies, weights, or health settings fail config loading. - **Probes:** `connect` tests transport; `GET`/`HEAD` validate TLS, bound the head, compare status exactly, follow no redirects, and consume no body. No cookies, authorization, or body; 16 concurrent probes process-wide; pool permits untouched. - **Groups share one protocol.** Keep credentials, paths, and queries out of group authorities. A `Host` override never overrides TLS identity. - **Reloads:** candidates start no probes; publication starts the new scheduler and retires the old. Unchanged identities keep state; changed endpoints, weights, policies, or TLS identities start fresh. - **Reservations** survive the response head. Streams and WebSocket relays release the active count on completion, error, or drop. Metrics carry scope, group, and ordinal labels only: `httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total}`, `httpjet_proxy_failover_total`, `httpjet_phase_upstream_seconds`. See the status API .
 
 ## Streaming, SSE and timeouts
 
-Upstream responses never buffer (`respBuffer` parses but always streams; `check` warns). SSE stays real-time through compression and H1, H2, and H3.
+The HTTP proxy streams responses after the upstream head arrives. Later response processing, such as body filtering or cache admission, can buffer eligible bodies. `respBuffer` is parsed for compatibility and does not change that policy. SSE bypasses compression.
 
 | Timeout | Meaning and limits |
 
@@ -2635,7 +2625,7 @@ Upstream responses never buffer (`respBuffer` parses but always streams; `check`
 
 | Response head | Processor default bounds the head. A context `responseTimeout` overrides it. |
 
-| Backend timeout | An exceeded backend deadline answers 504. Request bodies still stream to h1/h2 upstreams. |
+| Backend timeout | An exceeded backend deadline answers 504. The HTTP proxy can stream request bodies to h1/h2 upstreams. With an upload, the response-head deadline starts after upload EOF. |
 
 | Request body size | A context `maxReqBodySize` is enforced before dispatch. Before any backend work. |
 
@@ -2689,7 +2679,7 @@ SUMMARY: How responses shrink for faster delivery.
 
 # Compression
 
-`hj-compress` encodes responses with gzip, brotli and zstd. You get **gzip on by default; br/zstd are opt-in**. Server priority picks the codec, bounded by the client's `Accept-Encoding`.
+`hj-compress` encodes responses with gzip, brotli and zstd. Response compression enables gzip, brotli and zstd by default. The server chooses among enabled codecs the client accepts. For request decompression , gzip is enabled by default and brotli and zstd require opt-in.
 
         resolve    acl    rewrite    cache    dispatch    finalize    store
 
@@ -2703,25 +2693,25 @@ SUMMARY: How responses shrink for faster delivery.
 
 | gzip | `flate2` | 6 (1–9) | `enableGzipCompress`, `enableDynGzipCompress`, `gzipCompressLevel` |
 
-> [Diagram: compression-negotiation] Choosing an encoder. Bodies of 200 bytes or fewer are never compressed (OpenLiteSpeed parity), the compressible-type set matches LiteSpeed's compressibleTypes, already-encoded and 206 responses are skipped, and every encoded response carries Vary: Accept-Encoding.
+> [Diagram: compression-negotiation] Choosing an encoder. The dynamic response transform checks content type, cache directives, range and encoding headers. Known-size bodies need at least 201 bytes. Stream compression has separate per-codec gates.
 
 **What gets compressed** — check each item:
 
-- Bodies over 200 bytes. 200 bytes or fewer never compress.
+- Known-size bodies need at least 201 bytes. Streamed bodies are checked against the selected codec’s streaming switch.
 
 - Types in LiteSpeed's `compressibleTypes`. Other types pass through.
 
-- Unencoded, non-206 responses. Already-encoded and 206 responses skip.
+- Unencoded responses with no range and no `Cache-Control: no-transform`. The transform also skips 204, 206 and 304 responses.
 
-- Buffered bodies in one shot. Streamed bodies stay streaming.
+- Buffered bodies can encode in one shot or in cooperative slices when configured. Eligible streams encode incrementally.
 
 - Every encoded response. It carries `Vary: Accept-Encoding`.
 
-zstd uses a per-thread `ZSTD_CCTX` pool and pooled buffers (`hj_core::recycle::BODY_BUFS`). Streamed bodies (`Body::Stream`) wrap in a lazy `CompressStream`, so SSE stays real-time.
+zstd uses a per-thread `ZSTD_CCTX` pool and pooled buffers (`hj_core::recycle::BODY_BUFS`). Streamed bodies (`Body::Stream`) wrap in a lazy `CompressStream`, while SSE bypasses compression.
 
 ## Trusted-proxy zstd egress
 
-`--cf-send-zstd` (or `CF_SEND_ZSTD=1`) forces zstd to a *trusted-proxy* peer, ignoring forwarded `Accept-Encoding`. Cloudflare re-encodes per browser at its edge, so browser bytes stay unchanged (cheapest-to-produce form; officially unsupported CDN↔origin). Off by default; enabled in production. It never applies to untrusted clients.
+`--cf-send-zstd` (or `CF_SEND_ZSTD=1`) forces zstd to a *trusted-proxy* peer, ignoring forwarded `Accept-Encoding`. Cloudflare re-encodes per browser at its edge, so browser bytes stay unchanged (cheapest-to-produce form; officially unsupported CDN↔origin). Off by default. Enable it only when every peer classified as a trusted proxy can accept zstd. It never applies to untrusted clients.
 
 ## Precompressed siblings
 
@@ -2770,7 +2760,7 @@ SUMMARY: Add trusted code and sidecar checks.
 
 # Extending httpjet
 
-Extend httpjet two ways: linked Rust crates, or a WAF sidecar. No dynamic plugin ABI exists. No in-process sandbox exists. This page states that once.
+Extend httpjet with linked Rust crates or connect a WAF sidecar for request inspection.
 
 Rust offers no stable trait-object ABI across shared libraries. Native modules would share allocator, signals, threads anyway. No workload needs untrusted in-process code. No WASM runtime ships. Route untrusted inspection via the sidecar. Future untrusted designs must define capabilities, memory, fuel, deadlines, cancellation, body access, state, network access, versioning, fail semantics first.
 
@@ -2830,7 +2820,7 @@ httpjet embeds no rules engine. Ignored `lsrecaptcha`/`censorshipControl` stay i
 --waf-fail-open                       # weaker policy: continue on sidecar failure (every bypass is logged; 403 still blocks)
 ```
 
-> [Diagram: waf-sidecar] One inspection per request. Inspection runs after URI decoding/normalization and body-limit enforcement but before rewrite, cache lookup and any backend — background cache refreshes go through the same dispatch and are inspected too. Only two replies are valid; everything else is a sidecar failure.
+> [Diagram: waf-sidecar] Inspection before dispatch. Inspection runs after URI decoding/normalization and body-limit enforcement but before rewrite, cache lookup and any backend — background cache refreshes go through the same dispatch and are inspected too. A parsed 403 always blocks. A 204 allows the request only when it has valid, bodyless framing.
 
 ### Document
 
@@ -2846,7 +2836,7 @@ Concurrency cap plus shared 64 MiB serialization budget. Each inspection reserve
 
 ### Transport
 
-One close-delimited HTTP/1.1 POST per inspection. Never reused. Response head ≤ 4 KiB. Only 204/403 valid. Failures: duplicate/nonzero Content-Length, Transfer-Encoding, malformed status, EOF, other statuses.
+Each inspection uses a fresh HTTP/1.1 connection and accepts a response head of up to 4 KiB. A parsed 403 blocks regardless of its body framing. A 204 requires no Transfer-Encoding and may omit Content-Length or supply one zero value. Invalid allow responses and other statuses follow the configured failure policy.
 
            **tests**
 ```
@@ -2857,7 +2847,7 @@ cargo test -p hj-extension
 
 ## Why there is no dynamic or sandboxed plugin ABI
 
-See lede note. Choice stated once there. Untrusted inspection: WAF sidecar .
+Linked extensions share the server’s process and authority. Use a separate process for inspection code that needs isolation. WAF sidecar .
 
 ==============================================================================
 PAGE: CLI reference (https://httpjet.net/docs/cli)
@@ -2866,7 +2856,7 @@ SUMMARY: Every command, flag, and environment variable.
 
 # CLI reference
 
-One binary, four subcommands. You set persistent policy in XML. You set operational overrides on the command line. This page is generated from `httpjet serve --help` of the current release.
+One binary, four subcommands. You set persistent policy in XML. You set operational overrides on the command line. The serve flags are checked against the shipped v0.2.6 binary. Rows for optional features apply to builds that enable them.
 
 ## Subcommands
 
@@ -3574,7 +3564,7 @@ Filter all 14 benchmarked eras by tag, commit, workload, regime, receipt:
 
 | `v0.2.0` · Security Audit Fixes & Cold-Start Latency 2026-11-11 · `8fcb4647` | lab re-run dedicated lab VM, server 4 vCPUs / loadgen 4 vCPUs, all 11 releases | See Release 0.2.0 : lab medians vs v0.1.12 in the same run — H2 1 KiB **591.8k → 625.5k**, heavy `.htaccess` H2 **402.9k → 515.3k**, page-cache **410.5k → 544.5k**; slowest request right after boot **508 ms → 3 ms**. Receipts: release-sweep-2026-11-11.tsv + raw logs ; loopback CSVs on the benchmark page |
 
-| `experiment` · H3 GSO Segment Cap SINGULARITY · same-binary A/B | H3 32 KiB, 100k req/arm GSO cap 10 vs 20 | Static `6,052 → 7,816/6,552 rps`, `sendmsg` `−44.6%`, instr ` Receipt: `docs/h3-gso-segment-experiment.md` in the source tree |
+| `experiment` · H3 GSO Segment Cap SINGULARITY · same-binary A/B | H3 32 KiB, 100k req/arm GSO cap 10 vs 20 | Static `6,052 → 7,816/6,552 rps`, `sendmsg` `−44.6%`, instr ` current CLI defaults . Receipt: `docs/h3-gso-segment-experiment.md` in the source tree |
 
 ==============================================================================
 PAGE: Conformance & testing (https://httpjet.net/docs/conformance)
@@ -3583,7 +3573,7 @@ SUMMARY: Test results, protocol coverage, and parity checks.
 
 # Conformance & testing
 
-Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result: **146 / 146** h2spec 2.6.0 over TLS. Later sections reference this score, not repeat it.
+The table records implemented protocol surfaces and selected test evidence. In the historical TLS run, httpjet passed **146 / 146** h2spec 2.6.0 cases.
 
 ## Conformance matrix
 
@@ -3591,11 +3581,11 @@ Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result:
 
 | HTTP/1.1 | RFC 9110 · RFC 9111 · RFC 9112 | Strict framing, conditionals, ranges, `Vary`, 103. | Targets below. |
 
-| HTTP/2 | RFC 9113 (native `hj-h2`) | Full TLS pass. See lede. | h2c 145/146, one exception. |
+| HTTP/2 | RFC 9113 (native `hj-h2`) | 146 / 146 h2spec cases in the historical TLS run. | h2c 145/146, one exception. |
 
-| HPACK | RFC 7541 | Zero-allocation codec. | Two fuzz targets. |
+| HPACK | RFC 7541 | Bounded dynamic table and header decoding. | Two fuzz targets. |
 
-| HTTP/3 / QUIC | RFC 9114 over RFC 9000 (quinn-proto), QPACK RFC 9204 | aioquic + OTel fixtures in CI. | Migration disabled. |
+| HTTP/3 / QUIC | RFC 9114 over RFC 9000 (quinn-proto), QPACK RFC 9204 | Public source includes aioquic and telemetry fixtures. | Migration disabled. |
 
 | TLS | rustls + aws-lc-rs · RFC 8446 mandatory suite | SNI mirrors OLS; mTLS + CRLs. | Single-use tickets; 0-RTT off. |
 
@@ -3603,7 +3593,7 @@ Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result:
 
 | OCSP | RFC 6960 with the lightweight-profile conventions (SHA-256 issuer identity, bounded fetch — not full client conformance) | Bounded fetch. | Behind `--features ocsp`. |
 
-| PROXY protocol | v2 binary + v1 text | Per-listener, fail-closed. | Pre-TLS; loopback refused. |
+| PROXY protocol | v2 binary + v1 text | Per-listener, fail-closed. | Pre-TLS. Relayed source addresses that claim loopback or unspecified are refused. |
 
 | LSAPI | Native wire codec (vendored php-src `lsapidef.h`) | `lsphp` parity. | Header parser fuzzed. |
 
@@ -3615,13 +3605,13 @@ Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result:
 
 | OpenTelemetry | OTLP HTTP/protobuf, W3C traceparent (version 00) | Protobuf tests pass. | Behind `--features otel`. |
 
-| LiteSpeed parity | Retired differential matrix vs LSWS 6.3.5 | 11 / 11 retained. | Production exercises continuously. |
+| LiteSpeed parity | Retired differential matrix vs LSWS 6.3.5 | 11 / 11 retained. | Historical differential results. |
 
-Intake: origin-form; `*` OPTIONS-only; absolute-form authority replaces Host. CONNECT: 405. Authority-form, raw `#`, bare-LF: 400. HTTP/1.1 requires Host, h2-validated. Target: LSWS 6.3.5, same tree. LiteSpeed choices beat strict readings.
+Intake: origin-form; `*` OPTIONS-only; absolute-form authority replaces Host. CONNECT: 405. Authority-form, raw `#`, bare-LF: 400. HTTP/1.1 requires Host, h2-validated. For application compatibility, verify your own configuration using the migration checklist .
 
 ## LiteSpeed parity and the clean-room boundary
 
-Differential testing hit 11/11 pre-retirement: ETag, `.html`→PHP, LSAPI encoding, rewrite flags. httpjet now serves the live tree as drop-in. Reference: GPL OpenLiteSpeed source, behavior only. Reimplemented from scratch. No OLS code copied. License: **GPL-3.0-only**. No paid edition, no key. Independent, not endorsed by LiteSpeed Technologies.
+Differential testing hit 11/11 pre-retirement: ETag, `.html`→PHP, LSAPI encoding, rewrite flags. Those trials cover selected behaviors. Reference: GPL OpenLiteSpeed source, behavior only. Reimplemented from scratch. No OLS code copied. License: **GPL-3.0-only**. No paid edition, no key. Independent, not endorsed by LiteSpeed Technologies.
 
            **fileETag=28** · byte-for-byte
 ```
@@ -3642,23 +3632,15 @@ Suffix routing follows OLS order, including disclosure guard. Pool-less script h
 
 | scripts | Real-server fixtures on isolated loopback listeners: h2spec, ACME/OCSP/admin runtime tests, the cache gates, memo parity, OCI smoke. | see each page |
 
-Last runs: 0.1.10 green (3,068 passed / 0 failed; 3,019 at 0.1.5; 2,028 at 0.0.5). Before flipping 0.1.11 defaults: 40 memo tests, purge-revocation pipeline test, 24 H1/H2 + 4 H3 arms recording real hits. Failures count as regressions. Flaky meta-assertions removed June 2026. Tests stay deterministic.
+Historical run: v0.1.10 reported 3,068 passing workspace tests. For a new release, record the exact commit, commands and results you verify.
 
-> [Diagram: verification-pyramid] Four-layer verification stack. Every change passes ~3,068 unit and integration tests, bounded corpus and ASan fuzz targets, protocol interoperability suites (h2spec, aioquic, Pebble ACME, OTel), and live loopback deploy gates before cutover.
+> [Diagram: verification-pyramid] Verification layers. Choose checks for the change and runtime you are qualifying. Release publication status separately records distribution coverage.
 
-**Production gates.** Deploys run cache gates (cross-URL/scheme/host, private, persistence), memo parity, capsule purge, h2spec. Failure classes: Page cache → deploy gates . Flow: Operations → deploy .
+For a deployment, run the checks relevant to its enabled features. See the deployment workflow and the page-cache checks .
 
 ## CI and interoperability jobs
 
-- **Ubuntu 24.04 x86_64**: fmt, builds, config validation, license/DCO, workspace tests, H1 replay.
-
-- **Ubuntu 22.04 x86_64, 24.04 ARM64**: all-features compile, H1 replay, io_uring UDS test. Selected probes only, no kernel matrix.
-
-- **Protocol interoperability**: OTel binary, h2spec 2.6.0 TLS (SHA-256 pinned, exact pass — see lede), WebSocket/H2 tracing, aioquic 1.3.0 venv test.
-
-- **Dependency advisories**: daily RustSec failures, plus newer transport-critical crates (quinn, rustls, aws-lc-rs, tokio, httparse, io-uring, zstd, brotli, h2, hyper, http, mio, socket2, openssl, bcrypt, libc).
-
-- **Weekly/manual fuzz**: eight targets, bounded time/size/memory/retention.
+The public release includes workflows for installer, container and dependency checks. The commands below exercise the public protocol fixtures locally. An available fixture or workflow does not establish that release binaries passed it.
 
            **local reproduction**
 ```
@@ -3673,7 +3655,7 @@ Hosted execution evidence is tracked separately from local runs; a runner label 
 
 ## Fuzzing
 
-Eight `cargo-fuzz` targets share one invariant: never panic, never allocate unboundedly, agree with reference decoders. Targets: `h1_chunked_decode`, `h1_request_framing`, `hpack_decode`, `hpack_roundtrip`, `lsapi_resp_header`. Added 2026-10-06: `qpack_decode`, `proxy_protocol_parse`, `lscache_control`. ASan smokes (original five): 164,558 chunked, 739,373 framing, 452,899 HPACK-decode, 58,082 roundtrip, 438,582 LSAPI-header executions. No findings.
+The v0.2.6-3 source ships 14 fuzz targets: `fastcgi_records`, `h1_chunked_decode`, `h1_request_framing`, `h2_frames`, `h3_control`, `h3_request_stream`, `hpack_decode`, `hpack_roundtrip`, `lsapi_packet_stream`, `lsapi_resp_header`, `lscache_control`, `pagecache_container`, `proxy_protocol_parse`, `qpack_decode`. Each target checks the invariants documented in the public fuzzing guide .
 
            **bounded fuzz**
 ```
@@ -3683,4 +3665,4 @@ python3 scripts/fuzz-seeds.py     # regenerate the shared seed corpus
 
 ## Production gates
 
-See Test layers footer. Gates listed once there.
+Use the staged change workflow and record the checks that ran against your candidate.

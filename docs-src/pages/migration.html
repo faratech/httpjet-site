@@ -34,11 +34,12 @@
       <h2 id="check">2 · Validate a copied configuration</h2>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>gate 1</b></span></div><pre><code>target/release/httpjet --root /abs/copied-root check --strict
 sudo -u &lt;service-user&gt; target/release/httpjet --root /abs/copied-root check --strict</code></pre></div>
-      <p>Treat three errors as blockers:</p>
+      <p>Resolve any errors before starting the candidate:</p>
       <ul>
         <li>Shared or missing docroots block you.</li>
         <li>Mapped vhosts whose config did not load block you.</li>
-        <li>Geo rules without their database block you.</li>
+        <li>Geo rules require their database.</li>
+        <li>The first secure listener requires loadable TLS material.</li>
       </ul>
       <p>Run the check as the runtime identity too. Readable-by-root does not prove service access. Review all warnings before you proceed. See <a href="capabilities.html">Capabilities &amp; limits</a> for ignored directives.</p>
     </section>

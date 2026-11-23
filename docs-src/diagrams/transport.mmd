@@ -30,7 +30,8 @@ flowchart TB
   tls -- "h2" --> h2
   h1 --> memo
   h2 --> memo
-  quic --> memo
+  quic -- "accelerated / auto" --> memo
+  quic -- "legacy (default)" --> bridge
   memo -- "miss or dynamic" --> bridge["uring::bridge — hand the request to the tokio runtime"]:::core
   bridge --> pipe["pipeline::handle() · ServerState · LSAPI pool · page cache · reload · metrics"]:::core
-  pipe -- "response: buffered ≤ 256 KiB, streamed above" --> bridge
+  pipe -- "response: buffered or streamed" --> bridge

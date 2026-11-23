@@ -5,13 +5,13 @@
 
     <section>
       <h2 id="overview">Overview</h2>
-      <p>Run inline <code>&lt;rewrite&gt;</code> rules first, then the <code>.htaccess</code> chain (OpenLiteSpeed order). <code>evaluate()</code> returns one outcome per pass: <code>Rewritten</code>, <code>Redirect</code>, <code>Proxy</code>, <code>Forbidden</code>, <code>Gone</code> or <code>Unchanged</code>.</p>
+      <p>The server loads the applicable access-file chain, seeds the environment, and checks access on the original path. Within rewrite evaluation, inline XML rules run before per-directory rules. <code>evaluate()</code> returns one outcome per pass: <code>Rewritten</code>, <code>Redirect</code>, <code>Proxy</code>, <code>Forbidden</code>, <code>Gone</code> or <code>Unchanged</code>.</p>
       <!--diagram:rewrite-eval|<strong>One evaluation pass.</strong> A rewrite that crosses into another directory reloads the destination chain and evaluates again; a terminal flag stops the walk; an exhausted chain returns <code>Unchanged</code> and dispatch falls through to suffix routing.-->
     </section>
 
     <section>
       <h2 id="loading">Per-directory loading</h2>
-      <p><code>HtaccessCache</code> loads each directory's file (<code>accessFileName</code>, default <code>.htaccess</code>; bare names only). <strong>mtime invalidation</strong> re-stats at most once a second, so edits land within a second. The parsed form holds directives, regexes, scopes, the auth map and the memo verdict. The chain caps at <strong>64</strong> levels, then a deny-all sentinel applies.</p>
+      <p><code>HtaccessCache</code> loads each directory's file (<code>accessFileName</code>, default <code>.htaccess</code>; bare names only). Revalidation coalesces metadata checks for one second and compares device, inode, size, modification time, and change time. The parsed form holds directives, regexes, scopes, the auth map and the memo verdict. The chain caps at <strong>64</strong> levels, then a deny-all sentinel applies.</p>
       <p>Since 2026-09-16 an unreadable, unparseable or over-16 MiB <code>.htaccess</code> fails closed to that sentinel. Non-UTF-8 bytes decode lossily. Set <code>&lt;allowOverride&gt;0</code> to disable the chain; <code>autoLoadHtaccess</code> alone loads without overrides. Each generation owns its caches, so reloads never revive stale results.</p>
     </section>
 
@@ -138,7 +138,7 @@ Require valid-user</code></pre></div>
           <tr><th>Header set / add / append / merge / unset</th><td><span class="badge ok">supported</span></td><td class="wrap"><ul><li>Guards: <code>always</code>/<code>onsuccess</code>, <code>env=</code>/<code>env=!</code>, <code>%{NAME}e</code>.</li><li>Scopes merge directory, then <code>&lt;Files*&gt;</code>, then <code>&lt;If&gt;</code>. Applied in <code>finalize</code>; CR/LF rejected.</li></ul></td></tr>
 
           <tr><th>Header echo</th><td><span class="badge part">partial</span></td><td class="wrap">Parses without error. Emits nothing.</td></tr>
-          <tr><th>Header edit / edit* / note / setifempty / echo · RequestHeader *</th><td><span class="badge no">ignored</span></td><td class="wrap">Line ignored. See <code>docs/header-directive-compatibility.md</code> for the exact boundary.</td></tr>
+          <tr><th>Header edit / edit* / note / setifempty / echo · RequestHeader *</th><td><span class="badge no">ignored</span></td><td class="wrap">Line ignored. The public <code>hj-rewrite</code> header compatibility tests cover the boundary.</td></tr>
           <tr><th>Header condition expr= / value expr=</th><td><span class="badge part">partial</span></td><td class="wrap">Only <code>%{REQUEST_URI} =~ / !~</code> conjunctions evaluate. Value expressions are not implemented.</td></tr>
           <tr><th>ErrorDocument</th><td><span class="badge ok">supported</span></td><td class="wrap">Path, inline and external forms. Never clobbers an app's own JSON error body.</td></tr>
           <tr><th>DirectoryIndex</th><td><span class="badge ok">supported</span></td><td class="wrap">Including the <code>Disabled</code> form.</td></tr>
@@ -162,5 +162,5 @@ Require valid-user</code></pre></div>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>tests</b></span></div><pre><code>cargo test -p hj-rewrite                                   <span class="t-c"># parser, evaluator, access, auth, cache directives</span>
 cargo test -p hj-rewrite --test header_compat              <span class="t-c"># characterization fixtures for the Header boundary</span>
 cargo test -p hj-rewrite --test redirect_repro
-bash scripts/fast_memo_parity_test.sh                      <span class="t-c"># memo-on vs memo-off byte identity on a real chain</span></code></pre></div>
+cargo test -p httpjet pipeline::fast_memo</code></pre></div>
     </section>

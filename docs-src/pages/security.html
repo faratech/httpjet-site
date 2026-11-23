@@ -1,19 +1,20 @@
     <h1>Security &amp; access control</h1>
-    <p class="lede">Decide <strong>who the client is</strong> and <strong>who may ask</strong> here. The posture is <strong>fail closed</strong>: a control that cannot evaluate acts restrictive. One exception: the opt-in throttle fails open (see <a href="#throttle">Throttle</a>).</p>
+    <p class="lede">Decide <strong>who the client is</strong> and <strong>who may ask</strong> here. Check each control’s trust and failure policy. For example, the opt-in throttle can admit untracked requests under state pressure.</p>
 
     <div class="rail locator" role="img" aria-label="You are here: resolve and acl."><div class="rail__track"><span class="stage on"><span class="k">resolve</span></span><span class="stage on"><span class="k">acl</span></span><span class="stage"><span class="k">rewrite</span></span><span class="stage"><span class="k">cache</span></span><span class="stage"><span class="k">dispatch</span></span><span class="stage"><span class="k">finalize</span></span><span class="stage"><span class="k">store</span></span></div></div>
 
     <section>
       <h2 id="identity">Client identity</h2>
-      <p>Resolve one client IP at connection admission. Store it in <code>ReqCtx.client_ip</code>. Every later gate reads that value.</p>
-      <!--diagram:client-ip|<strong>From socket peer to client identity.</strong> Forwarded headers are evidence, not identity: they count only from a peer an <code>allow</code> rule marks <code>T</code>; from anyone else they are attacker-controlled data and ignored. Every later gate — ACL, geo, throttle, mTLS exemption, logs, the cache key — reads the resolved value.-->
+      <p>Resolve the client IP per request after vhost selection and the plaintext mTLS check. Access policy can evaluate both the peer and the resolved client, while GeoIP, request throttling, and application logging use the resolved address.</p>
+      <!--diagram:client-ip|<strong>From socket peer to client identity.</strong> The default setting is mode 2. It reads forwarded client addresses only when peer and TLS requirements are met. The modes below describe other supported policies.-->
       <div class="tablewrap"><table>
         <thead><tr><th><code>useIpInProxyHeader</code></th><th>Forwarded headers are believed…</th></tr></thead>
         <tbody>
           <tr><td>0</td><td>never</td></tr>
-          <tr><td>1 / 4</td><td>always. Only safe when only your proxy can reach the listener.</td></tr>
-          <tr><td>2 (default)</td><td>only from trusted peers (<code>allow … T</code>). <code>CF-Connecting-IP</code> counts on that path.</td></tr>
-          <tr><td>3</td><td>as 2, for IP purposes only</td></tr>
+          <tr><td>1</td><td>Uses the leftmost untrusted X-Forwarded-For address without a peer trust check. Use only behind a restricted listener.</td></tr>
+          <tr><td>4</td><td>Uses the last valid X-Forwarded-For address without a peer trust check. Use only behind a restricted listener.</td></tr>
+          <tr><td>2 (default)</td><td>Requires a trusted peer and TLS. If the listener requests client certificates, a valid presented certificate is also required. Prefers <code>CF-Connecting-IP</code>, then the rightmost untrusted X-Forwarded-For address.</td></tr>
+          <tr><td>3</td><td>Same address resolution as mode 2.</td></tr>
         </tbody></table></div>
       <p>The admin write API marks <code>useIpInProxyHeader</code> and <code>&lt;security&gt;</code> <strong>restart-required</strong>. Trust never changes under a running generation.</p>
     </section>
@@ -93,7 +94,7 @@ asn 13335 203.0.113.0/24</code></pre></div>
         <thead><tr><th>Surface</th><th>Guard</th></tr></thead>
         <tbody>
           <tr><td><code>/__hj_cache_purge</code>, <code>/__hj_cache_ready</code></td><td>Raw TCP peer must be loopback. POST-only purge (405 + <code>Allow</code>); ready takes GET/HEAD; a <code>unix:</code> listener opens both to local processes.</td></tr>
-          <tr><td><code>--metrics-addr</code> (<code>/metrics</code>, <code>/cache-entries</code>, <code>/__mimalloc-stats</code>, <code>/__alloc-count</code>, <code>/debug/pprof/profile</code>)</td><td>Loopback-only by default. <code>/metrics</code> open on loopback; the rest need a Bearer token matching <code>--profile-token-file</code> (403 when unset).</td></tr>
+          <tr><td><code>--metrics-addr</code> (<code>/metrics</code>, <code>/cache-entries</code>, <code>/__mimalloc-stats</code>, <code>/__alloc-count</code>, <code>/debug/pprof/profile</code>)</td><td>Loopback bind required. <code>/metrics</code> is available there without a token. Diagnostics require a Bearer token from <code>--profile-token-file</code> or <code>--profile-token</code> (403 when unset).</td></tr>
           <tr><td><code>--admin-addr</code> (<code>/v1/status</code>)</td><td>Loopback TCP only. Loopback Host required; Origin headers and bodies rejected.</td></tr>
           <tr><td><code>--admin-write-addr</code> (<code>/v1/revision</code>, <code>/v1/config[/validate]</code>)</td><td>Loopback + Bearer token from a 0400/0600 single-link file. Constant-time compare, exact <code>If-Match</code>, explicit resource roots.</td></tr>
           <tr><td>LSAPI control and generation files</td><td>Root-only control socket. Web pools mmap the generation file read-only; parent must not be group-writable.</td></tr>

@@ -40,7 +40,7 @@ window.DOCS_INDEX = [
    {
     "id": "install",
     "t": "Install a published release",
-    "kw": "httpjet http: SERVER-IP https: var www etc conf log keyFile certFile httpd_config.xml --root check --strict"
+    "kw": "httpjet --init none http: SERVER-IP https: var www etc conf log keyFile certFile httpd_config.xml --root check --strict"
    },
    {
     "id": "docker",
@@ -151,7 +151,7 @@ window.DOCS_INDEX = [
    {
     "id": "matrix",
     "t": "Capability matrix",
-    "kw": "CONNECT Upgrade: h2c --features acme ocsp sendfile ktls --ktls auto tls-hw-tx-offload example.test check h2: h2s: fcgi fastcgi cgi htaccess Header edit setifempty echo RequestHeader apr1 SHA --auth-user-file-roots otel HTTPJET_OTEL"
+    "kw": "CONNECT Upgrade: h2c --features acme ocsp sendfile tls-hw-tx-offload example.test check h2: h2s: fcgi fastcgi cgi htaccess Header edit setifempty echo RequestHeader apr1 SHA --auth-user-file-roots otel HTTPJET_OTEL"
    },
    {
     "id": "unsupported",
@@ -277,7 +277,7 @@ window.DOCS_INDEX = [
    {
     "id": "identity",
     "t": "Client identity",
-    "kw": "ReqCtx.client_ip allow useIpInProxyHeader CF-Connecting-IP security"
+    "kw": "useIpInProxyHeader CF-Connecting-IP security"
    },
    {
     "id": "network-acls",
@@ -322,7 +322,7 @@ window.DOCS_INDEX = [
    {
     "id": "control-surfaces",
     "t": "Control surfaces",
-    "kw": "__hj_cache_purge __hj_cache_ready Allow unix: --metrics-addr metrics cache-entries __mimalloc-stats __alloc-count debug pprof profile --profile-token-file --admin-addr status --admin-write-addr revision config validate If-Match"
+    "kw": "__hj_cache_purge __hj_cache_ready Allow unix: --metrics-addr metrics cache-entries __mimalloc-stats __alloc-count debug pprof profile --profile-token-file --profile-token --admin-addr status --admin-write-addr revision config validate If-Match"
    },
    {
     "id": "audit",
@@ -340,12 +340,12 @@ window.DOCS_INDEX = [
    {
     "id": "install",
     "t": "Installation",
-    "kw": "target cargo clean ExecStartPre"
+    "kw": "target cargo clean DynamicUser yes"
    },
    {
     "id": "systemd",
     "t": "Advanced systemd socket activation",
-    "kw": "httpjet.socket ReusePort yes Backlog serve --workers sockets.target httpjet-boot-ready.service Type notify httpjet.service httpjet-lsphp.socket RemoveOnStop httpjet-lsphp.service httpjet lsphp ExecReload lsphp-reload RuntimeDirectory httpjet-edge-firewall.service scripts httpjet-edge-firewall.sh systemd httpjet.service.d zz-hardening.conf ProtectSystem strict system-service TimeoutStopSec"
+    "kw": "packaging services systemd httpjet.service httpjet httpjet-example.service httpjet-lsphp.service"
    },
    {
     "id": "php",
@@ -360,7 +360,7 @@ window.DOCS_INDEX = [
    {
     "id": "deploy",
     "t": "Binary deploy and rollback",
-    "kw": "scripts deploy-lscache.sh --page-cache --xf-capsule --no-fast-memo HJ_FAST_MEMO --waf-sidecar-addr bin httpjet.prev StartLimitBurst systemctl reset-failed build-pgo.sh"
+    "kw": "--page-cache --xf-capsule --no-fast-memo HJ_FAST_MEMO --waf-sidecar-addr bin httpjet.prev"
    },
    {
     "id": "reload",
@@ -382,8 +382,7 @@ window.DOCS_INDEX = [
    },
    {
     "id": "release",
-    "t": "Release and upgrade discipline",
-    "kw": "scripts update-deps.sh"
+    "t": "Release and upgrade discipline"
    }
   ]
  },
@@ -416,7 +415,7 @@ window.DOCS_INDEX = [
    {
     "id": "telemetry",
     "t": "Telemetry TSV and the PHP slow log",
-    "kw": "--telemetry-file logs telemetry.tsv --telemetry-flush-secs --php-slow-log php-slow.tsv --php-slow-threshold-ms httpjet_lsapi_ttfb_seconds"
+    "kw": "--telemetry-file logs telemetry.tsv --telemetry-flush-secs --php-slow-log php-slow.tsv --php-slow-threshold-ms"
    },
    {
     "id": "otel",
@@ -557,7 +556,7 @@ window.DOCS_INDEX = [
    {
     "id": "http3",
     "t": "HTTP/3 & QUIC",
-    "kw": "uring h3.rs quinn-proto quinn-udp total_req_bytes Connected H3_EXCESSIVE_LOAD maxConnections BodyBufferBudget tcp"
+    "kw": "uring h3.rs quinn-proto quinn-udp total_req_bytes Connected H3_EXCESSIVE_LOAD BodyBufferBudget tcp"
    },
    {
     "id": "frontdoors",
@@ -594,7 +593,7 @@ window.DOCS_INDEX = [
    {
     "id": "overview",
     "t": "Overview",
-    "kw": "rewrite htaccess evaluate Rewritten Redirect Proxy Forbidden Gone Unchanged"
+    "kw": "evaluate Rewritten Redirect Proxy Forbidden Gone Unchanged"
    },
    {
     "id": "loading",
@@ -642,7 +641,7 @@ window.DOCS_INDEX = [
    {
     "id": "directives",
     "t": "Directives reference",
-    "kw": "HTTP:Name ENV:NAME LA-U: LA-F: TIME RewriteMap map:key DPI env all granted valid-user user apr1 SHA always onsuccess NAME Files finalize docs header-directive-compatibility.md REQUEST_URI Disabled application x-httpd-php Remove AddType ForceType Content-Type CacheKeyModify IfModule expires"
+    "kw": "HTTP:Name ENV:NAME LA-U: LA-F: TIME RewriteMap map:key DPI env all granted valid-user user apr1 SHA always onsuccess NAME Files finalize hj-rewrite REQUEST_URI Disabled application x-httpd-php Remove AddType ForceType Content-Type CacheKeyModify IfModule expires"
    },
    {
     "id": "context-overrides",
@@ -720,7 +719,7 @@ window.DOCS_INDEX = [
    {
     "id": "microcache",
     "t": "Microcaching today, and what is missing",
-    "kw": "public max-age scripts microcache_policy_example.sh microcachePolicyList docs microcache-policy.md"
+    "kw": "public max-age"
    },
    {
     "id": "observing",
@@ -748,7 +747,7 @@ window.DOCS_INDEX = [
    {
     "id": "zero-downtime",
     "t": "Zero-downtime deploys: the external pool",
-    "kw": "httpjet lsphp httpjet-lsphp.service Type notify systemctl restart reload httpjet-lsphp lsphp-reload --lsphp-generation-file httpjet-lsphp.socket listen xln LIVE scripts lsphp-reload-test.sh"
+    "kw": "httpjet lsphp httpjet-lsphp.service Type notify systemctl restart reload httpjet-lsphp lsphp-reload --lsphp-generation-file xln"
    },
    {
     "id": "pool",
@@ -758,7 +757,7 @@ window.DOCS_INDEX = [
    {
     "id": "supervisor",
     "t": "The lsphp supervisor",
-    "kw": "serve --lsphp-external lsphp FD_CLOEXEC close_range CLOSE_RANGE_CLOEXEC setsid PR_SET_PDEATHSIG pre_exec LSAPI_Z_HTTPJET_GENERATION_MARKER LSAPI_CHILDREN --php-children maxConns --php-max-process-time-ms php.ini systemd httpjet-lsphp.service.d hardening.conf MemoryDenyWriteExecute"
+    "kw": "serve --lsphp-external lsphp FD_CLOEXEC close_range CLOSE_RANGE_CLOEXEC setsid PR_SET_PDEATHSIG pre_exec LSAPI_Z_HTTPJET_GENERATION_MARKER LSAPI_CHILDREN --php-children maxConns --php-max-process-time-ms php.ini packaging systemd httpjet-lsphp.service"
    },
    {
     "id": "codec",
@@ -800,7 +799,7 @@ window.DOCS_INDEX = [
    {
     "id": "streaming",
     "t": "Streaming, SSE and timeouts",
-    "kw": "respBuffer check initTimeout responseTimeout maxReqBodySize"
+    "kw": "respBuffer initTimeout responseTimeout maxReqBodySize"
    },
    {
     "id": "websocket",
@@ -833,7 +832,7 @@ window.DOCS_INDEX = [
    {
     "id": "codecs",
     "t": "Codecs and negotiation",
-    "kw": "zstd enableZstdCompress enableDynZstdCompress zstdCompressLevel brotli brCompressLevel enableBrCompress enableDynBrCompress flate2 enableGzipCompress enableDynGzipCompress gzipCompressLevel compressibleTypes Vary: Accept-Encoding ZSTD_CCTX hj_core::recycle::BODY_BUFS Body::Stream CompressStream"
+    "kw": "zstd enableZstdCompress enableDynZstdCompress zstdCompressLevel brotli brCompressLevel enableBrCompress enableDynBrCompress flate2 enableGzipCompress enableDynGzipCompress gzipCompressLevel compressibleTypes Cache-Control: no-transform Vary: Accept-Encoding ZSTD_CCTX hj_core::recycle::BODY_BUFS Body::Stream CompressStream"
    },
    {
     "id": "cf-zstd",
@@ -1038,7 +1037,7 @@ window.DOCS_INDEX = [
    {
     "id": "testing",
     "t": "Test layers",
-    "kw": "cargo test crate htaccess redirect_repro header_compat --workspace ignore lsphp --ignored name h2spec aioquic"
+    "kw": "cargo test crate htaccess redirect_repro header_compat --workspace ignore lsphp --ignored name"
    },
    {
     "id": "ci",
@@ -1047,7 +1046,7 @@ window.DOCS_INDEX = [
    {
     "id": "fuzz",
     "t": "Fuzzing",
-    "kw": "cargo-fuzz h1_chunked_decode h1_request_framing hpack_decode hpack_roundtrip lsapi_resp_header qpack_decode proxy_protocol_parse lscache_control"
+    "kw": "fastcgi_records h1_chunked_decode h1_request_framing h2_frames h3_control h3_request_stream hpack_decode hpack_roundtrip lsapi_packet_stream lsapi_resp_header lscache_control pagecache_container proxy_protocol_parse qpack_decode"
    },
    {
     "id": "gates",

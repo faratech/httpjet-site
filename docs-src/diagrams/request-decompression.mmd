@@ -11,4 +11,4 @@ flowchart TB
   D -- "malformed" --> F
   D -- "> maxReqBodySize" --> E413[413]:::bad
   D -- "hits 16 MiB output ceiling" --> F
-  D -- ok --> G["drop Content-Encoding, set decoded Content-Length<br/>→ rewrite · WAF · cache · backend"]
+  D -- ok --> G["drop Content-Encoding, set decoded Content-Length<br/>→ WAF · rewrite · cache · backend"]

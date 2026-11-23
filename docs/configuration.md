@@ -9,7 +9,7 @@
 
 # Configuration reference
 
-httpjet is configured by a **LiteSpeed-compatible XML tree** selected with `--root`: `conf/httpd_config.xml`, the per-vhost files it references, and `conf/mime.properties`. An existing LiteSpeed or OpenLiteSpeed tree works as-is. On that base httpjet layers its own opt-in directives — marked httpjet — which LiteSpeed ignores. Operational overrides live on the command line , not in the XML.
+httpjet is configured by a **LiteSpeed-compatible XML tree** selected with `--root`: `conf/httpd_config.xml`, the per-vhost files it references, and `conf/mime.properties`. For an existing LiteSpeed or OpenLiteSpeed tree, validate a copy and follow the migration checklist . On that base httpjet layers its own opt-in directives — marked httpjet — which LiteSpeed ignores. Operational overrides live on the command line , not in the XML.
 
 ## The configuration tree
 
@@ -57,7 +57,7 @@ You run check under the service identity too. Readable-by-root does not prove re
 
 | `indexFiles` | `index.html` | Directory-index candidates (vhost may override). |
 
-| `useIpInProxyHeader` | `2` | Client-IP trust mode. 0 never, 1 always, 2 trusted peers, 3 as 2, 4 always. |
+| `useIpInProxyHeader` | `2` | Client-IP trust mode. Mode 0 uses the peer address. Modes 2 and 3 require peer and TLS trust. Modes 1 and 4 use X-Forwarded-For without peer validation. See client identity for how each mode selects an address. |
 
 | ` ` | `0` | HTTP/3 master switch; also drives `Alt-Svc`. Needs the UDP port published. |
 
@@ -115,7 +115,7 @@ You run check under the service identity too. Readable-by-root does not prove re
 
 | `secure`, `keyFile`, `certFile`, `certChain` | off | TLS material; `certChain=1` appends `CACertFile` to the served chain. |
 
-| `CACertFile` · `clientVerify` · `verifyDepth` | none · `0` · `1` | Client-certificate verification (0 none · 1 optional · 2 required · 3 optional without CA) against the listener CA. |
+| `CACertFile` · `clientVerify` · `verifyDepth` | none · `0` · `1` | Mode 0 disables client verification. Modes 1 and 3 optionally request a certificate and validate any certificate presented against the listener CA. Mode 2 also enforces the certificate requirement after the handshake for non-internal peers. |
 
 | `crlFile` httpjet | none | PEM CRL/bundle enforced by the client verifier. |
 
@@ -159,7 +159,7 @@ You define proxy, LSAPI, or FastCGI upstreams here. Unknown legacy types proxy; 
 
 | `initTimeout` / `retryTimeout` / `pcKeepAliveTimeout` | `60` / `0` / `60` s | Connect timeout / bad-mark cooldown (retry dials fresh; a backend timeout is 504) / idle recycle. |
 
-| `respBuffer` | `0` | Parsed; responses always stream (`check` warns if set). |
+| `respBuffer` | `0` | Parsed for compatibility. It does not control buffering, and `check` warns when enabled. Actual buffering depends on the handler and response processing. |
 
 | `clientCertFile` / `clientKeyFile` httpjet | none | Upstream mTLS client identity for `https://`/`h2s://` targets; must lie within an admin resource root when submitted via the API. |
 
@@ -179,7 +179,7 @@ You declare vhosts in `httpd_config.xml`. `restrained` confines to `vhRoot`; `en
 
 | ` ` `enable`, `autoLoadHtaccess`, `base`, `rules` | Inline rules run before the `.htaccess` chain. |
 
-| ` ` `allowOverride`, `accessFileName` | Controls `.htaccess` loading. Only `0` or `31` loads; partial masks refuse. |
+| ` ` `allowOverride`, `accessFileName` | Controls `.htaccess` loading. Vhosts accept `0` or `31`. A server-wide mask, if supplied, must be `31`. Context-level masks are rejected. |
 
 | ` ` `keyFile`, `certFile`, `certChain`, `CACertFile` | The SNI identity for this vhost's domains (chain material, not a client-verify root). |
 
