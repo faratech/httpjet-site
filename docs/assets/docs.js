@@ -2179,6 +2179,116 @@
     "0.2.5 was measured on November 22. The historic versions retain their November 21 measurements.",
     "Source and binary hashes, per-round output and functional check results are linked in the benchmark receipts."
   ]
+},
+{
+  "id": "b23",
+  "tag": "v0.2.6",
+  "short": "Dedicated lab benchmarks",
+  "date": "2026-11-23",
+  "commit": "57a78baf",
+  "era": 3,
+  "eraName": "CPU, TLS & Zero-Fault Campaign",
+  "regime": "dedicated VM · 4 server / 4 load-generator vCPUs · Unified PGO",
+  "title": "0.2.6 production source — dedicated lab benchmarks",
+  "summary": "All 1,710,000 requests succeeded across eight workloads and three rounds. The functional checks passed.",
+  "kpis": [
+    {
+      "v": "1,524.4k rps",
+      "d": "p99 0.190 ms",
+      "n": false,
+      "l": "H2 empty body"
+    },
+    {
+      "v": "1,353.9k rps",
+      "d": "p99 0.198 ms",
+      "n": false,
+      "l": "H2 static 1 KiB"
+    },
+    {
+      "v": "1,001.0k rps",
+      "d": "p99 1.130 ms",
+      "n": false,
+      "l": "H2 page-cache hit"
+    },
+    {
+      "v": "1,002.1k rps",
+      "d": "p99 0.231 ms",
+      "n": false,
+      "l": "H2 heavy .htaccess"
+    }
+  ],
+  "chart": {
+    "title": "Lab throughput by release",
+    "sub": "Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds",
+    "unit": "k req/s",
+    "series": [
+      "0.2.5 · Nov 22",
+      "0.2.6 · Nov 23"
+    ],
+    "rows": [
+      [
+        "H2 empty body",
+        [
+          1242.7,
+          1524.4
+        ]
+      ],
+      [
+        "H2 static 1 KiB",
+        [
+          1166.5,
+          1353.9
+        ]
+      ],
+      [
+        "H2 static 64 KiB",
+        [
+          114.2,
+          129.1
+        ]
+      ],
+      [
+        "H2 heavy .htaccess",
+        [
+          840.7,
+          1002.1
+        ]
+      ],
+      [
+        "H2 page-cache hit",
+        [
+          900.3,
+          1001.0
+        ]
+      ],
+      [
+        "H1 static 1 KiB",
+        [
+          406.2,
+          406.4
+        ]
+      ],
+      [
+        "H1 heavy .htaccess",
+        [
+          382.6,
+          390.4
+        ]
+      ],
+      [
+        "H1 PHP/LSAPI",
+        [
+          42.1,
+          45.6
+        ]
+      ]
+    ],
+    "foot": "The two releases ran on separate dedicated VMs with the same benchmark protocol."
+  },
+  "notes": [
+    "The November 23 run measured 0.2.6. Earlier points use their published measurements.",
+    "The benchmark receipts include the source and executable hashes, per-round logs, and functional checks."
+  ]
 }
     ];
 
@@ -2495,20 +2605,21 @@
             { idx: 18, tag: "v0.2.2", h2: 672.6, h1: 341.6, note: "Second review pass" },
             { idx: 19, tag: "v0.2.3", h2: 656.9, h1: 343.1, note: "Stream-fill + buffered work" },
             { idx: 20, tag: "v0.2.4", h2: 879.5, h1: 381.5, note: "Waves 1–11 optimizations" },
-            {"idx": 21, "tag": "v0.2.5", "h2": 840.7, "h1": 382.6, "note": "Separate November 22 dedicated lab run", "separateRun": true}
+            {"idx": 21, "tag": "v0.2.5", "h2": 840.7, "h1": 382.6, "note": "Separate November 22 dedicated lab run", "separateRun": true},
+            {"idx": 22, "tag": "v0.2.6", "h2": 1002.1, "h1": 390.4, "note": "Separate November 23 dedicated lab run", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. The dashed segment leads to the separate November 22 v0.2.5 run under the same protocol."
+          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. Dashed segments connect the November 22 and November 23 runs, each measured on a separate VM under the same protocol."
         },
         {
           id: "c-static",
           name: "2 · H2 & H1 Static Small-Object (RPS)",
           title: "Release Speed Curve — HTTP/2 & HTTP/1.1 Static 1 KiB",
-          sub: "1 KiB static file · h2 c=32 m=10, h1 c=100 · k req/s · dedicated labs 2026-11-21 and 2026-11-22",
+          sub: "1 KiB static file · h2 c=32 m=10, h1 c=100 · k req/s · dedicated labs 2026-11-21, 2026-11-22 and 2026-11-23",
           unit: "k rps",
           ymax: 1200,
           ystep: 300,
@@ -2528,20 +2639,21 @@
             { idx: 18, tag: "v0.2.2", h2: 794.6, h1: 378.8, note: "Second review pass" },
             { idx: 19, tag: "v0.2.3", h2: 849.1, h1: 383.4, note: "Stream-fill + buffered work" },
             { idx: 20, tag: "v0.2.4", h2: 1092.6, h1: 415.7, note: "Waves 1–11 optimizations" },
-            {"idx": 21, "tag": "v0.2.5", "h2": 1166.5, "h1": 406.2, "note": "Separate November 22 dedicated lab run", "separateRun": true}
+            {"idx": 21, "tag": "v0.2.5", "h2": 1166.5, "h1": 406.2, "note": "Separate November 22 dedicated lab run", "separateRun": true},
+            {"idx": 22, "tag": "v0.2.6", "h2": 1353.9, "h1": 406.4, "note": "Separate November 23 dedicated lab run", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. The dashed segment leads to the separate November 22 v0.2.5 run under the same protocol."
+          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. Dashed segments connect the November 22 and November 23 runs, each measured on a separate VM under the same protocol."
         },
         {
           id: "c-php",
           name: "3 · PHP/LSAPI & Origin Page Cache (RPS)",
           title: "Release Speed Curve — PHP over LSAPI & Origin Page-Cache Hits",
-          sub: "PHP fixture over LSAPI (h1 c=40) and page-cache hits on a 37 KB PHP fixture page (h2 c=32 m=32) · k req/s · dedicated labs 2026-11-21 and 2026-11-22",
+          sub: "PHP fixture over LSAPI (h1 c=40) and page-cache hits on a 37 KB PHP fixture page (h2 c=32 m=32) · k req/s · dedicated labs 2026-11-21, 2026-11-22 and 2026-11-23",
           unit: "k rps",
           ymax: 1000,
           ystep: 250,
@@ -2561,14 +2673,15 @@
             { idx: 18, tag: "v0.2.2", php: 39.6, cache: 679.3, note: "Second review pass" },
             { idx: 19, tag: "v0.2.3", php: 39.6, cache: 720.3, note: "Stream-fill + buffered work" },
             { idx: 20, tag: "v0.2.4", php: 41.8, cache: 849.6, note: "Waves 1–11 optimizations" },
-            {"idx": 21, "tag": "v0.2.5", "php": 42.1, "cache": 900.3, "note": "Separate November 22 dedicated lab run", "separateRun": true}
+            {"idx": 21, "tag": "v0.2.5", "php": 42.1, "cache": 900.3, "note": "Separate November 22 dedicated lab run", "separateRun": true},
+            {"idx": 22, "tag": "v0.2.6", "php": 45.6, "cache": 1001.0, "note": "Separate November 23 dedicated lab run", "separateRun": true}
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
             { key: "cache", label: "httpjet page-cache hit H2 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. PHP for v0.0.1–v0.0.3 is cold-pool-ramp-bound (warm, v0.0.1 sustains ~32k req/s). Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. The dashed segment leads to the separate November 22 v0.2.5 run under the same protocol."
+          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. PHP for v0.0.1–v0.0.3 is cold-pool-ramp-bound (warm, v0.0.1 sustains ~32k req/s). Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. Dashed segments connect the November 22 and November 23 runs, each measured on a separate VM under the same protocol."
         }
       ];
 
@@ -2635,17 +2748,22 @@
             .filter(function (p) { return p[2] != null; });
           if (!coords.length) return;
           function point(p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }
-          var last = coords.length - 1;
-          var separate = last > 0 && coords[last][3].separateRun;
-          var sameRun = separate ? coords.slice(0, last) : coords;
-          var poly = sameRun.map(point).join(" ");
           var floor = (padT + plotH).toFixed(1);
-          var area = sameRun[0][0].toFixed(1) + "," + floor + " " + poly + " " + sameRun[sameRun.length - 1][0].toFixed(1) + "," + floor;
-          h.push('<polygon points="' + area + '" fill="url(#cfill' + (sIdx % 2) + ')"/>');
-          h.push('<polyline points="' + poly + '" fill="none" stroke="' + sr.color + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>');
-          if (separate) {
-            h.push('<polyline points="' + point(coords[last - 1]) + " " + point(coords[last]) + '" fill="none" stroke="' + sr.color + '" stroke-width="2.4" stroke-dasharray="4 4"/>');
+          function drawRun(run) {
+            if (run.length < 2) return;
+            var poly = run.map(point).join(" ");
+            var area = run[0][0].toFixed(1) + "," + floor + " " + poly + " " + run[run.length - 1][0].toFixed(1) + "," + floor;
+            h.push('<polygon points="' + area + '" fill="url(#cfill' + (sIdx % 2) + ')"/>');
+            h.push('<polyline points="' + poly + '" fill="none" stroke="' + sr.color + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>');
           }
+          var runStart = 0;
+          for (var k = 1; k < coords.length; k++) {
+            if (!coords[k][3].separateRun) continue;
+            drawRun(coords.slice(runStart, k));
+            h.push('<polyline points="' + point(coords[k - 1]) + " " + point(coords[k]) + '" fill="none" stroke="' + sr.color + '" stroke-width="2.4" stroke-dasharray="4 4"/>');
+            runStart = k;
+          }
+          drawRun(coords.slice(runStart));
           coords.forEach(function (p) {
             var isSel = (p[3].idx === curIdx);
             var r = isSel ? 5.5 : 3.8;

@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="canonical" href="https://httpjet.net/benchmarks/">
 <title>httpjet — Performance Benchmarks</title>
-<meta name="description" content="httpjet benchmark suite: HTTP/1.1, HTTP/2 and HTTP/3 static, rewrite, PHP/LSAPI and page-cache results with raw CSV/TSV data, against nginx and OpenLiteSpeed. Includes dedicated lab measurements for the 0.2.5 production build.">
+<meta name="description" content="httpjet benchmark suite: HTTP/1.1, HTTP/2 and HTTP/3 static, rewrite, PHP/LSAPI and page-cache results with raw CSV/TSV data, against nginx and OpenLiteSpeed. Includes dedicated lab measurements for HTTPJet 0.2.6.">
 <link rel="icon" href="/docs/assets/favicon.svg" type="image/svg+xml">
 <style>
 :root{--bg:#0b1020;--card:#141b2e;--fg:#e7ecf5;--mut:#9aa6bf;--acc:#3b82f6;--line:#243049}
@@ -28,7 +28,7 @@ ul{margin:6px 0}
 <h1>httpjet — Performance Benchmarks</h1>
 <div class="sub">A from-scratch Rust drop-in LiteSpeed replacement · comprehensive loopback benchmark suite</div>
 <div class="sub">Generated 2026-11-21 · 8-core host · release build</div>
-<div class="sub">Latest benchmark results for <b>0.2.5</b> · dedicated lab · November 22, 2026. <a href="/docs/performance#release-0-2-5">Interactive comparisons and release curves</a>.</div>
+<div class="sub">Latest benchmark results for <b>0.2.6</b> · dedicated lab · November 23, 2026. <a href="/docs/performance#release-0-2-6">Interactive comparisons and release curves</a>.</div>
 </div></header>
 <div class="wrap">
 
@@ -38,6 +38,26 @@ driven by <code>ab</code> (IP literal + Host header); HTTP/2 by <code>h2load</co
 ~no rewrite rules; the "heavy" vhost runs the production ~130-rule <code>.htaccess</code> front controller.
 PHP is served through httpjet's native LSAPI to an isolated <code>lsphp</code> pool. Static file-size
 fixtures are random blobs. RPS = requests/sec (higher is better); latency in ms. 
+</div>
+
+<h2 id="v0-2-6">0.2.6 · Dedicated lab · November 23, 2026</h2>
+<div class="card">
+<p>Dedicated GCE <code>c4-highmem-8</code>, loopback, four server and four load-generator vCPUs, Unified PGO, and median of three rounds. All 1,710,000 sweep requests succeeded. 0.2.5 and nginx use their published results from separate dedicated lab runs.</p>
+<div class="grid"><figure><img src="charts/v026-throughput.png" alt="Throughput by release in the dedicated lab" width="1000" height="760"><figcaption>Throughput by release</figcaption></figure>
+<figure><img src="charts/v026-p99.png" alt="p99 response time by release in the dedicated lab" width="1000" height="760"><figcaption>p99 response time by release</figcaption></figure>
+<figure><img src="charts/v026-static-servers.png" alt="Static throughput across dedicated lab runs in the dedicated lab" width="1000" height="760"><figcaption>Static throughput across dedicated lab runs</figcaption></figure></div>
+<table><thead><tr><th>Workload</th><th>0.2.5 req/s</th><th>0.2.6 req/s</th><th>Throughput change</th><th>0.2.5 p99 (ms)</th><th>0.2.6 p99 (ms)</th></tr></thead>
+<tbody>
+<tr><td>H2 empty body</td><td>1,242,715</td><td><strong>1,524,413</strong></td><td>+22.7%</td><td>0.348</td><td>0.190</td></tr>
+<tr><td>H2 static 1 KiB</td><td>1,166,453</td><td><strong>1,353,894</strong></td><td>+16.1%</td><td>0.318</td><td>0.198</td></tr>
+<tr><td>H2 static 64 KiB</td><td>114,202</td><td><strong>129,051</strong></td><td>+13.0%</td><td>3.820</td><td>3.310</td></tr>
+<tr><td>H2 heavy .htaccess</td><td>840,654</td><td><strong>1,002,094</strong></td><td>+19.2%</td><td>0.391</td><td>0.231</td></tr>
+<tr><td>H2 page-cache hit</td><td>900,306</td><td><strong>1,001,001</strong></td><td>+11.2%</td><td>1.650</td><td>1.130</td></tr>
+<tr><td>H1 static 1 KiB</td><td>406,195</td><td><strong>406,375</strong></td><td>+0.0%</td><td>0.313</td><td>0.310</td></tr>
+<tr><td>H1 heavy .htaccess</td><td>382,553</td><td><strong>390,416</strong></td><td>+2.1%</td><td>0.346</td><td>0.348</td></tr>
+<tr><td>H1 PHP/LSAPI</td><td>42,115</td><td><strong>45,649</strong></td><td>+8.4%</td><td>1.810</td><td>1.710</td></tr>
+</tbody></table>
+<p><a href="data/release-sweep-2026-11-23.tsv">Per-round sweep TSV</a> · <a href="data/lab-extended-2026-11-23.tsv">Extended static TSV</a> · <a href="data/lab-checks-2026-11-23.tsv">Functional checks</a> · <a href="data/lab-receipts-2026-11-23.tar.gz">Raw logs and hashes</a> · <a href="/docs/performance#release-0-2-6">Interactive comparisons</a></p>
 </div>
 
 <h2 id="v0-2-5">0.2.5 production build · Dedicated lab · November 22, 2026</h2>

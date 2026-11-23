@@ -3101,8 +3101,8 @@ SUMMARY: Measured speed and how it was measured.
 
 httpjet is fast — and these docs are strict about *where* the time goes. Every figure names its regime, because a **loopback benchmark** (synthetic, on-box, PGO build) is not the same thing as **production telemetry** (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.
 
-        1,258 k rps   h2 static empty, c=50, dedicated load-generator VM, median of 3 (0.2.0, 2026-11-11)
-        44.8 k rps   PHP/LSAPI over HTTP/1.1, PGO loopback
+        1,524.4 k rps   0.2.6 H2 empty body, dedicated lab, median of 3
+        45.6 k rps   0.2.6 PHP/LSAPI over H1, dedicated lab, median of 3
         40 ×   cache hit vs the same page through PHP
         0.2 %   httpjet's request phases, June 2026 production telemetry
         1.55 IPC   h2 hit path at saturation, June 2026 (hardware counters)
@@ -3120,9 +3120,9 @@ Loopback removes network, handshakes, CDN. It isolates server code for compariso
 
 ## Performance across builds — interactive presentation
 
-The **Release Speed Curve** shows the 15 versions measured together on November 21, 2026, and the separate 0.2.5 run from November 22. The dashed segment marks the change in runs.
+The **Release Speed Curve** shows the November 21 sweep and the separate 0.2.5 and 0.2.6 runs on November 22 and 23. Dashed segments mark the boundary between runs.
 
-Both runs used dedicated `c4-highmem-8` VMs, loopback traffic, four vCPUs per side, the same eight workloads and median of three rounds. Explore the build slides and use the comparison view to inspect earlier measurements.
+Each run used a dedicated `c4-highmem-8` VM, loopback traffic, four vCPUs per side, the same eight workloads, and the median of three rounds. Explore the charts, build slides, or comparison view.
 
 ## Where the time actually goes
 
@@ -3216,6 +3216,20 @@ Memo alone, instructions/request, frozen non-PGO binary, SINGULARITY loopback, 1
 | H3 | 98,293 | 68,024 | **−30.8%** |
 
 Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: `docs/pagecache-response-memo-experiment.md` in the source tree.
+
+## 0.2.6 dedicated lab benchmarks
+
+The November 23, 2026 run measured 0.2.6 with Unified PGO. All **1,710,000 sweep requests** succeeded across eight workloads and three rounds, and the build passed the functional checks.
+
+The charts compare the new measurements with the published 0.2.5 results. The static-server chart carries forward nginx results from November 21.
+
+> [Benchmark Chart: v026-throughput — Throughput by release (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+
+> [Benchmark Chart: v026-p99 — p99 response time by release (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+
+> [Benchmark Chart: v026-static-servers — Static throughput across dedicated lab runs (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+
+Per-round sweep TSV · Extended static TSV · Functional checks · Raw results and hashes
 
 ## 0.2.5 production build: dedicated lab benchmarks
 
@@ -3337,6 +3351,8 @@ Loopback, production x86_64 host, PGO, 8 cores, live traffic shared, 2026-11-08,
 | Heavy `.htaccess` vhost, HTTP/2 (c100) | **271,118 req/s** | 131,955 req/s | 333,519 req/s |
 
 | Warm page-cache hit, HTTP/2 (c32/m32) | **110,158 req/s** | — | — |
+
+| `v0.2.6` · Dedicated lab benchmarks 2026-11-23 | Dedicated VM, 4 server / 4 load-generator vCPUs | 0.2.6 results · Eight workloads, three rounds, all functional checks passed. |
 
 | `v0.2.5` · Dedicated lab benchmarks 2026-11-22 | Dedicated VM, 4 server / 4 load-generator vCPUs | 0.2.5 results · H2 empty 1,242.7k, static 1 KiB 1,166.5k, heavy rewrite 840.7k, cache hit 900.3k req/s. Separate run with the November 21 lab protocol. |
 

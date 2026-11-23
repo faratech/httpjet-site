@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261122a'
+VERSION = '20261123a'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -111,6 +111,18 @@ def diagram(m):
 # Horizontal grouped bar charts as inline SVG. {name: (title, subtitle, unit, series, rows, foot)}
 # rows = [(label, [v0, v1, ...])]; None = no bar (annotated).
 CHARTS = {
+ 'v026-throughput': ('Throughput by release', 'Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds', 'k req/s',
+   ['0.2.5 · Nov 22', '0.2.6 · Nov 23'],
+   [('H2 empty body', [1242.7, 1524.4]), ('H2 static 1 KiB', [1166.5, 1353.9]), ('H2 static 64 KiB', [114.2, 129.1]), ('H2 heavy .htaccess', [840.7, 1002.1]), ('H2 page-cache hit', [900.3, 1001.0]), ('H1 static 1 KiB', [406.2, 406.4]), ('H1 heavy .htaccess', [382.6, 390.4]), ('H1 PHP/LSAPI', [42.1, 45.6])],
+   'The two releases ran on separate dedicated VMs with the same benchmark protocol.'),
+ 'v026-p99': ('p99 response time by release', 'Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds', 'ms',
+   ['0.2.5 · Nov 22', '0.2.6 · Nov 23'],
+   [('H2 empty body', [0.348, 0.19]), ('H2 static 1 KiB', [0.318, 0.198]), ('H2 static 64 KiB', [3.82, 3.31]), ('H2 heavy .htaccess', [0.391, 0.231]), ('H2 page-cache hit', [1.65, 1.13]), ('H1 static 1 KiB', [0.313, 0.31]), ('H1 heavy .htaccess', [0.346, 0.348]), ('H1 PHP/LSAPI', [1.81, 1.71])],
+   'The two releases ran on separate dedicated VMs with the same benchmark protocol.'),
+ 'v026-static-servers': ('Static throughput across dedicated lab runs', 'Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds', 'k req/s',
+   ['nginx · Nov 21', '0.2.5 · Nov 22', '0.2.6 · Nov 23'],
+   [('H2 empty body', [311.7, 1210.1, 1522.2]), ('H2 static 1 KiB', [215.3, 1039.1, 1325.8]), ('H2 static 64 KiB', [53.4, 117.4, 142.2]), ('H1 static 1 KiB', [269.3, 398.1, 411.6]), ('H1 static 1 KiB (wrk)', [333.7, 484.4, 490.1])],
+   'The two releases ran on separate dedicated VMs with the same benchmark protocol.'),
  'v025-throughput': ('Dedicated lab throughput by build', 'Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds', 'k req/s',
    ['0.2.4 · Nov 21', '0.2.5 · Nov 22'],
    [('H2 empty body', [1291.7, 1242.7]), ('H2 static 1 KiB', [1092.6, 1166.5]), ('H2 static 64 KiB', [110.0, 114.2]), ('H2 heavy .htaccess', [879.5, 840.7]), ('H2 page-cache hit', [849.6, 900.3]), ('H1 static 1 KiB', [415.7, 406.2]), ('H1 heavy .htaccess', [381.5, 382.6]), ('H1 PHP/LSAPI', [41.8, 42.1])],

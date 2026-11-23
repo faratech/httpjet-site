@@ -956,6 +956,10 @@ window.DOCS_INDEX = [
     "kw": "coop --uring-ring legacy defer --no-page-cache-response-memo DIGESTS docs pagecache-response-memo-experiment.md"
    },
    {
+    "id": "release-0-2-6",
+    "t": "0.2.6 dedicated lab benchmarks"
+   },
+   {
     "id": "release-0-2-5",
     "t": "0.2.5 production build: dedicated lab benchmarks"
    },
@@ -982,7 +986,7 @@ window.DOCS_INDEX = [
    {
     "id": "release-0-1-12",
     "t": "Release 0.1.12: hot-path allocation and contention reductions",
-    "kw": "Router::resolve_ref htaccess v0.2.5 h2load wrk"
+    "kw": "Router::resolve_ref htaccess v0.2.6 v0.2.5 h2load wrk"
    },
    {
     "id": "cache-result",
