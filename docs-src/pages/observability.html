@@ -4,7 +4,7 @@
     <section>
       <h2 id="metrics">Prometheus metrics</h2>
       <p><code>--metrics-addr</code> (default <code>127.0.0.1:9090</code>; empty disables) serves <code>/metrics</code> in Prometheus text format. You watch the families below first:</p>
-      <div class="tablewrap"><table><thead><tr><th>Family</th><th>Meaning. Limit:</th></tr></thead><tbody><tr><td><code>httpjet_requests_total</code></td><td>Served requests. Limit: pair with 5xx counters.</td></tr><tr><td><code>httpjet_pagecache_*</code></td><td>Cache activity. Limit: watch hit ratio first.</td></tr><tr><td><code>httpjet_lsapi_*</code></td><td>PHP pool health. Limit: watch TTFB next.</td></tr></tbody></table></div>
+      <div class="tablewrap"><table><thead><tr><th>Family</th><th>Meaning and limits</th></tr></thead><tbody><tr><td><code>httpjet_requests_total</code></td><td>Served requests. Pair with 5xx counters.</td></tr><tr><td><code>httpjet_pagecache_*</code></td><td>Cache activity. Watch hit ratio first.</td></tr><tr><td><code>httpjet_lsapi_*</code></td><td>PHP pool health. Watch TTFB next.</td></tr></tbody></table></div>
       <div class="filterbar" data-filter="metrictable"><input type="search" placeholder="filter metrics…" aria-label="Filter metrics"><span class="count"></span></div>
       <div class="tablewrap"><table id="metrictable" class="flagtable"><colgroup><col class="c-key"><col class="c-mid"><col class="c-txt"></colgroup><thead><tr><th>Metric</th><th>Type</th><th>Meaning</th></tr></thead>
         <tbody>
@@ -48,7 +48,7 @@
 
     <section>
       <h2 id="cache-entries">The cache-entries report</h2>
-      <p>You fetch <code>GET /cache-entries</code> on the metrics listener. It reports entries, bytes, and health. Limit: diagnostic routes require your Bearer [REDACTED]; missing tokens return 403.</p>
+      <p>You fetch <code>GET /cache-entries</code> on the metrics listener. It reports entries, bytes, and health. Diagnostic routes require your Bearer [REDACTED]; missing tokens return 403.</p>
     </section>
 
     <section>
@@ -83,7 +83,7 @@
         <dt><code>--telemetry-file logs/telemetry.tsv</code></dt><dd>Appends a cumulative snapshot row of the in-RAM aggregates every <code>--telemetry-flush-secs</code> (30): durability across restarts and a self-contained time series (~1 MB/day). The <code>:9090</code> endpoint works without it.</dd>
         <dt><code>--php-slow-log logs/php-slow.tsv</code></dt><dd>A TSV line for every LSAPI request whose render TTFB exceeds <code>--php-slow-threshold-ms</code> (50), plus a 1-in-128 sample of <em>all</em> PHP requests as the population baseline — the per-URL / user-class attribution behind <code>httpjet_lsapi_ttfb_seconds</code>. Rolls at 64 MiB, gzip archives, 7-day prune.</dd>
       </div>
-      <p>These files produced the 2026-08-30 sample on <a href="performance.html#attribution">Performance</a>: mean request 9.99 ms, of which 8.96 ms is inside PHP.</p>
+      <p>These files produced the 2026-08-30 sample on <a href="performance.html#attribution">Performance</a>: mean request 9.99 ms, including 8.96 ms of LSAPI time to first byte. That elapsed interval includes backend wait; it is not PHP CPU time.</p>
     </section>
 
     <section>
@@ -93,8 +93,8 @@
       <ul>
         <li><strong>Sampling and trust.</strong> <code>HTTPJET_OTEL_SAMPLE_RATIO</code> (default 0.01) ratio-samples roots; children follow. Inbound <code>traceparent</code>/<code>tracestate</code>/<code>baggage</code> are discarded by default — clients cannot dictate parentage or force sampling. <code>HTTPJET_OTEL_TRUSTED_PARENTS</code> lists exact gateway IPs (direct peers on a known non-PROXY listener) allowed to supply a single version-00 traceparent; a listed gateway controls parentage <em>and sampling</em>, so it must strip public trace headers first. Do not list a CDN merely because it forwards client IPs.</li>
         <li><strong>Propagation.</strong> Named configured proxy targets and WebSocket maps receive the generated traceparent; LSAPI receives it as <code>HTTP_TRACEPARENT</code>; ad-hoc targets get nothing.</li>
-        <li><strong>Completion.</strong> Spans end at local write completion. Limit: peer receipt stays unproven.</li>
-        <li><strong>Bounds.</strong> You queue 2048 spans in 256-span batches. Limit: saturation drops telemetry, never serving.</li>
+        <li><strong>Completion.</strong> Spans end at local write completion. Peer receipt stays unproven.</li>
+        <li><strong>Bounds.</strong> You queue 2048 spans in 256-span batches. Saturation drops telemetry, never serving.</li>
         <li><strong>Metrics instruments.</strong> <code>httpjet.pipeline.requests.completed</code> and <code>httpjet.pipeline.response_head.duration</code> (seconds, bounded status labels), plus <code>httpjet.otel.http.exports</code>.</li>
       </ul>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label">enable</span></div><pre><code>HTTPJET_OTEL=1 HTTPJET_OTEL_METRICS=1 HTTPJET_OTEL_SAMPLE_RATIO=0.05 \

@@ -8,7 +8,7 @@ flowchart TB
     udp443["UDP :443"]:::k
     uds["unix:/path"]:::k
   end
-  subgraph cores ["one monoio io_uring runtime per listener fd, pinned to its core"]
+  subgraph cores ["monoio io_uring workers; core pinning is configurable"]
     direction TB
     pp["PROXY protocol strip (per-listener opt-in)"]
     tls["monoio-rustls handshake · ALPN · optional kTLS"]

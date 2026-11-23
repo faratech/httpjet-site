@@ -7,24 +7,24 @@
       <h2 id="overview">How a request reaches a backend</h2>
       <p>Three routes select a gateway, in dispatch order. Script suffixes route to LSAPI or FastCGI instead.</p>
       <ol>
-        <li>Rewrite <code>[P]</code> target. Limit: deferred until after the page-cache lookup, so it can still cache.</li>
-        <li>WebSocket map (<code>&lt;websocketList&gt;</code>). Limit: only when the request carries an upgrade.</li>
-        <li>Proxy <code>&lt;context&gt;</code> whose prefix matches and whose <code>handler</code> names a <code>proxy</code> extProcessor. Limit: missing, unknown, or non-<code>proxy</code> handlers give 503, never static fallthrough.</li>
+        <li>Rewrite <code>[P]</code> target. Deferred until after the page-cache lookup, so it can still cache.</li>
+        <li>WebSocket map (<code>&lt;websocketList&gt;</code>). Only when the request carries an upgrade.</li>
+        <li>Proxy <code>&lt;context&gt;</code> whose prefix matches and whose <code>handler</code> names a <code>proxy</code> extProcessor. Missing, unknown, or non-<code>proxy</code> handlers give 503, never static fallthrough.</li>
       </ol>
       <div class="tablewrap"><table>
-        <thead><tr><th>Target form</th><th>Protocol. Limit:</th></tr></thead>
+        <thead><tr><th>Target form</th><th>Protocol and limits</th></tr></thead>
         <tbody>
-          <tr><td><code>host:port</code>, <code>ip:port</code>, <code>uds:///path</code>, <code>http://…</code></td><td>HTTP/1.1 with keep-alive pools. Limit: pool keys are scheme-scoped.</td></tr>
-          <tr><td><code>https://…</code></td><td>HTTP/1.1 over TLS, certificate verified. Limit: optional client cert via <code>clientCertFile</code>/<code>clientKeyFile</code>.</td></tr>
-          <tr><td><code>h2://host:port</code> <span class="badge hj">httpjet</span></td><td>HTTP/2 prior knowledge (cleartext). Limit: multiplexes on one backend connection.</td></tr>
-          <tr><td><code>h2s://host[:443]</code> <span class="badge hj">httpjet</span></td><td>HTTP/2 over TLS. Limit: ALPN fail-closed; h2 requests re-absolutized for <code>:scheme</code>/<code>:authority</code>.</td></tr>
+          <tr><td><code>host:port</code>, <code>ip:port</code>, <code>uds:///path</code>, <code>http://…</code></td><td>HTTP/1.1 with keep-alive pools. Pool keys are scheme-scoped.</td></tr>
+          <tr><td><code>https://…</code></td><td>HTTP/1.1 over TLS, certificate verified. Optional client cert via <code>clientCertFile</code>/<code>clientKeyFile</code>.</td></tr>
+          <tr><td><code>h2://host:port</code> <span class="badge hj">httpjet</span></td><td>HTTP/2 prior knowledge (cleartext). Multiplexes on one backend connection.</td></tr>
+          <tr><td><code>h2s://host[:443]</code> <span class="badge hj">httpjet</span></td><td>HTTP/2 over TLS. ALPN fail-closed; h2 requests re-absolutized for <code>:scheme</code>/<code>:authority</code>.</td></tr>
         </tbody></table></div>
       <p>Proxied responses may not assert <code>X-LiteSpeed-Purge</code>/<code>-Cache-Control</code>/<code>-Tag</code>/<code>-Vary</code>; you strip them. Named upstreams receive a W3C <code>traceparent</code> when <a href="observability.html#otel">tracing</a> is on.</p>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">[P] targets are screened</span>
       <ul>
-        <li>Since 2026-09-16, a <code>[P]</code> URL resolving to any non-public-unicast address is refused. Limit: loopback, unspecified, link-local, RFC 1918, CGNAT, multicast, and documentation ranges count; <code>/etc/hosts</code> pins cannot bypass DNS screening.</li>
-        <li>Only an exact operator-configured extProcessor or WebSocket-map address exempts a screened target. Limit: Unix-socket <code>[P]</code> targets are always refused; concurrent DNS lookups stay bounded.</li>
-        <li>When the request can choose the upstream host via substitution, you withhold client credentials. Limit: <code>Authorization</code>, <code>Proxy-Authorization</code>, and <code>Cookie</code> are withheld when scheme/authority comes from <code>$N</code>/<code>%N</code>/<code>%{…}</code>.</li>
+        <li>Since 2026-09-16, a <code>[P]</code> URL resolving to any non-public-unicast address is refused. Loopback, unspecified, link-local, RFC 1918, CGNAT, multicast, and documentation ranges count; <code>/etc/hosts</code> pins cannot bypass DNS screening.</li>
+        <li>Only an exact operator-configured extProcessor or WebSocket-map address exempts a screened target. Unix-socket <code>[P]</code> targets are always refused; concurrent DNS lookups stay bounded.</li>
+        <li>When the request can choose the upstream host via substitution, you withhold client credentials. <code>Authorization</code>, <code>Proxy-Authorization</code>, and <code>Cookie</code> are withheld when scheme/authority comes from <code>$N</code>/<code>%N</code>/<code>%{…}</code>.</li>
       </ul></div></div>
     </section>
 
@@ -50,11 +50,11 @@
       <!--diagram:proxy-selection|<strong>Selection.</strong> Eligibility intersects active health and the passive breaker; policy picks among eligible peers. A pre-head dial failure marks the peer and moves on; sent bodies never replay.-->
       <!--diagram:upstream-health|<strong>Peer states.</strong> A peer starts cold until <code>rise</code> successes; <code>fall</code> failures take it down; probes restore it. All-ineligible gives 503.-->
       <ul>
-        <li><strong>Policies:</strong> <code>primary-first</code> (default), <code>weighted-round-robin</code> (smooth WRR), <code>weighted-least-active</code> (active ÷ weight, WRR tie-break). Limit: invalid policies, weights, or health settings fail config loading.</li>
-        <li><strong>Probes:</strong> <code>connect</code> tests transport; <code>GET</code>/<code>HEAD</code> validate TLS, bound the head, compare status exactly, follow no redirects, and consume no body. Limit: no cookies, authorization, or body; 16 concurrent probes process-wide; pool permits untouched.</li>
-        <li><strong>Groups share one protocol.</strong> Keep credentials, paths, and queries out of group authorities. Limit: a <code>Host</code> override never overrides TLS identity.</li>
-        <li><strong>Reloads:</strong> candidates start no probes; publication starts the new scheduler and retires the old. Limit: unchanged identities keep state; changed endpoints, weights, policies, or TLS identities start fresh.</li>
-        <li><strong>Reservations</strong> survive the response head. Limit: streams and WebSocket relays release the active count on completion, error, or drop.</li>
+        <li><strong>Policies:</strong> <code>primary-first</code> (default), <code>weighted-round-robin</code> (smooth WRR), <code>weighted-least-active</code> (active ÷ weight, WRR tie-break). Invalid policies, weights, or health settings fail config loading.</li>
+        <li><strong>Probes:</strong> <code>connect</code> tests transport; <code>GET</code>/<code>HEAD</code> validate TLS, bound the head, compare status exactly, follow no redirects, and consume no body. No cookies, authorization, or body; 16 concurrent probes process-wide; pool permits untouched.</li>
+        <li><strong>Groups share one protocol.</strong> Keep credentials, paths, and queries out of group authorities. A <code>Host</code> override never overrides TLS identity.</li>
+        <li><strong>Reloads:</strong> candidates start no probes; publication starts the new scheduler and retires the old. Unchanged identities keep state; changed endpoints, weights, policies, or TLS identities start fresh.</li>
+        <li><strong>Reservations</strong> survive the response head. Streams and WebSocket relays release the active count on completion, error, or drop.</li>
       </ul>
       <p>Metrics carry scope, group, and ordinal labels only: <code>httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total}</code>, <code>httpjet_proxy_failover_total</code>, <code>httpjet_phase_upstream_seconds</code>. See the <a href="admin-api.html#read">status API</a>.</p>
     </section>
@@ -63,12 +63,12 @@
       <h2 id="streaming">Streaming, SSE and timeouts</h2>
       <p>Upstream responses never buffer (<code>respBuffer</code> parses but always streams; <code>check</code> warns). SSE stays real-time through compression and H1, H2, and H3.</p>
       <div class="tablewrap"><table>
-        <thead><tr><th>Timeout</th><th>Meaning. Limit:</th></tr></thead>
+        <thead><tr><th>Timeout</th><th>Meaning and limits</th></tr></thead>
         <tbody>
-          <tr><td>Backend connect</td><td><code>initTimeout</code> bounds the connect. Limit: see your processor configuration.</td></tr>
-          <tr><td>Response head</td><td>Processor default bounds the head. Limit: a context <code>responseTimeout</code> overrides it.</td></tr>
-          <tr><td>Backend timeout</td><td>An exceeded backend deadline answers 504. Limit: request bodies still stream to h1/h2 upstreams.</td></tr>
-          <tr><td>Request body size</td><td>A context <code>maxReqBodySize</code> is enforced before dispatch. Limit: before any backend work.</td></tr>
+          <tr><td>Backend connect</td><td><code>initTimeout</code> bounds the connect. See your processor configuration.</td></tr>
+          <tr><td>Response head</td><td>Processor default bounds the head. A context <code>responseTimeout</code> overrides it.</td></tr>
+          <tr><td>Backend timeout</td><td>An exceeded backend deadline answers 504. Request bodies still stream to h1/h2 upstreams.</td></tr>
+          <tr><td>Request body size</td><td>A context <code>maxReqBodySize</code> is enforced before dispatch. Before any backend work.</td></tr>
         </tbody></table></div>
     </section>
 
@@ -76,9 +76,9 @@
       <h2 id="websocket">WebSocket relay</h2>
       <p>A <code>&lt;websocketList&gt;</code> map (<code>uri</code> → <code>address</code>) or a <code>ws://</code> rewrite <code>[P]</code> performs the HTTP/1 backend handshake, then relays raw frames. An upgrade reaching an ordinary proxy <code>&lt;context&gt;</code> without a map gets 426.</p>
       <ul>
-        <li>Upstreams are plain TCP HTTP/1 only. Limit: no TLS, H2, or Unix-socket targets.</li>
-        <li>Maps carry a stable <code>websocket:&lt;uri&gt;</code> identity, vhost-scoped, for trace propagation. Limit: the client span covers the handshake, not the unbounded relay.</li>
-        <li>TCP keepalive stays on. Limit: a vanished peer cannot pin fds and permits forever.</li>
+        <li>Upstreams are plain TCP HTTP/1 only. No TLS, H2, or Unix-socket targets.</li>
+        <li>Maps carry a stable <code>websocket:&lt;uri&gt;</code> identity, vhost-scoped, for trace propagation. The client span covers the handshake, not the unbounded relay.</li>
+        <li>TCP keepalive stays on. A vanished peer cannot pin fds and permits forever.</li>
       </ul>
     </section>
 
@@ -101,11 +101,11 @@
 &lt;/scriptHandler&gt;</code></pre></div>
       <!--diagram:fastcgi-flow|<strong>One request through hj-fastcgi.</strong> The gateway takes an already-validated script target and never derives an executable from the URI. Only a clean, exact <code>END_REQUEST</code> makes a connection reusable; multiplexing is disabled.-->
       <ul>
-        <li><strong>Wire bounds:</strong> FastCGI version 1, nonzero request id, known record types, 65,535-byte records. Limit: PARAMS rejected before allocation past field or aggregate caps.</li>
-        <li><strong>Pool:</strong> all sockets, including idle and dialing, cap under one acquisition deadline. Limit: poison/drop releases capacity immediately; clean idle sockets expire oldest-first.</li>
-        <li><strong>CGI variables</strong> are server-derived; headers become validated <code>HTTP_*</code>. Limit: processor <code>env</code> cannot override <code>SCRIPT_FILENAME</code>, <code>DOCUMENT_ROOT</code>, <code>REMOTE_ADDR</code>, <code>SERVER_NAME</code>, <code>CONTENT_LENGTH</code>, <code>HTTP_AUTHORIZATION</code>, etc. (same deny-list as LSAPI <code>[E=]</code>).</li>
-        <li><strong>Bodies</strong> buffer under the shared budget for an exact STDIN length. Limit: underflow/overflow, framing errors, and cancellation poison the connection.</li>
-        <li><strong>Responses:</strong> strict CRLF head, repeated end-to-end headers kept, one valid <code>Status</code>, CGI <code>Location</code> default, folding rejected. Limit: hop-by-hop and <code>X-LiteSpeed-*</code> stripped; missing <code>END_REQUEST</code> aborts; STDERR is capped and escaped into the error log only.</li>
+        <li><strong>Wire bounds:</strong> FastCGI version 1, nonzero request id, known record types, 65,535-byte records. PARAMS rejected before allocation past field or aggregate caps.</li>
+        <li><strong>Pool:</strong> all sockets, including idle and dialing, cap under one acquisition deadline. Poison/drop releases capacity immediately; clean idle sockets expire oldest-first.</li>
+        <li><strong>CGI variables</strong> are server-derived; headers become validated <code>HTTP_*</code>. Processor <code>env</code> cannot override <code>SCRIPT_FILENAME</code>, <code>DOCUMENT_ROOT</code>, <code>REMOTE_ADDR</code>, <code>SERVER_NAME</code>, <code>CONTENT_LENGTH</code>, <code>HTTP_AUTHORIZATION</code>, etc. (same deny-list as LSAPI <code>[E=]</code>).</li>
+        <li><strong>Bodies</strong> buffer under the shared budget for an exact STDIN length. Underflow/overflow, framing errors, and cancellation poison the connection.</li>
+        <li><strong>Responses:</strong> strict CRLF head, repeated end-to-end headers kept, one valid <code>Status</code>, CGI <code>Location</code> default, folding rejected. Hop-by-hop and <code>X-LiteSpeed-*</code> stripped; missing <code>END_REQUEST</code> aborts; STDERR is capped and escaped into the error log only.</li>
       </ul>
       <p class="mini">Known follow-ups: CGI context-directory routing (today suffix mappings only), a codec fragmentation corpus, and a real-application interoperability fixture.</p>
     </section>

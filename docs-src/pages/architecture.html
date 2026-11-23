@@ -3,49 +3,21 @@
 
     <section>
       <h2 id="workspace">Workspace shape</h2>
-      <p>The graph is acyclic and <code>hj-config</code> sits at the root. <code>hj-core</code> is the small frozen seam for every handler. Two crates, <code>hj-acme</code> and <code>hj-ocsp</code>, link only behind build features. The binary is the only crate that sees everything. Transports, protocols, gateways and the cache evolve behind <code>hj-core</code>. Request-aware page-cache glue also lives in the binary.</p>
+      <p>The dependency graph is acyclic, with several independent root crates including <code>hj-config</code>. <code>hj-core</code> is the small frozen seam for every handler. Two crates, <code>hj-acme</code> and <code>hj-ocsp</code>, link only behind build features. The binary is the only crate that sees everything. Transports, protocols, gateways and the cache evolve behind <code>hj-core</code>. Request-aware page-cache glue also lives in the binary.</p>
       <div class="chips">
         <a class="chip ok" href="https://github.com/faratech/httpjet"><span class="dot"></span>Browse workspace on GitHub ↗</a>
         <span class="chip"><span class="dot"></span>1 binary + 19 libraries</span>
-        <span class="chip"><span class="dot"></span>Rust 1.99.1 · edition 2024 · v0.2.4</span>
-        <span class="chip"><span class="dot"></span>Acyclic; hj-config at the root</span>
-        <span class="chip"><span class="dot"></span>3,237 test functions</span>
+        <span class="chip"><span class="dot"></span>Rust 1.100.0+ · edition 2024</span>
+        <span class="chip"><span class="dot"></span>Acyclic crate dependencies</span>
+        <span class="chip"><span class="dot"></span>3,237 tests at v0.2.4</span>
         <span class="chip"><span class="dot"></span>Vendored forks: monoio, monoio-rustls (real writev), dashmap, pprof</span>
       </div>
     </section>
 
     <section>
       <h2 id="dag">Crate dependency graph</h2>
-      <p><code>hj-config</code> parses LiteSpeed XML into one normalized model. <code>hj-core</code> re-exports that model for every downstream crate.</p>
-      <figure class="figure">
-        <svg viewBox="0 0 880 600" role="img" aria-label="Crate dependency graph: hj-config feeds hj-core, which feeds the handler and transport crates; isolated crates and optional feature crates converge on the httpjet binary.">
-          <defs>
-            <linearGradient id="brandgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".5" stop-color="#818cf8"/><stop offset="1" stop-color="#e879f9"/></linearGradient>
-            <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2c3856"/></marker>
-          </defs>
-          <path class="edge" d="M440,72 L440,104" marker-end="url(#ar)"/>
-          <path class="edge-b" d="M440,150 L440,196"/>
-          <path class="edge" d="M110,290 L110,340" marker-end="url(#ar)"/>
-          <path class="edge" d="M440,290 L440,500" marker-end="url(#ar)"/>
-          <path class="edge" d="M110,378 L370,504" marker-end="url(#ar)"/>
-          <path class="edge" d="M775,330 L520,504" marker-end="url(#ar)"/>
-          <path class="edge" d="M300,378 L400,504" marker-end="url(#ar)" stroke-dasharray="4 3"/>
-          <path class="edge" d="M300,290 L300,340" marker-end="url(#ar)"/>
-          <g><rect class="node-box" x="360" y="34" width="160" height="38" rx="9"/><text class="node-t" x="440" y="51" text-anchor="middle">hj-config</text><text class="node-d" x="440" y="64" text-anchor="middle">XML tree → model · parse_bundle</text></g>
-          <g><rect class="node-core" x="300" y="110" width="280" height="40" rx="9"/><text class="node-t" x="440" y="128" text-anchor="middle" fill="#fff">hj-core</text><text class="node-d" x="440" y="141" text-anchor="middle">the frozen contract · ReqCtx · Router · budgets</text></g>
-          <rect x="40" y="200" width="640" height="90" rx="10" fill="rgba(129,140,248,.05)" stroke="#243049"/>
-          <text class="node-d" x="52" y="216" fill="#8b95ad">handlers &amp; transports (depend on hj-core)</text>
-          <g font-family="ui-monospace,monospace" font-size="11.5" fill="#cdd7ee">
-            <text x="60"  y="243">hj-tls</text><text x="132" y="243">hj-h2</text><text x="200" y="243">hj-lsapi</text><text x="284" y="243">hj-fastcgi</text><text x="380" y="243">hj-static</text><text x="466" y="243">hj-compress</text><text x="574" y="243">hj-proxy</text>
-            <text x="60"  y="273">hj-acl</text><text x="132" y="273">hj-extension</text><text x="240" y="273">hj-http (ServeConfig)</text><text x="420" y="273">hj-pagecache (uses hj-cache)</text>
-          </g>
-          <g><rect class="node-box" x="45" y="340" width="130" height="38" rx="9"/><text class="node-t" x="110" y="357" text-anchor="middle">hj-cache</text><text class="node-d" x="110" y="370" text-anchor="middle">sharded byte-LRU</text></g>
-          <g><rect class="node-box" x="220" y="340" width="160" height="38" rx="9" stroke-dasharray="4 3"/><text class="node-t" x="300" y="357" text-anchor="middle">hj-acme · hj-ocsp</text><text class="node-d" x="300" y="370" text-anchor="middle">--features acme / ocsp</text></g>
-          <g><rect class="node-box" x="700" y="200" width="150" height="130" rx="10"/><text class="node-d" x="775" y="220" text-anchor="middle" fill="#8b95ad">no direct hj-core dep</text><text class="node-t" x="775" y="244" text-anchor="middle" font-size="11.5">hj-rewrite</text><text class="node-t" x="775" y="266" text-anchor="middle" font-size="11.5">hj-log</text><text class="node-t" x="775" y="288" text-anchor="middle" font-size="11.5">hj-geo</text><text class="node-t" x="775" y="310" text-anchor="middle" font-size="11.5">hj-cache</text></g>
-          <g><rect x="300" y="504" width="280" height="62" rx="10" fill="#13203a" stroke="url(#brandgrad)" stroke-width="1.6"/><text class="node-t" x="440" y="526" text-anchor="middle" fill="#fff" font-size="13">httpjet</text><text class="node-d" x="440" y="541" text-anchor="middle">uring transport · pipeline · lscache glue · admin</text><text class="node-d" x="440" y="555" text-anchor="middle">config_transaction · resource_generation · waf · otel</text></g>
-        </svg>
-        <figcaption>hj-config → hj-core → handlers and transports → the httpjet binary.</figcaption>
-      </figure>
+      <p><code>hj-config</code> parses LiteSpeed XML into one normalized model. <code>hj-core</code> re-exports that model for crates using the shared handler contract.</p>
+      <!--diagram:crate-map|<strong>Workspace relationships.</strong> Arrows show selected dependencies, not every edge. The binary assembles the server; optional certificate crates require build features. See <a href="https://github.com/faratech/httpjet/blob/main/ARCHITECTURE.md">the source architecture map</a> for the complete overview.-->
     </section>
 
     <section>
@@ -54,26 +26,26 @@
         <table>
           <thead><tr><th>Crate</th><th>Role</th></tr></thead>
           <tbody>
-            <tr><td><span class="crate">hj-core</span></td><td>The frozen handler seam. Limit: changing its types requires updating every dependent.</td></tr>
-            <tr><td><span class="crate">hj-config</span></td><td>LiteSpeed XML to one normalized model. Limit: defaults fail closed.</td></tr>
-            <tr><td><span class="crate">hj-tls</span></td><td>One rustls config for TCP and QUIC. Limit: SNI uses no cert-name-match, like OLS.</td></tr>
-            <tr><td><span class="crate">hj-acme</span> <span class="badge opt">feature</span></td><td>HTTP-01 and DNS-01 issuance and renewal. Limit: links only behind <code>acme</code>.</td></tr>
-            <tr><td><span class="crate">hj-ocsp</span> <span class="badge opt">feature</span></td><td>Bounded OCSP fetch and validation. Limit: needs OpenSSL 3.x and the <code>ocsp</code> feature.</td></tr>
-            <tr><td><span class="crate">hj-http</span></td><td>Shared connection-tuning from <code>&lt;tuning&gt;</code>. Limit: it holds no transport.</td></tr>
-            <tr><td><span class="crate">hj-h2</span></td><td>The native HTTP/2 server and HPACK codec. Limit: one task serves each connection.</td></tr>
-            <tr><td><span class="crate">hj-lsapi</span></td><td>LSAPI codec, pool and <code>lsphp</code> supervisor. Limit: the jail fails closed.</td></tr>
-            <tr><td><span class="crate">hj-fastcgi</span></td><td>FastCGI codec, pool and handler. Limit: use only explicit <code>fcgi</code>/<code>fastcgi</code> processors.</td></tr>
-            <tr><td><span class="crate">hj-static</span></td><td>Static files with ranges and conditionals. Limit: opens stay beneath the docroot.</td></tr>
-            <tr><td><span class="crate">hj-cache</span></td><td>Shared sharded byte-LRU primitive. Limit: sizing comes from <code>CacheCaps</code>.</td></tr>
-            <tr><td><span class="crate">hj-pagecache</span></td><td>The origin page store. Limit: request-aware glue lives in the binary.</td></tr>
-            <tr><td><span class="crate">hj-compress</span></td><td>gzip, brotli and zstd response encoding. Limit: negotiation follows server priority.</td></tr>
-            <tr><td><span class="crate">hj-rewrite</span></td><td>mod_rewrite and <code>.htaccess</code> evaluation. Limit: lookahead uses <code>fancy-regex</code> fallback.</td></tr>
-            <tr><td><span class="crate">hj-proxy</span></td><td>Reverse proxy, WebSocket and SSE relay. Limit: upstreams use h1, <code>h2://</code> or <code>h2s://</code>.</td></tr>
-            <tr><td><span class="crate">hj-acl</span></td><td>ACLs, real-IP, throttle and geo rules. Limit: geo resolves to CIDR sets at build.</td></tr>
-            <tr><td><span class="crate">hj-geo</span></td><td>Offline GeoIP and ASN sources. Limit: it makes no runtime fetches.</td></tr>
-            <tr><td><span class="crate">hj-log</span></td><td>Non-blocking access and error logging. Limit: the syslog tap is optional.</td></tr>
-            <tr><td><span class="crate">hj-extension</span></td><td>Compile-time handlers and transforms. Limit: the shipped registry is empty.</td></tr>
-            <tr><td><span class="crate">httpjet</span></td><td>The binary with transport and pipeline. Limit: it alone sees every crate. Path: see the note below this table.</td></tr>
+            <tr><td><span class="crate">hj-core</span></td><td>The frozen handler seam. Changing its types requires updating every dependent.</td></tr>
+            <tr><td><span class="crate">hj-config</span></td><td>LiteSpeed XML to one normalized model. Defaults fail closed.</td></tr>
+            <tr><td><span class="crate">hj-tls</span></td><td>One rustls config for TCP and QUIC. SNI uses no cert-name-match, like OLS.</td></tr>
+            <tr><td><span class="crate">hj-acme</span> <span class="badge opt">feature</span></td><td>HTTP-01 and DNS-01 issuance and renewal. Links only behind <code>acme</code>.</td></tr>
+            <tr><td><span class="crate">hj-ocsp</span> <span class="badge opt">feature</span></td><td>Bounded OCSP fetch and validation. Needs OpenSSL 3.x and the <code>ocsp</code> feature.</td></tr>
+            <tr><td><span class="crate">hj-http</span></td><td>Shared connection-tuning from <code>&lt;tuning&gt;</code>. It holds no transport.</td></tr>
+            <tr><td><span class="crate">hj-h2</span></td><td>The native HTTP/2 server and HPACK codec. One task serves each connection.</td></tr>
+            <tr><td><span class="crate">hj-lsapi</span></td><td>LSAPI codec, pool and <code>lsphp</code> supervisor. The jail fails closed.</td></tr>
+            <tr><td><span class="crate">hj-fastcgi</span></td><td>FastCGI codec, pool and handler. Use only explicit <code>fcgi</code>/<code>fastcgi</code> processors.</td></tr>
+            <tr><td><span class="crate">hj-static</span></td><td>Static files with ranges and conditionals. Opens stay beneath the docroot.</td></tr>
+            <tr><td><span class="crate">hj-cache</span></td><td>Shared sharded byte-LRU primitive. Sizing comes from <code>CacheCaps</code>.</td></tr>
+            <tr><td><span class="crate">hj-pagecache</span></td><td>The origin page store. Request-aware glue lives in the binary.</td></tr>
+            <tr><td><span class="crate">hj-compress</span></td><td>gzip, brotli and zstd response encoding. Negotiation follows server priority.</td></tr>
+            <tr><td><span class="crate">hj-rewrite</span></td><td>mod_rewrite and <code>.htaccess</code> evaluation. Lookahead uses <code>fancy-regex</code> fallback.</td></tr>
+            <tr><td><span class="crate">hj-proxy</span></td><td>Reverse proxy, WebSocket and SSE relay. Upstreams use h1, <code>h2://</code> or <code>h2s://</code>.</td></tr>
+            <tr><td><span class="crate">hj-acl</span></td><td>ACLs, real-IP, throttle and geo rules. Geo resolves to CIDR sets at build.</td></tr>
+            <tr><td><span class="crate">hj-geo</span></td><td>Offline GeoIP and ASN sources. It makes no runtime fetches.</td></tr>
+            <tr><td><span class="crate">hj-log</span></td><td>Non-blocking access and error logging. The syslog tap is optional.</td></tr>
+            <tr><td><span class="crate">hj-extension</span></td><td>Compile-time handlers and transforms. The shipped registry is empty.</td></tr>
+            <tr><td><span class="crate">httpjet</span></td><td>The binary with transport and pipeline. It alone sees every crate. Path: see the note below this table.</td></tr>
           </tbody>
         </table>
       </div>
@@ -144,8 +116,8 @@
         <li><strong>Errors:</strong> <code>thiserror</code> types at system boundaries; internal invariant violations panic with a message rather than pretending to recover.</li>
         <li><strong>unsafe:</strong> Keep <code>unsafe</code> rare and never in HPACK. Document the safety invariant above each block.</li>
         <li><strong>Async:</strong> tokio tasks for independent work, <code>FuturesUnordered</code> for multiplexing with coordinated shutdown, no per-stream spawn on hot paths.</li>
-        <li><strong>Hashing:</strong> Use <code>rustc-hash</code> only for trusted or hard-capped keys. Limit: the <code>.htaccess</code> memo caps at 16 shards × 512 entries, keys ≤ 1 KiB. Untrusted unbounded maps keep SipHash.</li>
-        <li><strong>Allocator:</strong> Use mimalloc globally with threshold-gated trim (<code>--mimalloc-trim-*</code>). Limit: production sets <code>MIMALLOC_PURGE_DELAY=0</code>, so you pool transient buffers in <code>hj_core::recycle</code>.</li>
+        <li><strong>Hashing:</strong> Use <code>rustc-hash</code> only for trusted or hard-capped keys. The <code>.htaccess</code> memo caps at 16 shards × 512 entries, keys ≤ 1 KiB. Untrusted unbounded maps keep SipHash.</li>
+        <li><strong>Allocator:</strong> Use mimalloc globally with threshold-gated trim (<code>--mimalloc-trim-*</code>). Production sets <code>MIMALLOC_PURGE_DELAY=0</code>, so you pool transient buffers in <code>hj_core::recycle</code>.</li>
       </ul>
       <!--diagram:recycle-pools|<strong>Zero-fault buffer and task recycling (v0.1.2–v0.1.5).</strong> Under <code>MIMALLOC_PURGE_DELAY=0</code>, unpooled transient allocations in sparse size classes fault back in on every request. <code>hj_core::recycle</code> pools H2 stream futures, bridge futures, tiered body buffers (frozen into ref-counted <code>Bytes</code> via <code>Bytes::from_owner</code> and returned when the last slice drops), LSAPI read/BEGIN buffers, and per-core 64 KiB TLS record buffers.-->
     </section>

@@ -1,15 +1,18 @@
 flowchart TB
-  classDef bad fill:#2a1420,stroke:#e879f9,color:#fff
-  classDef ok fill:#0f2a24,stroke:#34d399,color:#fff
-  A["terminal response (LSAPI · proxy · static)"] --> B("app opted in?<br/>X-LiteSpeed-Cache-Control: public|private,max-age=N<br/>(or standard Cache-Control on a --page-cache-standard-vhosts vhost)")
-  B -- no --> N["not stored"]:::bad
-  B -- yes --> C("guards")
-  C -- "status not in cacheStatusCode · Set-Cookie of a private cookie<br/>· proxied response asserting X-LiteSpeed-* · self-redirect Location<br/>· purge received after render start · object > 100 MiB" --> N
-  C -- ok --> D("W-TinyLFU admission<br/>frequency ≥ --page-cache-admit-threshold (+1 per 256 KiB)")
-  D -- "not yet" --> N2["counted, not stored (miss-miss-hit)"]:::bad
-  D -- admitted --> E["strip Set-Cookie + X-LiteSpeed-* from the public copy<br/>record identity (host + raw path), tags, vary set, TTL, stale windows"]
-  E --> F("file tier on?")
-  F -- no --> G["in-RAM body (charged to --page-cache-mem)"]:::ok
-  F -- yes --> H["HJPC file at birth (identity form, tmpfs)<br/>metadata-only charge to RAM index; footprint to --page-cache-disk-mem"]:::ok
-  H -- "at store time (bounded background pool)" --> I["background dict recompress in place<br/>(per-vhost zstd dictionary, 3.5–9× smaller)"]:::ok
+  A["Backend or static response"] --> B{"GET and cacheable response<br/>passing shared guards?"}
+  B -- no --> N["Do not store"]
+  B -- yes --> C{"Cache disposition<br/>and request route"}
+  C -- "public + public route" --> P{"Public policy, vary<br/>and cookie guards pass?"}
+  C -- "private + private route" --> Q{"Private vary<br/>and policy guards pass?"}
+  C -- "other combinations" --> N
+  P -- no --> N
+  Q -- no --> N
+  P -- yes --> D{"Admission threshold met?"}
+  D -- no --> N
+  D -- yes --> STORE["Store public entry"]
+  Q -- yes --> PRIV["Store private entry<br/>without frequency admission"]
+  STORE --> F{"File tier enabled?"}
+  PRIV --> F
+  F -- no --> RAM["Keep body in RAM"]
+  F -- yes --> FILE["Write file; optionally recompress<br/>in bounded background work"]
   click D "page-cache.html#admission"

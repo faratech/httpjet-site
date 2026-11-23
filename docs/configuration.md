@@ -15,15 +15,15 @@ httpjet is configured by a **LiteSpeed-compatible XML tree** selected with `--ro
 
 With no `--root`, httpjet uses `/usr/local/lsws`. You get LiteSpeed value semantics:
 
-- Variables `$SERVER_ROOT`, `$HOSTNAME`, `$VH_ROOT`, `$VH_NAME` substitute. Limit: `$DOC_ROOT` and `$VH_DOMAIN` need vhost resolution.
+- Variables `$SERVER_ROOT`, `$HOSTNAME`, `$VH_ROOT`, `$VH_NAME` substitute. `$DOC_ROOT` and `$VH_DOMAIN` need vhost resolution.
 
-- Sizes accept `K`/`M`/`G`/`B` suffixes. Limit: times use bare seconds.
+- Sizes accept `K`/`M`/`G`/`B` suffixes. Times use bare seconds.
 
-- Bounded integers fall back to defaults when invalid. Limit: `setUIDMode`/`chrootMode` errors instead (2026-09-16).
+- Bounded integers fall back to defaults when invalid. `setUIDMode`/`chrootMode` errors instead (2026-09-16).
 
-- Booleans accept `1`, `2`, or `true`. Limit: symlink value `2` never follows.
+- Booleans accept `1`, `2`, or `true`. Symlink value `2` never follows.
 
-- Unknown elements load silently. Limit: partial `allowOverride`, vhost `clientVerify`, rewrite maps, `phpIniOverride`, `enableHotlinkCtrl`, and `forceStrictOwnership` refuse the load.
+- Unknown elements load silently. Partial `allowOverride`, vhost `clientVerify`, rewrite maps, `phpIniOverride`, `enableHotlinkCtrl`, and `forceStrictOwnership` refuse the load.
 
            **layout** · a server root
 ```
@@ -57,7 +57,7 @@ You run check under the service identity too. Readable-by-root does not prove re
 
 | `indexFiles` | `index.html` | Directory-index candidates (vhost may override). |
 
-| `useIpInProxyHeader` | `2` | Client-IP trust mode. Limit: 0 never, 1 always, 2 trusted peers, 3 as 2, 4 always. |
+| `useIpInProxyHeader` | `2` | Client-IP trust mode. 0 never, 1 always, 2 trusted peers, 3 as 2, 4 always. |
 
 | ` ` | `0` | HTTP/3 master switch; also drives `Alt-Svc`. Needs the UDP port published. |
 
@@ -77,13 +77,13 @@ You run check under the service identity too. Readable-by-root does not prove re
 
 | `maxCachedFileSize` / `totalInMemCacheSize` | `4M` / `4G` | Small-file in-memory promotion threshold and budget (`CacheCaps`); the budget is clamped to 1 GiB. |
 
-| `maxMMapFileSize` / `totalMMapCacheSize` | `256K` / `2G` | Sizes the static RAM store. Limit: per-file cap uses the larger value; budgets clamp to 1 GiB + 2 GiB. |
+| `maxMMapFileSize` / `totalMMapCacheSize` | `256K` / `2G` | Sizes the static RAM store. Per-file cap uses the larger value; budgets clamp to 1 GiB + 2 GiB. |
 
 | `fileETag` | `28` | ETag bitmask (INODE|MTIME|SIZE → `"size-mtime-inode;;;"`); 0 = no ETag. |
 
 | `enable{Gzip,Br,Zstd}Compress` (+`Dyn`) | on | Static/dynamic compression per codec; `zstdCompressLevel` 3, `brCompressLevel` 5. |
 
-| ` enableExpires`, `expiresByType` | off | Expiry rules like `image/*=A604800`. Limit: authenticated responses default to `private, no-store`. |
+| ` enableExpires`, `expiresByType` | off | Expiry rules like `image/*=A604800`. Authenticated responses default to `private, no-store`. |
 
 | ` expireInSeconds` · `privateExpireInSeconds` · `cacheStatusCode` · `enablePostCache` | `900` · `0` · `200,301` · off | Default public/private TTLs and cacheable statuses. `cacheStorePath` is parsed but deliberately unused (see `--page-cache-store-path`). |
 
@@ -111,7 +111,7 @@ You run check under the service identity too. Readable-by-root does not prove re
 
 | Directive | Default | Meaning |
 
-| `name`, `address` | `*:80` | Listener bind address. Limit: `unix:`/`uds:` serves HTTP only; TLS over UDS never serves. |
+| `name`, `address` | `*:80` | Listener bind address. `unix:`/`uds:` serves HTTP only; TLS over UDS never serves. |
 
 | `secure`, `keyFile`, `certFile`, `certChain` | off | TLS material; `certChain=1` appends `CACertFile` to the served chain. |
 
@@ -123,7 +123,7 @@ You run check under the service identity too. Readable-by-root does not prove re
 
 | `proxyProtocol` httpjet | `0` | PROXY v2/v1 required on *this* listener; fail-closed; never on a public bind. |
 
-| `vhostMapList/vhostMap` `vhost`, `domain` | — | Maps host to vhost. Limit: exact, then parent, then `*`; globs never match. |
+| `vhostMapList/vhostMap` `vhost`, `domain` | — | Maps host to vhost. Exact, then parent, then `*`; globs never match. |
 
            **httpd_config.xml** · a TLS listener with h3
 ```
@@ -141,7 +141,7 @@ You run check under the service identity too. Readable-by-root does not prove re
 
 ## External processors
 
-You define proxy, LSAPI, or FastCGI upstreams here. Limit: unknown legacy types proxy; `cgi` contexts never execute.
+You define proxy, LSAPI, or FastCGI upstreams here. Unknown legacy types proxy; `cgi` contexts never execute.
 
 | Directive | Default | Meaning |
 
@@ -171,7 +171,7 @@ You define proxy, LSAPI, or FastCGI upstreams here. Limit: unknown legacy types 
 
 ## Virtual hosts
 
-You declare vhosts in `httpd_config.xml`. Limit: `restrained` confines to `vhRoot`; `enableScript=0` disables scripts.
+You declare vhosts in `httpd_config.xml`. `restrained` confines to `vhRoot`; `enableScript=0` disables scripts.
 
 | Vhost directive | Meaning |
 
@@ -179,7 +179,7 @@ You declare vhosts in `httpd_config.xml`. Limit: `restrained` confines to `vhRoo
 
 | ` ` `enable`, `autoLoadHtaccess`, `base`, `rules` | Inline rules run before the `.htaccess` chain. |
 
-| ` ` `allowOverride`, `accessFileName` | Controls `.htaccess` loading. Limit: only `0` or `31` loads; partial masks refuse. |
+| ` ` `allowOverride`, `accessFileName` | Controls `.htaccess` loading. Only `0` or `31` loads; partial masks refuse. |
 
 | ` ` `keyFile`, `certFile`, `certChain`, `CACertFile` | The SNI identity for this vhost's domains (chain material, not a client-verify root). |
 
@@ -203,7 +203,7 @@ Contexts map URI prefixes to terminals (`static`, `proxy`, `redirect`, `php`/`ls
 
 | `type`, `uri`, `location`, `handler`, `enabled` | — | Kind, prefix, on-disk location (static), processor name (proxy/lsapi). |
 
-| `extraHeaders` | — | Adds response headers. Limit: `Name: value` only; never on `proxy` contexts. |
+| `extraHeaders` | — | Adds response headers. `Name: value` only; never on `proxy` contexts. |
 
 | `addDefaultCharset` / `addDefaultCharsetCustomized` | off | Charset appended to text types. |
 
@@ -215,7 +215,7 @@ Contexts map URI prefixes to terminals (`static`, `proxy`, `redirect`, `php`/`ls
 
 | `bandwidthLimit` httpjet | `0` | Egress throttle overriding the server-wide rate. |
 
-| `subFilter` (repeatable) · `subFilterOnce` · `subFilterTypes` · `subFilterMaxBody` httpjet | — · `0` · `text/html` · `4M` | Literal body substitution. Limit: missing `=>` disables the context filter. → |
+| `subFilter` (repeatable) · `subFilterOnce` · `subFilterTypes` · `subFilterMaxBody` httpjet | — · `0` · `text/html` · `4M` | Literal body substitution. Missing `=>` disables the context filter. → |
 
            **vhost XML** · a proxied API prefix with overrides
 ```

@@ -1,5 +1,5 @@
     <h1>Performance</h1>
-    <p class="lede">httpjet is fast — and these docs are strict about <em>where</em> the time goes. Every figure names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real CDN-fronted traffic). The short version: on a Cloudflare-fronted PHP site, almost all wall time is PHP, and httpjet's own CPU is a rounding error.</p>
+    <p class="lede">httpjet is fast — and these docs are strict about <em>where</em> the time goes. Every figure names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real CDN-fronted traffic). The historical production samples describe one site and traffic mix; they are not a prediction for every deployment.</p>
 
     <div class="stats">
       <div class="stat accent"><div class="v">1,524.4<span class="u">k rps</span></div><div class="l">0.2.6 H2 empty body, dedicated lab, median of 3</div></div>
@@ -8,7 +8,7 @@
       <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's request phases, June 2026 production telemetry</div></div>
       <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation, June 2026 (hardware counters)</div></div>
       <div class="stat accent"><div class="v">0.0002<span class="u">flt</span></div><div class="l">v0.1.5 h2 static minor page faults/req</div></div>
-      <div class="stat accent"><div class="v">0<span class="u">/ 80</span></div><div class="l">metric rows worse, 0.1.10 vs 0.1.5 (controlled A/B)</div></div>
+      <div class="stat accent"><div class="v">0<span class="u">/ 80</span></div><div class="l">rows classified worse beyond noise, 0.1.10 vs 0.1.5 (controlled A/B)</div></div>
       <div class="stat accent"><div class="v">+27.6<span class="u">%</span></div><div class="l">h2 page-cache hit RPS, 0.1.11 defaults (coop ring + response memo, x86 ABBA)</div></div>
     </div>
 
@@ -19,7 +19,7 @@
         <span class="chip"><span class="dot"></span>production telemetry · real CF-fronted traffic</span>
         <span class="chip"><span class="dot"></span>hardware counters · perf at saturation</span>
       </div>
-      <p>Loopback removes network, handshakes, CDN. It isolates server code for comparison only. <strong>No loopback figure here is a production number.</strong> Telemetry measures user time instead: backend- and edge-dominated. Same server: ~908k req/s synthetic, ~0.2% of June 2026 user latency. Different questions.</p>
+      <p>Loopback removes the external network and CDN, but a test may still include TLS handshakes. It isolates a particular workload for comparison. <strong>No loopback figure here is a production capacity number.</strong> Origin telemetry describes the sampled requests at the server; it does not measure the complete browser-to-edge journey.</p>
     </section>
 
     <section>
@@ -41,8 +41,8 @@
     <section>
       <h2 id="attribution">Where the time actually goes</h2>
       <!--chart:attribution-->
-      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>Across millions of production requests, the <code>lsphp</code> render is <strong>86.5–98.8% of request wall time</strong>. In the June 2026 telemetry httpjet's own request phases were about <strong>0.2%</strong> — roughly <strong>138 µs per request</strong> (rewrite, cache lookup, compression); a synthetic cache hit costs ~38 µs of CPU including TLS, HTTP/2, rewrite, cache lookup and access logging. The 2026-08-30 sample: mean request 9.99 ms, 8.96 ms of it LSAPI TTFB, rewrite 5.4 µs, cache lookup 3.2 µs; pool acquire p99.9 &lt; 1 ms.</p><span class="regime">production telemetry · --telemetry-file + --php-slow-log</span></div></div>
-      <p>Halving httpjet CPU shaves ~0.1% off latency here. Cache hits remove ~99% instead. Investment follows that asymmetry: cache, PHP/opcache, cacheable fraction.</p>
+      <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>In the historical production samples, LSAPI response time accounted for <strong>86.5–98.8% of measured request wall time</strong>. That interval includes waiting for the backend and is not a measure of PHP CPU time. In the June 2026 telemetry httpjet's own request phases were about <strong>0.2%</strong> — roughly <strong>138 µs per request</strong> (rewrite, cache lookup, compression); a synthetic cache hit costs ~38 µs of CPU including TLS, HTTP/2, rewrite, cache lookup and access logging. The 2026-08-30 sample: mean request 9.99 ms, 8.96 ms of it LSAPI TTFB, rewrite 5.4 µs, cache lookup 3.2 µs; pool acquire p99.9 &lt; 1 ms.</p><span class="regime">production telemetry · --telemetry-file + --php-slow-log</span></div></div>
+      <p>These observations point to backend response time and cacheability as useful areas to investigate for that workload. CPU time, elapsed latency, and cache-hit performance are different measurements; one cannot be converted directly into another.</p>
       <p><strong>At the instruction floor.</strong> Saturated h2 hits show <strong>IPC 1.55</strong>, <strong>0.31% branch-miss</strong>, <strong>1.6 L1d misses per 100 instructions</strong>. Instructions per request bottleneck, not locality. Futex (~85% of syscall time) was idle parking, not contention. Box sat ~50% idle at ceiling.</p>
       <p>Responses: global <strong>mimalloc</strong>, <strong>on-core fast path</strong> plus memo. October 2026 campaign (<code>0.0.9</code>–<code>0.1.5</code>): skip double lookup for 404/PHP GETs (−14.5% cookied CPU); memoize <code>.htaccess</code> matches (<code>access_decision_for_request</code> 13% → 2.7%); <code>--trusted-proxy-idle-secs 1800</code> (handshakes −30% x86, −78% ARM); <code>--page-cache-dict-level</code> (ARM encode ~50% → 11%); pool buffers via <code>hj_core::recycle::BODY_BUFS</code> under <code>MIMALLOC_PURGE_DELAY=0</code>.</p>
     </section>
@@ -59,7 +59,7 @@
 
     <section>
       <h2 id="release-0-1-10">Release 0.1.10: controlled A/B against 0.1.5</h2>
-      <p>The <code>0.1.10</code> release (October 26, 2026) closed the five-round review. It found <strong>23 issues, fixed 22, and closed 1 by decision</strong>. The full workspace suite (3,068 tests) stayed green. Both builds ran back to back here. Each used its production flags. The run covered <strong>16 workloads, 5 blocks, in both run orders</strong>. Result: <strong>0 of 80 metric rows were worse</strong>. Every figure below shows relative A/B change only.</p>
+      <p>The <code>0.1.10</code> release (October 26, 2026) closed the five-round review. It found <strong>23 issues, fixed 22, and closed 1 by decision</strong>. The full workspace suite (3,068 tests) stayed green. Both builds ran back to back here. Each used its production flags. The run covered <strong>16 workloads, 5 blocks, in both run orders</strong>. The report classified <strong>0 of 80 metric rows as worse beyond the test’s noise thresholds</strong>. Some point estimates moved in the unfavorable direction, as shown below. Every figure is a relative A/B change.</p>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Workload</th><th>Throughput</th><th>p50</th><th>p99</th><th>CPU / request</th><th>RSS</th></tr></thead>
@@ -115,8 +115,8 @@
 
     <section>
       <h2 id="release-0-2-6">0.2.6 dedicated lab benchmarks</h2>
-      <p>The November 23, 2026 run measured 0.2.6 with Unified PGO. All <strong>1,710,000 sweep requests</strong> succeeded across eight workloads and three rounds, and the build passed the functional checks.</p>
-      <p>The charts compare the new measurements with the published 0.2.5 results. The static-server chart carries forward nginx results from November 21.</p>
+      <p>The November 23, 2026 run measured 0.2.6 with Unified PGO on a dedicated VM. It is a synthetic loopback run, not a production capacity estimate. All <strong>1,710,000 sweep requests</strong> succeeded across eight workloads and three rounds, and the build passed the functional checks.</p>
+      <p>The charts include the published 0.2.5 and nginx results from earlier runs on separate VMs. Differences can include run-to-run and placement effects; they are not a controlled head-to-head comparison.</p>
       <!--chart:v026-throughput-->
       <!--chart:v026-p99-->
       <!--chart:v026-static-servers-->
@@ -141,7 +141,7 @@
         <li><strong><code>fast_memo</code> &amp; request pipeline:</strong> shared <code>Arc&lt;HeaderMap&gt;</code> zero-clone <code>fast_memo</code> egress across H1/H2/H3; 50 ms coarse HTTP <code>Date</code> clock cache; single-probe router host resolution; compact IPv4/IPv6 ACL bitmask tables with a 16-slot reload-safe TLS peer cache; cached static <code>RootDir</code> descriptors with <code>FxHash</code> metadata lookups.</li>
         <li><strong>Rewrite, compression &amp; backends:</strong> borrowed zero-alloc header and path lookups across <code>.htaccess</code> and <code>mod_rewrite</code> evaluation; pooled plain-zstd and streamed-gzip codecs; borrowed LSAPI CGI builders and zero-alloc log escaping.</li>
       </ul>
-      <p>Dedicated lab VM, 2026-11-21 (c4-highmem-8, loopback, server on 4 cores, <code>h2load</code> on 4, every release Unified-PGO-built from its tag, 3 rotated rounds, median; all 15 releases re-measured in one run: <a href="assets/release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a>):</p>
+      <p>Dedicated lab VM, 2026-11-21 (c4-highmem-8, loopback, server on 4 vCPUs, <code>h2load</code> on 4, every release Unified-PGO-built from its tag, 3 rotated rounds, median; all 15 releases re-measured in one run: <a href="assets/release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a>):</p>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Workload</th><th>0.2.2 (k req/s)</th><th>0.2.3 (k req/s)</th><th>0.2.4 (k req/s)</th><th>0.2.4 vs 0.2.3</th></tr></thead>
@@ -167,7 +167,7 @@
     <section>
       <h2 id="release-0-2-2">Release 0.2.1 / 0.2.2: admission fix, second review pass</h2>
       <p><code>0.2.1</code> (2026-11-12) sized the page-cache store-admission filter so a never-requested URL reads zero — <code>--page-cache-admit-threshold 2</code> had decayed into storing every cacheable response — kept LSAPI length-prefix guards in release builds, and added fuzz targets. <code>0.2.2</code> (2026-11-12) closed a QUIC flood-guard bypass (a second datagram re-servicing the handshake slot), re-parses access files on ctime/size/inode change, asks proxied upstreams for identity under subFilter, drops refused ACME orders, and cuts the admission filter's false positives. Neither release shipped hot-path work, and the lab shows it: 0.2.1 vs 0.2.0 and 0.2.2 vs 0.2.1 are flat within round spread on every workload.</p>
-      <p>Lab VM, 2026-11-12 (loopback, server on 4 cores, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median; all thirteen releases re-measured in this one run). The version comparisons: 0.2.0 &rarr; 0.2.1, H2 1 KiB <strong>699.3k &rarr; 669.1k</strong>, heavy <code>.htaccess</code> H2 <strong>518.9k &rarr; 545.7k</strong>, page-cache hit <strong>604.2k &rarr; 540.9k</strong>, PHP/LSAPI <strong>32.3k &rarr; 32.6k</strong>; 0.2.1 &rarr; 0.2.2, H2 1 KiB <strong>669.1k &rarr; 665.6k</strong>, heavy H2 <strong>545.7k &rarr; 537.8k</strong>, page-cache <strong>540.9k &rarr; 542.4k</strong>, PHP <strong>32.6k &rarr; 32.5k</strong>. In the same lab nginx reached 185k (H2 1 KiB) against httpjet 0.2.2's 728k three-way cell (639.7k median sweep cell; the three-way cell is noisier).</p>
+      <p>Lab VM, 2026-11-12 (loopback, server on 4 vCPUs, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median; all thirteen releases re-measured in this one run). The version comparisons: 0.2.0 &rarr; 0.2.1, H2 1 KiB <strong>699.3k &rarr; 669.1k</strong>, heavy <code>.htaccess</code> H2 <strong>518.9k &rarr; 545.7k</strong>, page-cache hit <strong>604.2k &rarr; 540.9k</strong>, PHP/LSAPI <strong>32.3k &rarr; 32.6k</strong>; 0.2.1 &rarr; 0.2.2, H2 1 KiB <strong>669.1k &rarr; 665.6k</strong>, heavy H2 <strong>545.7k &rarr; 537.8k</strong>, page-cache <strong>540.9k &rarr; 542.4k</strong>, PHP <strong>32.6k &rarr; 32.5k</strong>. In the same lab nginx reached 185k (H2 1 KiB) against httpjet 0.2.2's 728k three-way cell (639.7k median sweep cell; the three-way cell is noisier).</p>
       <!--chart:lab-threeway-->
 
       <h2 id="release-0-2-0">Release 0.2.0: security audit fixes and cold-start latency</h2>
@@ -196,7 +196,7 @@
       <p>Dedicated load-generator VM (c4-highcpu-8, same zone) against the production host over the private network, 2026-11-11, production traffic live, median of 3 passes with the server order rotated. The VPC firewall admits only specific ports, so the three servers ran one at a time on one allowed port:</p>
       <!--chart:dedicated-0200-->
       <p><code>wrk</code> cross-check (H1, 1 KiB, c=100, 15 s): httpjet <strong>571,500</strong>, nginx 430,111, OpenLiteSpeed 377,631 req/s. The 0.1.12 run of the same procedure (2026-11-08: 1,183k and 1,097k on HTTP/2 empty and 1 KiB) is in the section below; the 0.2.0 cells sit within about +6% and +13% of it, inside this setup's run-to-run spread.</p>
-      <p>Lab VM, 2026-11-11 (loopback, server on 4 cores, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median). Use it to compare httpjet releases against each other: 0.2.0 vs 0.1.12 measured in the same run, H2 1 KiB <strong>591.8k &rarr; 625.5k</strong>, H1 1 KiB <strong>273.3k &rarr; 311.2k</strong>, heavy <code>.htaccess</code> H2 <strong>402.9k &rarr; 515.3k</strong>, PHP/LSAPI <strong>27.8k &rarr; 32.3k</strong>, page-cache hit <strong>410.5k &rarr; 544.5k</strong>, H2 empty <strong>563.1k &rarr; 717.2k</strong>; H2 64 KiB is flat (92.4k &rarr; 89.7k). Raw logs and the per-round TSV: <a href="assets/release-sweep-2026-11-11/">release-sweep-2026-11-11/</a>. In the same lab nginx reached 196k (H2 1 KiB) against httpjet 0.2.0's 656k.</p>
+      <p>Lab VM, 2026-11-11 (loopback, server on 4 vCPUs, loadgen on 4, every release PGO-built from its tag, 3 rotated rounds, median). Use it to compare httpjet releases against each other: 0.2.0 vs 0.1.12 measured in the same run, H2 1 KiB <strong>591.8k &rarr; 625.5k</strong>, H1 1 KiB <strong>273.3k &rarr; 311.2k</strong>, heavy <code>.htaccess</code> H2 <strong>402.9k &rarr; 515.3k</strong>, PHP/LSAPI <strong>27.8k &rarr; 32.3k</strong>, page-cache hit <strong>410.5k &rarr; 544.5k</strong>, H2 empty <strong>563.1k &rarr; 717.2k</strong>; H2 64 KiB is flat (92.4k &rarr; 89.7k). Raw logs and the per-round TSV: <a href="assets/release-sweep-2026-11-11/">release-sweep-2026-11-11/</a>. In the same lab nginx reached 196k (H2 1 KiB) against httpjet 0.2.0's 656k.</p>
       <!--chart:lab-threeway-->
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Honest caveats</span><p>The production-host rows share a machine with live traffic, and the same servers swing &plusmn;10&ndash;20% between runs there: nginx's H2 1 KiB moved from 180,940 (2026-11-08) to 153,485 (this run) with no change on its side. Read them as the shape of the comparison, not as a precise delta against 0.1.12. The lab table, where both builds ran back to back on an idle VM, is the version-to-version comparison. The 0.1.12 dedicated load-generator table below was not re-run for 0.2.0 and still describes 0.1.12. The cache rows used a non-forum <code>/help/</code> page through the real origin cache (metrics endpoint not verified in this run; each page was primed and confirmed as <code>x-litespeed-cache: hit</code>). Raw CSVs for this run are on the <a href="/benchmarks/">benchmark page</a>.</p></div></div>
     </section>
@@ -378,7 +378,7 @@
             <tr data-group="zerofault">
               <th><code>v0.1.10</code> &middot; Bug/Perf Bash<span class="mini">2026-10-26 &middot; <code>c07d345</code></span></th>
               <td class="def">loopback A/B, both orders<br><span class="mini">x86, vs public v0.1.5</span></td>
-              <td class="wrap">See <a href="#release-0-1-10">Release 0.1.10</a>: <strong><code>0 of 80</code></strong> rows worse, miss→store CPU <strong><code>&minus;61%</code></strong>. <span class="mini">Relative A/B only.</span></td>
+              <td class="wrap">See <a href="#release-0-1-10">Release 0.1.10</a>: <strong><code>0 of 80</code></strong> rows classified worse beyond noise, miss→store CPU <strong><code>&minus;61%</code></strong>. <span class="mini">Relative A/B only.</span></td>
             </tr>
             <tr data-group="zerofault">
               <th><code>v0.1.11</code> &middot; Coop Ring + Response Memo Defaults<span class="mini">2026-11-07 &middot; <code>54df571f</code></span></th>
@@ -387,17 +387,17 @@
             </tr>
             <tr data-group="zerofault">
               <th><code>v0.1.12</code> &middot; Hot-Path Allocation &amp; Contention Reductions<span class="mini">2026-11-08 &middot; <code>85b99e16</code></span></th>
-              <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 cores / loadgen 4 cores, all 10 releases</span></td>
+              <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 vCPUs / loadgen 4 vCPUs, all 10 releases</span></td>
               <td class="wrap">See <a href="#release-0-1-12">Release 0.1.12</a>: lab medians vs v0.1.11 — H2 1 KiB <strong>443.2k &rarr; 549.7k</strong>, H1 1 KiB <strong>267.2k &rarr; 284.3k</strong>, page-cache <strong>396.0k &rarr; 485.7k</strong>; dedicated-client three-way H2 <strong>371,540</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-08.tsv">release-sweep-2026-11-08.tsv</a> + <a href="assets/release-sweep-2026-11-08/">raw logs</a>; three-way CSVs on the <a href="/benchmarks/">benchmark page</a></span></td>
             </tr>
             <tr data-group="zerofault">
               <th><code>v0.2.4</code> &middot; Transport, Pipeline &amp; Backend Optimizations (Waves 1&ndash;11)<span class="mini">2026-11-20 &middot; <code>6b6f1c6</code></span></th>
-              <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 cores / loadgen 4 cores, all 15 releases</span></td>
+              <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 vCPUs / loadgen 4 vCPUs, all 15 releases</span></td>
               <td class="wrap">See <a href="#release-0-2-4">Release 0.2.4</a>: lab medians vs v0.2.3 in the same run &mdash; H2 empty <strong>860.1k &rarr; 1,291.7k</strong> (<strong>+50.2%</strong>), H2 1 KiB <strong>849.1k &rarr; 1,092.6k</strong> (<strong>+28.7%</strong>), heavy <code>.htaccess</code> H2 <strong>656.9k &rarr; 879.5k</strong> (<strong>+33.9%</strong>), page-cache <strong>720.3k &rarr; 849.6k</strong> (<strong>+18.0%</strong>), PHP <strong>39.6k &rarr; 41.8k</strong> (<strong>+5.6%</strong>); lab three-way vs nginx H2 1 KiB <strong>932.6k vs 215.3k</strong> (4.33&times;). <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a> + <a href="assets/release-sweep-2026-11-21/">raw logs</a> + <a href="assets/lab-threeway-2026-11-21.tsv">lab-threeway-2026-11-21.tsv</a></span></td>
             </tr>
             <tr data-group="zerofault">
               <th><code>v0.2.3</code> &middot; Stream-Fill &amp; Buffered Work<span class="mini">2026-11-16 &middot; <code>0a9899c7</code></span></th>
-              <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 cores / loadgen 4 cores, all 15 releases</span></td>
+              <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 vCPUs / loadgen 4 vCPUs, all 15 releases</span></td>
               <td class="wrap">See <a href="#release-0-2-3">Release 0.2.3</a>: lab medians vs v0.2.2 in the same run &mdash; H2 1 KiB <strong>794.6k &rarr; 849.1k</strong> (+6.9%), page-cache <strong>679.3k &rarr; 720.3k</strong> (+6.0%), H1 1 KiB <strong>378.8k &rarr; 383.4k</strong>, heavy <code>.htaccess</code> H2 <strong>672.6k &rarr; 656.9k</strong>, PHP <strong>39.6k &rarr; 39.6k</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-21.tsv">release-sweep-2026-11-21.tsv</a> + <a href="assets/release-sweep-2026-11-21/">raw logs</a></span></td>
             </tr>
             <tr data-group="zerofault">
@@ -410,7 +410,7 @@
             </tr>
             <tr>
               <th><code>v0.2.0</code> &middot; Security Audit Fixes &amp; Cold-Start Latency<span class="mini">2026-11-11 &middot; <code>8fcb4647</code></span></th>
-              <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 cores / loadgen 4 cores, all 11 releases</span></td>
+              <td class="def">lab re-run<br><span class="mini">dedicated lab VM, server 4 vCPUs / loadgen 4 vCPUs, all 11 releases</span></td>
               <td class="wrap">See <a href="#release-0-2-0">Release 0.2.0</a>: lab medians vs v0.1.12 in the same run &mdash; H2 1 KiB <strong>591.8k &rarr; 625.5k</strong>, heavy <code>.htaccess</code> H2 <strong>402.9k &rarr; 515.3k</strong>, page-cache <strong>410.5k &rarr; 544.5k</strong>; slowest request right after boot <strong>508 ms &rarr; 3 ms</strong>. <span class="mini">Receipts: <a href="assets/release-sweep-2026-11-11.tsv">release-sweep-2026-11-11.tsv</a> + <a href="assets/release-sweep-2026-11-11/">raw logs</a>; loopback CSVs on the <a href="/benchmarks/">benchmark page</a></span></td>
             </tr>
             <tr data-group="zerofault">

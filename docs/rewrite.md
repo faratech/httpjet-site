@@ -46,13 +46,13 @@ Each flagged rule runs through `CompiledRegex`. Prefer `regex_automata::meta::Re
 
 | Pattern shape | Engine | Why |
 
-| Anchors, classes, alternation, repetition | `regex_automata::meta` | Linear time. Limit: per-pattern thread-local cache, no shared lock. |
+| Anchors, classes, alternation, repetition | `regex_automata::meta` | Linear time. Per-pattern thread-local cache, no shared lock. |
 
-| Lookahead `(?=…)` / `(?!…)`, lookbehind | `fancy-regex` | Not a finite automaton. Limit: backtracking only here. |
+| Lookahead `(?=…)` / `(?!…)`, lookbehind | `fancy-regex` | Not a finite automaton. Backtracking only here. |
 
-| In-pattern backreference `\1` | `fancy-regex` | Requires backtracking. Limit: backtracking only here. |
+| In-pattern backreference `\1` | `fancy-regex` | Requires backtracking. Backtracking only here. |
 
-| Pure lookahead conjunction `^(?=.*A)(?=.*B)…` | `regex_automata::meta` per part | One linear search per part. Limit: `fancy-regex` only for captures (0.1.10: 29 → 1 µs). |
+| Pure lookahead conjunction `^(?=.*A)(?=.*B)…` | `regex_automata::meta` per part | One linear search per part. `fancy-regex` only for captures (0.1.10: 29 → 1 µs). |
 
 A regex error at match time **fails closed toward the rule's polarity**. A failing deny counts as matched; a failing allow is withheld (hardened 2026-09-06).
 
@@ -119,11 +119,11 @@ XenForo and WordPress rewrite every URL to `/index.php`. Keep the **original `RE
 
 Protect a subtree with `AuthType Basic` + `AuthName` + `AuthUserFile` + `Require valid-user | user …`:
 
-- Resolve requirements in scope order. Limit: metadata-only sections cannot erase inherited requirements; explicit `Require` replaces them.
+- Resolve requirements in scope order. Metadata-only sections cannot erase inherited requirements; explicit `Require` replaces them.
 
-- Enforce before cache lookup, on original/rewritten/index/script targets. Limit: valid credentials set `REMOTE_USER`; failures return 401.
+- Enforce before cache lookup, on original/rewritten/index/script targets. Valid credentials set `REMOTE_USER`; failures return 401.
 
-- Fail closed on unsupported auth. Limit: exact usernames stay preserved.
+- Fail closed on unsupported auth. Exact usernames stay preserved.
 
            **.htaccess** · a protected subtree
 ```
@@ -135,11 +135,11 @@ Require valid-user
 
 Accepted htpasswd hashes — verify each in constant time:
 
-- **bcrypt** (`$2y$`/`$2b$`/`$2a$`, `htpasswd -B`). Limit: cost capped at 14; higher is refused before hashing.
+- **bcrypt** (`$2y$`/`$2b$`/`$2a$`, `htpasswd -B`). Cost capped at 14; higher is refused before hashing.
 
 - **APR1-MD5** (`$apr1$`), **MD5-crypt** (`$1$`) and `{SHA}`.
 
-- Plaintext, DES, `$5$` and `$6$` `crypt()`. Limit: these verify *false* with a parse-time warning.
+- Plaintext, DES, `$5$` and `$6$` `crypt()`. These verify *false* with a parse-time warning.
 
 An unknown user pays dummy bcrypt/MD5 work at the file's recorded cost. Charge Basic-auth attempts per client before hashing. Refuse repeated `Authorization` headers.
 
@@ -153,39 +153,39 @@ Note: the 2026-09-06 review split parsed policy from the effective realm; the ru
 
 | RewriteEngine · RewriteBase | supported | Toggle and base-path resolution. |
 
-| RewriteCond · RewriteRule | supported | - Flags: `L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F`; `OR` on conditions. - File tests: `-f/-F -d -e -l/-L/-h -s -x` (`-U` always matches). - Variables: `REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME`, `%{HTTP:Name}`, `%{ENV:NAME}`, `%{LA-U:…}`/`%{LA-F:…}`. - `%{TIME*}` yields the empty string. - `RewriteMap`, `${map:key}`, `T=`/`H=` fail closed at parse time. Limit: other flags (e.g. `DPI`, `CO=`) are ignored. |
+| RewriteCond · RewriteRule | supported | - Flags: `L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F`; `OR` on conditions. - File tests: `-f/-F -d -e -l/-L/-h -s -x` (`-U` always matches). - Variables: `REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME`, `%{HTTP:Name}`, `%{ENV:NAME}`, `%{LA-U:…}`/`%{LA-F:…}`. - `%{TIME*}` yields the empty string. - `RewriteMap`, `${map:key}`, `T=`/`H=` fail closed at parse time. Other flags (e.g. `DPI`, `CO=`) are ignored. |
 
-| SetEnvIf · SetEnvIfNoCase | supported | Lazy header access. Limit: server-computed CGI names stay protected. |
+| SetEnvIf · SetEnvIfNoCase | supported | Lazy header access. Server-computed CGI names stay protected. |
 
-| Order · Allow from · Deny from | supported | Apache accumulation per scope. Limit: `env=`, host and CIDR operands make the chain memo-ineligible. |
+| Order · Allow from · Deny from | supported | Apache accumulation per scope. `env=`, host and CIDR operands make the chain memo-ineligible. |
 
-| Require | partial | `all granted`, `valid-user`, `user …`. Limit: everything else fails closed to deny. |
+| Require | partial | `all granted`, `valid-user`, `user …`. Everything else fails closed to deny. |
 
-| AuthType · AuthName · AuthUserFile | supported | Basic only. Limit: bcrypt, APR1 (`$apr1$`), MD5-crypt (`$1$`) and `{SHA}` only. |
+| AuthType · AuthName · AuthUserFile | supported | Basic only. Bcrypt, APR1 (`$apr1$`), MD5-crypt (`$1$`) and `{SHA}` only. |
 
-| Header set / add / append / merge / unset | supported | - Guards: `always`/`onsuccess`, `env=`/`env=!`, `%{NAME}e`. - Scopes merge directory, then ` `, then ` `. Limit: applied in `finalize`; CR/LF rejected. |
+| Header set / add / append / merge / unset | supported | - Guards: `always`/`onsuccess`, `env=`/`env=!`, `%{NAME}e`. - Scopes merge directory, then ` `, then ` `. Applied in `finalize`; CR/LF rejected. |
 
-| Header echo | partial | Parses without error. Limit: emits nothing. |
+| Header echo | partial | Parses without error. Emits nothing. |
 
-| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. Limit: see `docs/header-directive-compatibility.md` for the exact boundary. |
+| Header edit / edit* / note / setifempty / echo · RequestHeader * | ignored | Line ignored. See `docs/header-directive-compatibility.md` for the exact boundary. |
 
-| Header condition expr= / value expr= | partial | Only `%{REQUEST_URI} =~ / !~` conjunctions evaluate. Limit: value expressions are not implemented. |
+| Header condition expr= / value expr= | partial | Only `%{REQUEST_URI} =~ / !~` conjunctions evaluate. Value expressions are not implemented. |
 
-| ErrorDocument | supported | Path, inline and external forms. Limit: never clobbers an app's own JSON error body. |
+| ErrorDocument | supported | Path, inline and external forms. Never clobbers an app's own JSON error body. |
 
 | DirectoryIndex | supported | Including the `Disabled` form. |
 
-| SetHandler · AddHandler · AddType · ForceType · RemoveHandler · RemoveType | supported | `application/x-httpd-php` forces PHP. Limit: other handlers and `Remove*` record a non-PHP reset; `AddType`/`ForceType` override `Content-Type`. |
+| SetHandler · AddHandler · AddType · ForceType · RemoveHandler · RemoveType | supported | `application/x-httpd-php` forces PHP. Other handlers and `Remove*` record a non-PHP reset; `AddType`/`ForceType` override `Content-Type`. |
 
-| CacheLookup · CacheEnable · CacheDisable · CacheKeyModify | supported | LSCache directives for the page cache . Limit: `CacheKeyModify` strips query parameters from the key. |
+| CacheLookup · CacheEnable · CacheDisable · CacheKeyModify | supported | LSCache directives for the page cache . `CacheKeyModify` strips query parameters from the key. |
 
-| php_value · php_admin_value · php_flag · php_admin_flag | supported | Per-request PHP ini overrides. Limit: LSAPI special-env path only. |
+| php_value · php_admin_value · php_flag · php_admin_flag | supported | Per-request PHP ini overrides. LSAPI special-env path only. |
 
-|             | partial | Common scopes honored. Limit: ` ` only for the modeled REQUEST_URI shape; ` ` bodies evaluate. |
+|             | partial | Common scopes honored. ` ` only for the modeled REQUEST_URI shape; ` ` bodies evaluate. |
 
 | FileETag · H2EarlyHints · esi · AddOutputFilterByType · AllowOverride · Options | no-op | Recognized and dropped. |
 
-| ExpiresActive · ExpiresDefault · ExpiresByType | supported | Scoped across directory, ` ` and ` `. Limit: shares the `A/M` grammar; overrides vhost XML ` ` when active. |
+| ExpiresActive · ExpiresDefault · ExpiresByType | supported | Scoped across directory, ` ` and ` `. Shares the `A/M` grammar; overrides vhost XML ` ` when active. |
 
 Unrecognized directives are ignored, so vendor files stay loadable.
 

@@ -1,0 +1,9 @@
+flowchart TB
+  A["Look up original URI and vary key"] --> B{"Entry found and<br/>identity matches?"}
+  B -- "fresh" --> HIT["Serve hit"]
+  B -- "stale within SWR window" --> STALE["Serve stale; refresh in background"]
+  B -- "missing, expired, or collision" --> C{"Same key already rendering?"}
+  C -- yes --> WAIT["Wait; retry lookup or continue to backend"]
+  C -- no --> LEAD["Render backend; apply store gates"]
+  LEAD -- "5xx, eligible retained stale" --> SIE["Serve stale-if-error"]
+  click LEAD "page-cache.html#store"

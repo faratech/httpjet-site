@@ -17,31 +17,31 @@ You hand requests to other processes here: reverse proxy, WebSocket and SSE rela
 
 Three routes select a gateway, in dispatch order. Script suffixes route to LSAPI or FastCGI instead.
 
-- Rewrite `[P]` target. Limit: deferred until after the page-cache lookup, so it can still cache.
+- Rewrite `[P]` target. Deferred until after the page-cache lookup, so it can still cache.
 
-- WebSocket map (` `). Limit: only when the request carries an upgrade.
+- WebSocket map (` `). Only when the request carries an upgrade.
 
-- Proxy ` ` whose prefix matches and whose `handler` names a `proxy` extProcessor. Limit: missing, unknown, or non-`proxy` handlers give 503, never static fallthrough.
+- Proxy ` ` whose prefix matches and whose `handler` names a `proxy` extProcessor. Missing, unknown, or non-`proxy` handlers give 503, never static fallthrough.
 
-| Target form | Protocol. Limit: |
+| Target form | Protocol and limits |
 
-| `host:port`, `ip:port`, `uds:///path`, `http://…` | HTTP/1.1 with keep-alive pools. Limit: pool keys are scheme-scoped. |
+| `host:port`, `ip:port`, `uds:///path`, `http://…` | HTTP/1.1 with keep-alive pools. Pool keys are scheme-scoped. |
 
-| `https://…` | HTTP/1.1 over TLS, certificate verified. Limit: optional client cert via `clientCertFile`/`clientKeyFile`. |
+| `https://…` | HTTP/1.1 over TLS, certificate verified. Optional client cert via `clientCertFile`/`clientKeyFile`. |
 
-| `h2://host:port` httpjet | HTTP/2 prior knowledge (cleartext). Limit: multiplexes on one backend connection. |
+| `h2://host:port` httpjet | HTTP/2 prior knowledge (cleartext). Multiplexes on one backend connection. |
 
-| `h2s://host[:443]` httpjet | HTTP/2 over TLS. Limit: ALPN fail-closed; h2 requests re-absolutized for `:scheme`/`:authority`. |
+| `h2s://host[:443]` httpjet | HTTP/2 over TLS. ALPN fail-closed; h2 requests re-absolutized for `:scheme`/`:authority`. |
 
 Proxied responses may not assert `X-LiteSpeed-Purge`/`-Cache-Control`/`-Tag`/`-Vary`; you strip them. Named upstreams receive a W3C `traceparent` when tracing is on.
 
         !   [P] targets are screened
 
-- Since 2026-09-16, a `[P]` URL resolving to any non-public-unicast address is refused. Limit: loopback, unspecified, link-local, RFC 1918, CGNAT, multicast, and documentation ranges count; `/etc/hosts` pins cannot bypass DNS screening.
+- Since 2026-09-16, a `[P]` URL resolving to any non-public-unicast address is refused. Loopback, unspecified, link-local, RFC 1918, CGNAT, multicast, and documentation ranges count; `/etc/hosts` pins cannot bypass DNS screening.
 
-- Only an exact operator-configured extProcessor or WebSocket-map address exempts a screened target. Limit: Unix-socket `[P]` targets are always refused; concurrent DNS lookups stay bounded.
+- Only an exact operator-configured extProcessor or WebSocket-map address exempts a screened target. Unix-socket `[P]` targets are always refused; concurrent DNS lookups stay bounded.
 
-- When the request can choose the upstream host via substitution, you withhold client credentials. Limit: `Authorization`, `Proxy-Authorization`, and `Cookie` are withheld when scheme/authority comes from `$N`/`%N`/`%{…}`.
+- When the request can choose the upstream host via substitution, you withhold client credentials. `Authorization`, `Proxy-Authorization`, and `Cookie` are withheld when scheme/authority comes from `$N`/`%N`/`%{…}`.
 
 ## Upstream groups & selection
 
@@ -60,31 +60,31 @@ Several ` ` children make a group. Without options you keep ordered primary/fail
 
      GET
 
-/ready application.internal 10 2 2 3 200 ``` > [Diagram: proxy-selection] Selection. Eligibility intersects active health and the passive breaker; policy picks among eligible peers. A pre-head dial failure marks the peer and moves on; sent bodies never replay. > [Diagram: upstream-health] Peer states. A peer starts cold until rise successes; fall failures take it down; probes restore it. All-ineligible gives 503. - **Policies:** `primary-first` (default), `weighted-round-robin` (smooth WRR), `weighted-least-active` (active ÷ weight, WRR tie-break). Limit: invalid policies, weights, or health settings fail config loading. - **Probes:** `connect` tests transport; `GET`/`HEAD` validate TLS, bound the head, compare status exactly, follow no redirects, and consume no body. Limit: no cookies, authorization, or body; 16 concurrent probes process-wide; pool permits untouched. - **Groups share one protocol.** Keep credentials, paths, and queries out of group authorities. Limit: a `Host` override never overrides TLS identity. - **Reloads:** candidates start no probes; publication starts the new scheduler and retires the old. Limit: unchanged identities keep state; changed endpoints, weights, policies, or TLS identities start fresh. - **Reservations** survive the response head. Limit: streams and WebSocket relays release the active count on completion, error, or drop. Metrics carry scope, group, and ordinal labels only: `httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total}`, `httpjet_proxy_failover_total`, `httpjet_phase_upstream_seconds`. See the status API .
+/ready application.internal 10 2 2 3 200 ``` > [Diagram: proxy-selection] Selection. Eligibility intersects active health and the passive breaker; policy picks among eligible peers. A pre-head dial failure marks the peer and moves on; sent bodies never replay. > [Diagram: upstream-health] Peer states. A peer starts cold until rise successes; fall failures take it down; probes restore it. All-ineligible gives 503. - **Policies:** `primary-first` (default), `weighted-round-robin` (smooth WRR), `weighted-least-active` (active ÷ weight, WRR tie-break). Invalid policies, weights, or health settings fail config loading. - **Probes:** `connect` tests transport; `GET`/`HEAD` validate TLS, bound the head, compare status exactly, follow no redirects, and consume no body. No cookies, authorization, or body; 16 concurrent probes process-wide; pool permits untouched. - **Groups share one protocol.** Keep credentials, paths, and queries out of group authorities. A `Host` override never overrides TLS identity. - **Reloads:** candidates start no probes; publication starts the new scheduler and retires the old. Unchanged identities keep state; changed endpoints, weights, policies, or TLS identities start fresh. - **Reservations** survive the response head. Streams and WebSocket relays release the active count on completion, error, or drop. Metrics carry scope, group, and ordinal labels only: `httpjet_proxy_peer_{healthy,probes_total,health_transitions_total,active_requests,selections_total,prehead_failures_total}`, `httpjet_proxy_failover_total`, `httpjet_phase_upstream_seconds`. See the status API .
 
 ## Streaming, SSE and timeouts
 
 Upstream responses never buffer (`respBuffer` parses but always streams; `check` warns). SSE stays real-time through compression and H1, H2, and H3.
 
-| Timeout | Meaning. Limit: |
+| Timeout | Meaning and limits |
 
-| Backend connect | `initTimeout` bounds the connect. Limit: see your processor configuration. |
+| Backend connect | `initTimeout` bounds the connect. See your processor configuration. |
 
-| Response head | Processor default bounds the head. Limit: a context `responseTimeout` overrides it. |
+| Response head | Processor default bounds the head. A context `responseTimeout` overrides it. |
 
-| Backend timeout | An exceeded backend deadline answers 504. Limit: request bodies still stream to h1/h2 upstreams. |
+| Backend timeout | An exceeded backend deadline answers 504. Request bodies still stream to h1/h2 upstreams. |
 
-| Request body size | A context `maxReqBodySize` is enforced before dispatch. Limit: before any backend work. |
+| Request body size | A context `maxReqBodySize` is enforced before dispatch. Before any backend work. |
 
 ## WebSocket relay
 
 A ` ` map (`uri` → `address`) or a `ws://` rewrite `[P]` performs the HTTP/1 backend handshake, then relays raw frames. An upgrade reaching an ordinary proxy ` ` without a map gets 426.
 
-- Upstreams are plain TCP HTTP/1 only. Limit: no TLS, H2, or Unix-socket targets.
+- Upstreams are plain TCP HTTP/1 only. No TLS, H2, or Unix-socket targets.
 
-- Maps carry a stable `websocket: ` identity, vhost-scoped, for trace propagation. Limit: the client span covers the handshake, not the unbounded relay.
+- Maps carry a stable `websocket: ` identity, vhost-scoped, for trace propagation. The client span covers the handshake, not the unbounded relay.
 
-- TCP keepalive stays on. Limit: a vanished peer cannot pin fds and permits forever.
+- TCP keepalive stays on. A vanished peer cannot pin fds and permits forever.
 
 ## FastCGI gateway opt-in
 
@@ -99,7 +99,7 @@ Declare ` fcgi ` or `fastcgi` for `ExtKind::FastCgi` — never a silent proxy/LS
    32
    5
 
-30 fcgi cgi my_fcgi ``` > [Diagram: fastcgi-flow] One request through hj-fastcgi. The gateway takes an already-validated script target and never derives an executable from the URI. Only a clean, exact END_REQUEST makes a connection reusable; multiplexing is disabled. - **Wire bounds:** FastCGI version 1, nonzero request id, known record types, 65,535-byte records. Limit: PARAMS rejected before allocation past field or aggregate caps. - **Pool:** all sockets, including idle and dialing, cap under one acquisition deadline. Limit: poison/drop releases capacity immediately; clean idle sockets expire oldest-first. - **CGI variables** are server-derived; headers become validated `HTTP_*`. Limit: processor `env` cannot override `SCRIPT_FILENAME`, `DOCUMENT_ROOT`, `REMOTE_ADDR`, `SERVER_NAME`, `CONTENT_LENGTH`, `HTTP_AUTHORIZATION`, etc. (same deny-list as LSAPI `[E=]`). - **Bodies** buffer under the shared budget for an exact STDIN length. Limit: underflow/overflow, framing errors, and cancellation poison the connection. - **Responses:** strict CRLF head, repeated end-to-end headers kept, one valid `Status`, CGI `Location` default, folding rejected. Limit: hop-by-hop and `X-LiteSpeed-*` stripped; missing `END_REQUEST` aborts; STDERR is capped and escaped into the error log only. Known follow-ups: CGI context-directory routing (today suffix mappings only), a codec fragmentation corpus, and a real-application interoperability fixture.
+30 fcgi cgi my_fcgi ``` > [Diagram: fastcgi-flow] One request through hj-fastcgi. The gateway takes an already-validated script target and never derives an executable from the URI. Only a clean, exact END_REQUEST makes a connection reusable; multiplexing is disabled. - **Wire bounds:** FastCGI version 1, nonzero request id, known record types, 65,535-byte records. PARAMS rejected before allocation past field or aggregate caps. - **Pool:** all sockets, including idle and dialing, cap under one acquisition deadline. Poison/drop releases capacity immediately; clean idle sockets expire oldest-first. - **CGI variables** are server-derived; headers become validated `HTTP_*`. Processor `env` cannot override `SCRIPT_FILENAME`, `DOCUMENT_ROOT`, `REMOTE_ADDR`, `SERVER_NAME`, `CONTENT_LENGTH`, `HTTP_AUTHORIZATION`, etc. (same deny-list as LSAPI `[E=]`). - **Bodies** buffer under the shared budget for an exact STDIN length. Underflow/overflow, framing errors, and cancellation poison the connection. - **Responses:** strict CRLF head, repeated end-to-end headers kept, one valid `Status`, CGI `Location` default, folding rejected. Hop-by-hop and `X-LiteSpeed-*` stripped; missing `END_REQUEST` aborts; STDERR is capped and escaped into the error log only. Known follow-ups: CGI context-directory routing (today suffix mappings only), a codec fragmentation corpus, and a real-application interoperability fixture.
 
 ## Conventional CGI and uWSGI not routable
 

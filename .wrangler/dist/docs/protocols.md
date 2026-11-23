@@ -15,19 +15,19 @@ You get HTTP/1.1, native HTTP/2, and HTTP/3 over QUIC here. One unconditional io
 
 ## Overview
 
-All serving lives in the binary's `uring/` module. You select the protocol at the connection boundary.
+The binary’s `uring/` module accepts connections and selects a protocol using TLS ALPN or the cleartext HTTP/2 preface.
 
-| Signal | Stack. Limit: |
+| Signal | Stack and limits |
 
-| TLS ALPN `h2` | Native `hj-h2`. Limit: TLS only. |
+| TLS ALPN `h2` | Native `hj-h2`. TLS only. |
 
-| TLS ALPN other / none | Custom monoio + `httparse` HTTP/1.1. Limit: http/1.1 or none. |
+| TLS ALPN other / none | Custom monoio + `httparse` HTTP/1.1. Http/1.1 or none. |
 
-| Cleartext 24-byte h2 preface | Native `hj-h2` h2c. Limit: prior knowledge, no upgrade. |
+| Cleartext 24-byte h2 preface | Native `hj-h2` h2c. Prior knowledge, no upgrade. |
 
-| Cleartext other bytes | HTTP/1.1. Limit: sniff is non-destructive. |
+| Cleartext other bytes | HTTP/1.1. Sniff is non-destructive. |
 
-| UDP on the HTTPS port | HTTP/3, `quinn-proto` on io_uring. Limit: see HTTP/3 . |
+| UDP on the HTTPS port | HTTP/3, `quinn-proto` on io_uring. See HTTP/3 . |
 
 > [Diagram: connection-lifecycle] A TCP connection's life. PROXY stripping (if opted in) precedes TLS or the cleartext sniff. ALPN picks the TLS stack; the 24-byte preface picks the cleartext one. H2 drains with GOAWAY on shutdown.
 
@@ -35,25 +35,25 @@ All serving lives in the binary's `uring/` module. You select the protocol at th
 
 You get strict RFC 9112 framing here. Cleartext h2c needs no upgrade handshake.
 
-| Rule | Behaviour. Limit: |
+| Rule | Behavior and limits |
 
-| Framing | Single `Content-Length` only. Limit: conflicting lengths rejected. |
+| Framing | Single `Content-Length` only. Conflicting lengths rejected. |
 
-| Reads and bodies | Bounded incomplete reads; chunked bodies decoded. Limit: deadlines extend only on progress, to an absolute ceiling. |
+| Reads and bodies | Bounded incomplete reads; chunked bodies decoded. Deadlines extend only on progress, to an absolute ceiling. |
 
-| Keep-alive | Keep-alive and pipelining supported. Limit: `maxKeepAliveReq` 0 or 1 disables keep-alive, matching OpenLiteSpeed. |
+| Keep-alive | Keep-alive and pipelining supported. `maxKeepAliveReq` 0 or 1 disables keep-alive, matching OpenLiteSpeed. |
 
-| Request target | Origin-form, plus `*` for OPTIONS. Limit: http/https absolute-form reduces to origin-form; its authority replaces `Host`. |
+| Request target | Origin-form, plus `*` for OPTIONS. Http/https absolute-form reduces to origin-form; its authority replaces `Host`. |
 
-| `CONNECT` / authority-form / raw `#` | `CONNECT` answers 405. Limit: authority-form and raw `#` answer 400. |
+| `CONNECT` / authority-form / raw `#` | `CONNECT` answers 405. Authority-form and raw `#` answer 400. |
 
-| `Host` | HTTP/1.1 requires `Host`; HTTP/1.0 may omit it. Limit: must be UTF-8 and pass the h2/h3 `:authority` validation. |
+| `Host` | HTTP/1.1 requires `Host`; HTTP/1.0 may omit it. Must be UTF-8 and pass the h2/h3 `:authority` validation. |
 
-| Line endings | Bare LF ends no header line. Limit: rejected 400 before the head materializes. |
+| Line endings | Bare LF ends no header line. Rejected 400 before the head materializes. |
 
-| Refusals | Lingering close drains unread request bytes. Limit: the peer reads the error status cleanly. |
+| Refusals | Lingering close drains unread request bytes. The peer reads the error status cleanly. |
 
-| Egress | Large responses stream from the bridge. Limit: minimum send-progress rate applies; see below. |
+| Egress | Large responses stream from the bridge. Minimum send-progress rate applies; see below. |
 
 These rules date from the 2026-10-06 review. You detect h2c non-destructively: observed bytes pass to the winning stack.
 
@@ -73,42 +73,42 @@ match sniff_cleartext(&mut stream).await? {
 }
 ```
 
-- **103 Early Hints.** You emit interim `103` from the shared preload/preconnect `Link` matcher. Limit: batched with the final head when ready; `101` upgrades bypass it; canonical/alternate links excluded.
+- **103 Early Hints.** You emit interim `103` from the shared preload/preconnect `Link` matcher. Batched with the final head when ready; `101` upgrades bypass it; canonical/alternate links excluded.
 
-- **Ranges.** You parse, clamp, and coalesce RFC 9110 multi-range sets. Limit: `multipart/byteranges`, capped at 8 ranges / 8 MiB part bytes, full-200 fallback; invalid component poisons the header (200); unsatisfiable set is 416.
+- **Ranges.** You parse, clamp, and coalesce RFC 9110 multi-range sets. `multipart/byteranges`, capped at 8 ranges / 8 MiB part bytes, full-200 fallback; invalid component poisons the header (200); unsatisfiable set is 416.
 
-- **Request decompression.** You decode gzip by default. Limit: brotli/zstd need `--request-decompression-extra`; bounded and buffered; see Compression .
+- **Request decompression.** You decode gzip by default. Brotli/zstd need `--request-decompression-extra`; bounded and buffered; see Compression .
 
-- **Bandwidth pacing.** You pace `Body::Full` as 64 KiB slices and streams per chunk. Limit: per-connection token bucket, burst 2× rate, when `bandwidthLimit` is set; a matched context overrides the server-wide rate.
+- **Bandwidth pacing.** You pace `Body::Full` as 64 KiB slices and streams per chunk. Per-connection token bucket, burst 2× rate, when `bandwidthLimit` is set; a matched context overrides the server-wide rate.
 
-- **Send progress.** You end a response under 16 KiB delivered per `connTimeout` window. Limit: applies to every response write, sendfile included.
+- **Send progress.** You end a response under 16 KiB delivered per `connTimeout` window. Applies to every response write, sendfile included.
 
 ## Native HTTP/2
 
 `hj-h2` serves ALPN `h2` and cleartext h2c here. You optimize one connection's multiplexing for few, long-lived CDN connections.
 
-- TLS conn ALPN h2 / h2c ONE connection task FuturesUnordered⟨stream⟩ stream 1 · handler stream 2 · handler … stream N HPACK enc / dec send flow control · deadlines one vectored writev / wake wire zero-copy Bytes bridge dispatch → shared pipeline → monoio writes One connection task multiplexes every stream. It emits a single vectored write per wake. **One task per connection.** Streams multiplex through `FuturesUnordered`. Limit: 100 streams cost one task.
+- TLS conn ALPN h2 / h2c ONE connection task FuturesUnordered⟨stream⟩ stream 1 · handler stream 2 · handler … stream N HPACK enc / dec send flow control · deadlines one vectored writev / wake wire zero-copy Bytes bridge dispatch → shared pipeline → monoio writes One connection task multiplexes every stream. It emits a single vectored write per wake. **One task per connection.** Streams multiplex through `FuturesUnordered`. 100 streams cost one task.
 
-- **Flow control.** Per-stream and connection windows apply. Limit: frame, header-block, and body deadlines run on the monoio loop.
+- **Flow control.** Per-stream and connection windows apply. Frame, header-block, and body deadlines run on the monoio loop.
 
-- **Stalled streams.** Under 16 KiB per `connTimeout` window earns `RST_STREAM(CANCEL)`. Limit: withheld flow-control credit only.
+- **Stalled streams.** Under 16 KiB per `connTimeout` window earns `RST_STREAM(CANCEL)`. Withheld flow-control credit only.
 
-- **Streaming bodies.** LSAPI, proxy, SSE, and file bodies stream unbuffered. Limit: spans stay open through final flush.
+- **Streaming bodies.** LSAPI, proxy, SSE, and file bodies stream unbuffered. spans stay open through final flush.
 
-- **Writes.** One vectored write per wake; large bodies stay zero-copy `Bytes`. Limit: vendored `monoio-rustls` adds `writev`, one flush write, per-core pooled buffers.
+- **Writes.** One vectored write per wake; large bodies stay zero-copy `Bytes`. Vendored `monoio-rustls` adds `writev`, one flush write, per-core pooled buffers.
 
-- **Validation.** RFC 9113 inbound, GOAWAY drain. Limit: stray `CONTINUATION` and stream-id reuse are connection errors.
+- **Validation.** RFC 9113 inbound, GOAWAY drain. Stray `CONTINUATION` and stream-id reuse are connection errors.
 
-- **Oversize heads.** Over-cap block gets bodiless 431; over-cap body gets 413. Limit: then `RST_STREAM(NO_ERROR)`; suppressed decode keeps HPACK in sync.
+- **Oversize heads.** Over-cap block gets bodiless 431; over-cap body gets 413. Then `RST_STREAM(NO_ERROR)`; suppressed decode keeps HPACK in sync.
 
-- **Refusals.** Budget-refused streams get `RST_STREAM(REFUSED_STREAM)`. Limit: rapid-reset budget 200, refilled 10/s; past it, GOAWAY(ENHANCE_YOUR_CALM).
+- **Refusals.** Budget-refused streams get `RST_STREAM(REFUSED_STREAM)`. Rapid-reset budget 200, refilled 10/s; past it, GOAWAY(ENHANCE_YOUR_CALM).
 
-- **Abuse bounds.** HTTP/2 Bomb (CVE-2026-49975) and no-progress stay bounded. Limit: see rapid-reset budget.
+- **Abuse bounds.** HTTP/2 Bomb (CVE-2026-49975) and no-progress stay bounded. See rapid-reset budget.
 
-- **Pacing.** Per-connection at OutQueue flush. Limit: server-wide rate only; H3 unpaced.
+- **Pacing.** Per-connection at OutQueue flush. Server-wide rate only; H3 unpaced.
 
         ⎁   Measured
-You pass **146 of 146** h2spec 2.6.0 cases over TLS. Limit: three consecutive runs is the gate; h2c records 145/146, with generic §3.5/2 structurally unsatisfiable on the sniffing port.
+You pass **146 of 146** h2spec 2.6.0 cases over TLS. Three consecutive runs is the gate; h2c records 145/146, with generic §3.5/2 structurally unsatisfiable on the sniffing port.
  scripts/h2spec_check.sh · scripts/ci-h2spec.py
         i   HPACK
 RFC 7541 HPACK lives in the `hpack` submodule of `hj-h2`, zero-allocation and pure safe Rust (`#![forbid(unsafe_op_in_unsafe_fn)]`). Huffman codes to 11 bits resolve from a 4 KiB root table. Three 32-entry sub-tables cover 12–16-bit codes (0.1.7; replaced 256 KiB flat; cold decode 16.6 → 4.6 µs). The encoder remembers eight long literals (257+ bytes) per thread (0.1.10; 4.73 → 1.34 µs per block). Decoder and round-trip are fuzz targets . See the HPACK stub .
@@ -121,15 +121,15 @@ HPACK now lives inside Native HTTP/2 as a three-line summary. You keep this stub
 
 `uring/h3.rs` runs `quinn-proto` state over io_uring UDP here. You bridge requests into the same pipeline.
 
-- **Intake and parsing.** You use `quinn-udp` metadata (GSO/GRO, live GSO cap) and parse streams incrementally. Limit: QUIC DATAGRAM disabled; QPACK head bytes charge `total_req_bytes` and the body budget.
+- **Intake and parsing.** You use `quinn-udp` metadata (GSO/GRO, live GSO cap) and parse streams incrementally. QUIC DATAGRAM disabled; QPACK head bytes charge `total_req_bytes` and the body budget.
 
-- **Bodies and stalls.** Small, cached, and sub-threshold bodies go whole; large, SSE, and proxy bodies stream HEADERS-first. Limit: backpressured DATA; send-stalled streams reset; retained memory bounded per connection (2026-09-06).
+- **Bodies and stalls.** Small, cached, and sub-threshold bodies go whole; large, SSE, and proxy bodies stream HEADERS-first. Backpressured DATA; send-stalled streams reset; retained memory bounded per connection (2026-09-06).
 
-- **Budget.** Charge at `Connected`, after validation. Limit: spoofed Initials cannot hold budget; full budget closes `H3_EXCESSIVE_LOAD`.
+- **Budget.** Charge at `Connected`, after validation. Spoofed Initials cannot hold budget; full budget closes `H3_EXCESSIVE_LOAD`.
 
-- **Handshake slots.** One of 256 per-core slots per unvalidated connection. Limit: above 64 per core, stateless **Retry**; token-bearing Initials pass; handshakes close after 10 s.
+- **Handshake slots.** One of 256 per-core slots per unvalidated connection. Above 64 per core, stateless **Retry**; token-bearing Initials pass; handshakes close after 10 s.
 
-- **Discovery and trust.** Advertise via **Alt-Svc** (last TLS transform); pin trust/mTLS at acceptance. Limit: migration disabled; reloads affect future handshakes only.
+- **Discovery and trust.** Advertise via **Alt-Svc** (last TLS transform); pin trust/mTLS at acceptance. Migration disabled; reloads affect future handshakes only.
 
 > [Diagram: h3-admission] HTTP/3 UDP intake. Unvalidated Initials pass per-core slot caps (256 max, Retry above 64) before charging maxConnections at Connected. QPACK heads charge total_req_bytes and BodyBufferBudget.
 
@@ -144,9 +144,9 @@ Two per-listener features sit before protocol detection. Both are httpjet-native
 
 Set ` 1 ` and you require a PROXY header on every connection. You install the claimed address before TLS or the H1/h2c sniff.
 
-- Missing header closes the connection. Limit: fail-closed both ways.
+- Missing header closes the connection. Fail-closed both ways.
 
-- Loopback or unspecified sources are refused at the parser (2026-09-16). Limit: they would otherwise forge mTLS exemption and the loopback purge gate.
+- Loopback or unspecified sources are refused at the parser (2026-09-16). They would otherwise forge mTLS exemption and the loopback purge gate.
 
         !   The listener opt-in is the trust decision
 Never enable this on an internet-facing bind. Anyone can forge their client address there; `check` warns on wildcard or public binds.
@@ -155,25 +155,25 @@ Never enable this on an internet-facing bind. Anyone can forge their client addr
 
 Use `unix:/path/sock` (or `uds:`), or `--http-uds`, for plain HTTP over a Unix socket. You serve H1 and h2c prior knowledge on one accept core.
 
-- Socket mode is 0660, owner and group read/write. Limit: SO_REUSEPORT does not exist for AF_UNIX; socket-activated fds are adopted by path.
+- Socket mode is 0660, owner and group read/write. SO_REUSEPORT does not exist for AF_UNIX; socket-activated fds are adopted by path.
 
-- A stale file is unlinked only after `connect(2)` proves it dead. Limit: cleanup binds to the owned directory and socket identity.
+- A stale file is unlinked only after `connect(2)` proves it dead. Cleanup binds to the owned directory and socket identity.
 
-- Peers have no address. Limit: ACLs, the per-IP throttle, and `REMOTE_ADDR` see fabricated loopback; the log renders `unix:`.
+- Peers have no address. ACLs, the per-IP throttle, and `REMOTE_ADDR` see fabricated loopback; the log renders `unix:`.
 
-- TLS over UDS is unsupported. Limit: `check` lints it.
+- TLS over UDS is unsupported. `check` lints it.
 
 ## File egress: sendfile & kTLS
 
 An uncached `Body::File` keeps its pinned inode and byte range across the bridge. You send it with bounded nonblocking `sendfile(2)` on plain TCP HTTP/1.
 
-- Unsupported pairs resume at the exact offset via positional io_uring reads. Limit: short files or aborts close, never a wrong `Content-Length`.
+- Unsupported pairs resume at the exact offset via positional io_uring reads. Short files or aborts close, never a wrong `Content-Length`.
 
-- Stalled sendfile backs off 100 µs → 12.8 ms. Limit: 16 KiB per `connTimeout` progress rule still applies.
+- Stalled sendfile backs off 100 µs → 12.8 ms. 16 KiB per `connTimeout` progress rule still applies.
 
-- `--features ktls` extends this to TLS 1.3 H1 after the rustls handshake. Limit: queued peer KeyUpdate applies before next writes, fencing TX rekey.
+- `--features ktls` extends this to TLS 1.3 H1 after the rustls handshake. Queued peer KeyUpdate applies before next writes, fencing TX rekey.
 
-- Policy `--ktls=auto|on|off`; `auto` (default in feature builds) checks the IPv4 default-route NIC via ethtool. Limit: enables only with active `tls-hw-tx-offload` on a non-virtual NIC; else logs one reason, stays rustls.
+- Policy `--ktls=auto|on|off`; `auto` (default in feature builds) checks the IPv4 default-route NIC via ethtool. Enables only with active `tls-hw-tx-offload` on a non-virtual NIC; else logs one reason, stays rustls.
 
 - TLS 1.2, H2, H3, and UDS keep userspace paths.
 

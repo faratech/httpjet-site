@@ -54,7 +54,7 @@ The following reference topology is optional. The fresh installer uses a single 
 
 | `httpjet-boot-ready.service` | Boot-only oneshot gate, availability-first: the `Type=notify` LSAPI pool is the one hard dependency; databases/caches are ordered but not required — it waits up to 300 s, then proceeds with a loud warning so a cold boot with a slow database still serves static + warm cache + stale-if-error. Later backend maintenance cannot tear down the sockets. |
 
-| `httpjet.service` | The web tier under a dedicated user. Limit: you check drop-ins before reasoning about flags. |
+| `httpjet.service` | The web tier under a dedicated user. You check drop-ins before reasoning about flags. |
 
 | `httpjet-lsphp.socket` | Owns the LSAPI Unix listener (mode 0600, backlog 8192, `RemoveOnStop`). Never restart it during a reload or supervisor deploy. |
 

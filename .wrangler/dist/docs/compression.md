@@ -19,7 +19,7 @@
 
 | zstd | `zstd` | 3 (1–22) | `enableZstdCompress`, `enableDynZstdCompress`, `zstdCompressLevel` |
 
-| brotli | `brotli` | 5 (0–11). Limit: without `brCompressLevel`, `enableBrCompress` level 1–6 sets it, 0 disables. | `enableBrCompress`, `enableDynBrCompress`, `brCompressLevel` |
+| brotli | `brotli` | 5 (0–11). Without `brCompressLevel`, `enableBrCompress` level 1–6 sets it, 0 disables. | `enableBrCompress`, `enableDynBrCompress`, `brCompressLevel` |
 
 | gzip | `flate2` | 6 (1–9) | `enableGzipCompress`, `enableDynGzipCompress`, `gzipCompressLevel` |
 
@@ -27,15 +27,15 @@
 
 **What gets compressed** — check each item:
 
-- Bodies over 200 bytes. Limit: 200 bytes or fewer never compress.
+- Bodies over 200 bytes. 200 bytes or fewer never compress.
 
-- Types in LiteSpeed's `compressibleTypes`. Limit: other types pass through.
+- Types in LiteSpeed's `compressibleTypes`. Other types pass through.
 
-- Unencoded, non-206 responses. Limit: already-encoded and 206 responses skip.
+- Unencoded, non-206 responses. Already-encoded and 206 responses skip.
 
-- Buffered bodies in one shot. Limit: streamed bodies stay streaming.
+- Buffered bodies in one shot. Streamed bodies stay streaming.
 
-- Every encoded response. Limit: it carries `Vary: Accept-Encoding`.
+- Every encoded response. It carries `Vary: Accept-Encoding`.
 
 zstd uses a per-thread `ZSTD_CCTX` pool and pooled buffers (`hj_core::recycle::BODY_BUFS`). Streamed bodies (`Body::Stream`) wrap in a lazy `CompressStream`, so SSE stays real-time.
 
@@ -64,13 +64,13 @@ httpjet --root /abs/root serve … --request-decompression-extra br,zstd     # a
 
 - A successful decode removes `Content-Encoding`. It replaces `Content-Length` with the decoded length before any handler runs.
 
-- Decoded output may not exceed `maxReqBodySize` (413). Limit: the absolute decoder ceiling is 16 MiB.
+- Decoded output may not exceed `maxReqBodySize` (413). The absolute decoder ceiling is 16 MiB.
 
-- At the 16 MiB ceiling, you forward the encoded body unchanged. Limit: you never expose a truncated body.
+- At the 16 MiB ceiling, you forward the encoded body unchanged. You never expose a truncated body.
 
-- Brotli large-window extensions stay disabled. Limit: zstd frames cap at a 2 24 -byte window; `deflate` never decodes.
+- Brotli large-window extensions stay disabled. Zstd frames cap at a 2 24 -byte window; `deflate` never decodes.
 
-- Brotli/zstd reserve 17 MiB for decoder tables first. Limit: if workspace plus both body forms cannot reserve, you get 503.
+- Brotli/zstd reserve 17 MiB for decoder tables first. If workspace plus both body forms cannot reserve, you get 503.
 
 **Limits.** Response-side decoding caps `windowLogMax` and bounds decoded size. A hostile or corrupt frame fails the decode instead of ballooning memory. Compare representative hits and misses before trading CPU for bytes. Production samples this phase as `httpjet_phase_compress_seconds`.
 

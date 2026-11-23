@@ -11,8 +11,8 @@
         <thead><tr><th><code>useIpInProxyHeader</code></th><th>Forwarded headers are believed…</th></tr></thead>
         <tbody>
           <tr><td>0</td><td>never</td></tr>
-          <tr><td>1 / 4</td><td>always. Limit: only safe when only your proxy can reach the listener.</td></tr>
-          <tr><td>2 (default)</td><td>only from trusted peers (<code>allow … T</code>). Limit: <code>CF-Connecting-IP</code> counts on that path.</td></tr>
+          <tr><td>1 / 4</td><td>always. Only safe when only your proxy can reach the listener.</td></tr>
+          <tr><td>2 (default)</td><td>only from trusted peers (<code>allow … T</code>). <code>CF-Connecting-IP</code> counts on that path.</td></tr>
           <tr><td>3</td><td>as 2, for IP purposes only</td></tr>
         </tbody></table></div>
       <p>The admin write API marks <code>useIpInProxyHeader</code> and <code>&lt;security&gt;</code> <strong>restart-required</strong>. Trust never changes under a running generation.</p>
@@ -50,9 +50,9 @@ asn 13335 203.0.113.0/24</code></pre></div>
     <section>
       <h2 id="tls">TLS &amp; mTLS</h2>
       <ul>
-        <li><strong>mTLS</strong> — set <code>clientVerify</code> 1–3 for a webpki verifier on the <em>listener</em> CA; level 2 requires a client certificate. Limit: <code>--no-mtls</code> is local testing only; confirm flags with <code>systemctl show -p ExecStart</code>.</li>
-        <li><strong>Revocation and resumption</strong> — add <code>crlFile</code> for PEM CRL enforcement; absent means none. Limit: one TLS 1.3 suite, 0-RTT off, single-use tickets only without client verification, resumption off with OCSP.</li>
-        <li><strong>One config, two transports</strong> — a certificate, verifier or CRL change lands on TCP and QUIC together. Limit: see <a href="certificates.html">TLS, ACME &amp; OCSP</a>.</li>
+        <li><strong>mTLS</strong> — set <code>clientVerify</code> 1–3 for a webpki verifier on the <em>listener</em> CA; level 2 requires a client certificate. <code>--no-mtls</code> is local testing only; confirm flags with <code>systemctl show -p ExecStart</code>.</li>
+        <li><strong>Revocation and resumption</strong> — add <code>crlFile</code> for PEM CRL enforcement; absent means none. One TLS 1.3 suite, 0-RTT off, single-use tickets only without client verification, resumption off with OCSP.</li>
+        <li><strong>One config, two transports</strong> — a certificate, verifier or CRL change lands on TCP and QUIC together. See <a href="certificates.html">TLS, ACME &amp; OCSP</a>.</li>
       </ul>
       <p class="mini">A plaintext request for an mTLS vhost is refused unless from loopback. TLS stream splitting was made memory-safe in the 2026-09-06 round.</p>
     </section>
@@ -62,16 +62,16 @@ asn 13335 203.0.113.0/24</code></pre></div>
       <div class="tablewrap"><table>
         <thead><tr><th>Fence</th><th>Enforcement</th></tr></thead>
         <tbody>
-          <tr><td>Header, URL, connections, timeouts</td><td>From <code>&lt;tuning&gt;</code>. Limit: <code>maxReqURLLen</code>, <code>maxReqHeaderSize</code>, <code>maxConnections</code>, <code>connTimeout</code>, <code>keepAliveTimeout</code>, <code>maxKeepAliveReq</code>.</td></tr>
-          <tr><td>Body size</td><td><code>maxReqBodySize</code>, per-context override. Limit: 413 on every terminal; reserve decoded growth first.</td></tr>
-          <tr><td>Body budget</td><td>Process-wide byte budget with owned leases. Limit: released on completion or teardown; see <code>httpjet_body_buffer_*</code>.</td></tr>
-          <tr><td>Request decompression</td><td>Gzip default; br/zstd opt-in. Limit: 16 MiB ceiling, 17 MiB workspace, zstd window ≤ 2<sup>24</sup>, one coding (<a href="compression.html#request">→</a>).</td></tr>
-          <tr><td>Egress bandwidth</td><td>Per-connection token bucket (<code>bandwidthLimit</code>). Limit: H2 paces per connection; H3 unpaced.</td></tr>
-          <tr><td>Ranges · sub_filter · <code>.htaccess</code></td><td>8 ranges / 8 MiB. Limit: 4 MiB then raw pass-through; 64 levels then deny-all.</td></tr>
-          <tr><td>H2 / H3 memory</td><td>Stream and connection limits, Bomb mitigation. Limit: leases release on reset/EOF/error.</td></tr>
-          <tr><td>Page cache</td><td>100 MiB object cap; index/file/hot budgets; identity guard. Limit: integrity key validated like admin tokens; purge is loopback POST-only.</td></tr>
-          <tr><td>Reload safety</td><td>Broken SIGHUP config keeps the old generation. Limit: out-of-range isolation modes are hard errors.</td></tr>
-          <tr><td>Worker pinning</td><td>Core indices clamped to <code>CPU_SETSIZE</code>. Limit: no pin past the set size.</td></tr>
+          <tr><td>Header, URL, connections, timeouts</td><td>From <code>&lt;tuning&gt;</code>. <code>maxReqURLLen</code>, <code>maxReqHeaderSize</code>, <code>maxConnections</code>, <code>connTimeout</code>, <code>keepAliveTimeout</code>, <code>maxKeepAliveReq</code>.</td></tr>
+          <tr><td>Body size</td><td><code>maxReqBodySize</code>, per-context override. 413 on every terminal; reserve decoded growth first.</td></tr>
+          <tr><td>Body budget</td><td>Process-wide byte budget with owned leases. Released on completion or teardown; see <code>httpjet_body_buffer_*</code>.</td></tr>
+          <tr><td>Request decompression</td><td>Gzip default; br/zstd opt-in. 16 MiB ceiling, 17 MiB workspace, zstd window ≤ 2<sup>24</sup>, one coding (<a href="compression.html#request">→</a>).</td></tr>
+          <tr><td>Egress bandwidth</td><td>Per-connection token bucket (<code>bandwidthLimit</code>). H2 paces per connection; H3 unpaced.</td></tr>
+          <tr><td>Ranges · sub_filter · <code>.htaccess</code></td><td>8 ranges / 8 MiB. 4 MiB then raw pass-through; 64 levels then deny-all.</td></tr>
+          <tr><td>H2 / H3 memory</td><td>Stream and connection limits, Bomb mitigation. Leases release on reset/EOF/error.</td></tr>
+          <tr><td>Page cache</td><td>100 MiB object cap; index/file/hot budgets; identity guard. Integrity key validated like admin tokens; purge is loopback POST-only.</td></tr>
+          <tr><td>Reload safety</td><td>Broken SIGHUP config keeps the old generation. Out-of-range isolation modes are hard errors.</td></tr>
+          <tr><td>Worker pinning</td><td>Core indices clamped to <code>CPU_SETSIZE</code>. No pin past the set size.</td></tr>
         </tbody></table></div>
       <p class="mini">Incomplete request reads stay bounded (2026-09-06). H2 frame/body deadlines apply on both loops. Judge integrity state by <code>httpjet_pagecache_integrity_active</code>; <code>--page-cache-integrity-required</code> makes an uninstallable key a boot failure.</p>
     </section>
@@ -92,12 +92,12 @@ asn 13335 203.0.113.0/24</code></pre></div>
       <div class="tablewrap"><table>
         <thead><tr><th>Surface</th><th>Guard</th></tr></thead>
         <tbody>
-          <tr><td><code>/__hj_cache_purge</code>, <code>/__hj_cache_ready</code></td><td>Raw TCP peer must be loopback. Limit: POST-only purge (405 + <code>Allow</code>); ready takes GET/HEAD; a <code>unix:</code> listener opens both to local processes.</td></tr>
-          <tr><td><code>--metrics-addr</code> (<code>/metrics</code>, <code>/cache-entries</code>, <code>/__mimalloc-stats</code>, <code>/__alloc-count</code>, <code>/debug/pprof/profile</code>)</td><td>Loopback-only by default. Limit: <code>/metrics</code> open on loopback; the rest need a Bearer token matching <code>--profile-token-file</code> (403 when unset).</td></tr>
-          <tr><td><code>--admin-addr</code> (<code>/v1/status</code>)</td><td>Loopback TCP only. Limit: loopback Host required; Origin headers and bodies rejected.</td></tr>
-          <tr><td><code>--admin-write-addr</code> (<code>/v1/revision</code>, <code>/v1/config[/validate]</code>)</td><td>Loopback + Bearer token from a 0400/0600 single-link file. Limit: constant-time compare, exact <code>If-Match</code>, explicit resource roots.</td></tr>
-          <tr><td>LSAPI control and generation files</td><td>Root-only control socket. Limit: web pools mmap the generation file read-only; parent must not be group-writable.</td></tr>
-          <tr><td>ACME store · DNS token · integrity key · admin token</td><td>Owner and mode checks on the descriptor. Limit: no symlink following, bounded reads.</td></tr>
+          <tr><td><code>/__hj_cache_purge</code>, <code>/__hj_cache_ready</code></td><td>Raw TCP peer must be loopback. POST-only purge (405 + <code>Allow</code>); ready takes GET/HEAD; a <code>unix:</code> listener opens both to local processes.</td></tr>
+          <tr><td><code>--metrics-addr</code> (<code>/metrics</code>, <code>/cache-entries</code>, <code>/__mimalloc-stats</code>, <code>/__alloc-count</code>, <code>/debug/pprof/profile</code>)</td><td>Loopback-only by default. <code>/metrics</code> open on loopback; the rest need a Bearer token matching <code>--profile-token-file</code> (403 when unset).</td></tr>
+          <tr><td><code>--admin-addr</code> (<code>/v1/status</code>)</td><td>Loopback TCP only. Loopback Host required; Origin headers and bodies rejected.</td></tr>
+          <tr><td><code>--admin-write-addr</code> (<code>/v1/revision</code>, <code>/v1/config[/validate]</code>)</td><td>Loopback + Bearer token from a 0400/0600 single-link file. Constant-time compare, exact <code>If-Match</code>, explicit resource roots.</td></tr>
+          <tr><td>LSAPI control and generation files</td><td>Root-only control socket. Web pools mmap the generation file read-only; parent must not be group-writable.</td></tr>
+          <tr><td>ACME store · DNS token · integrity key · admin token</td><td>Owner and mode checks on the descriptor. No symlink following, bounded reads.</td></tr>
         </tbody></table></div>
     </section>
 
@@ -106,15 +106,15 @@ asn 13335 203.0.113.0/24</code></pre></div>
       <div class="tablewrap"><table>
         <thead><tr><th>Date</th><th>Scope</th><th>Headline</th></tr></thead>
         <tbody>
-          <tr><td>2026-08-30</td><td>#362–#368</td><td>No exploitable High. Limit: five low/informational fixes.</td></tr>
-          <tr><td>2026-09-06</td><td>Five findings</td><td>H2/H3 reservation leaks, gzip accounting, Basic-auth merging. Limit: plus authenticated-static caching and UA memo keys.</td></tr>
-          <tr><td>2026-09-16</td><td>Twelve fixes</td><td>Unreadable <code>.htaccess</code> fail-closed, PROXY loopback claims, <code>[P]</code> screening. Limit: plus CGI deny-list, never-root, single Content-Length.</td></tr>
-          <tr><td>2026-10-06</td><td>#560–#575 (0.0.4)</td><td>H3 budget at <code>Connected</code>, RFC 9112 intake, docroot-confined <code>AuthUserFile</code>. Limit: plus POST-only purge, fuzz targets, RustSec CI.</td></tr>
+          <tr><td>2026-08-30</td><td>#362–#368</td><td>No exploitable High. Five low/informational fixes.</td></tr>
+          <tr><td>2026-09-06</td><td>Five findings</td><td>H2/H3 reservation leaks, gzip accounting, Basic-auth merging. Plus authenticated-static caching and UA memo keys.</td></tr>
+          <tr><td>2026-09-16</td><td>Twelve fixes</td><td>Unreadable <code>.htaccess</code> fail-closed, PROXY loopback claims, <code>[P]</code> screening. Plus CGI deny-list, never-root, single Content-Length.</td></tr>
+          <tr><td>2026-10-06</td><td>#560–#575 (0.0.4)</td><td>H3 budget at <code>Connected</code>, RFC 9112 intake, docroot-confined <code>AuthUserFile</code>. Plus POST-only purge, fuzz targets, RustSec CI.</td></tr>
           <tr><td>—</td><td>0.0.5 (#579–#593)</td><td>15 findings.</td></tr>
-          <tr><td>2026-10-13</td><td>0.0.6 (#594–#611)</td><td>Truncated LSAPI/FastCGI aborts, HPACK over-cap stream error. Limit: plus H3 backpressure, OCSP SAN checks.</td></tr>
-          <tr><td>2026-10-14..24</td><td>0.0.7–0.1.5, bug-bash 1–16, #1138</td><td>OLS parity, APR1/MD5-crypt + auth rate limit, SHA-256 vary hashing. Limit: plus WAF peer-UID, rustls 0.23.46.</td></tr>
-          <tr><td>2026-10-25</td><td>0.1.10 bug/perf bash</td><td>23 issues, 22 fixed, one closed by decision. Limit: no-follow walk, H1 send deadlines, dropped-POST replay.</td></tr>
-          <tr><td>2026-11-10..11</td><td>0.2.0 review of v0.1.10..v0.1.12 + the 2026-10-30 sweep (#1193&ndash;#1230)</td><td>28 issues fixed, each with a regression test; two read-only reviews found no wrong-content path in the response memo or page cache. Limit: upstream WebSocket handshake validation, no credentials in capsule revalidation, every gzip member decoded, LSAPI packet order, error-log escaping, QUIC self-closing Initials (pre-handshake memory), shared cache bodies off the server-wide H3 budget, listener address checks, CPU steering gated on NIC queues.</td></tr>
+          <tr><td>2026-10-13</td><td>0.0.6 (#594–#611)</td><td>Truncated LSAPI/FastCGI aborts, HPACK over-cap stream error. Plus H3 backpressure, OCSP SAN checks.</td></tr>
+          <tr><td>2026-10-14..24</td><td>0.0.7–0.1.5, bug-bash 1–16, #1138</td><td>OLS parity, APR1/MD5-crypt + auth rate limit, SHA-256 vary hashing. Plus WAF peer-UID, rustls 0.23.46.</td></tr>
+          <tr><td>2026-10-25</td><td>0.1.10 bug/perf bash</td><td>23 issues, 22 fixed, one closed by decision. No-follow walk, H1 send deadlines, dropped-POST replay.</td></tr>
+          <tr><td>2026-11-10..11</td><td>0.2.0 review of v0.1.10..v0.1.12 + the 2026-10-30 sweep (#1193&ndash;#1230)</td><td>28 issues fixed, each with a regression test; two read-only reviews found no wrong-content path in the response memo or page cache. Upstream WebSocket handshake validation, no credentials in capsule revalidation, every gzip member decoded, LSAPI packet order, error-log escaping, QUIC self-closing Initials (pre-handshake memory), shared cache bodies off the server-wide H3 budget, listener address checks, CPU steering gated on NIC queues.</td></tr>
           <tr><td>2026-11-20</td><td>0.2.4 audit remediation + follow-up pass</td><td>36 reliability and correctness fixes across H1/H2/H3 transport, page cache, rewrite/<code>.htaccess</code>, proxy pooling, TLS/OCSP lifecycle, and backend gateways; panic-lint ratchet reduced from 572 to 567 sites.</td></tr>
         </tbody></table></div>
       <p>Gates re-run after each round: full suite (3,237 tests at 0.2.4; 3,171 at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.</p>

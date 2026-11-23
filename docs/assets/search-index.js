@@ -9,7 +9,7 @@ window.DOCS_INDEX = [
    {
     "id": "what",
     "t": "What httpjet is",
-    "kw": "--root mime.properties lsphp Header ErrorDocument X-LiteSpeed-Cache-Control Tag Vary Purge fileETag html h2: h2s: sub_filter check --strict"
+    "kw": "mime.properties lsphp Header ErrorDocument X-LiteSpeed-Cache-Control Tag Vary Purge fileETag html h2: h2s: sub_filter check --strict"
    },
    {
     "id": "map",
@@ -27,7 +27,7 @@ window.DOCS_INDEX = [
    {
     "id": "status",
     "t": "Project status",
-    "kw": "Arc HeaderMap fast_memo RootDir htaccess check --strict lsphp acme ocsp otel ktls profiling"
+    "kw": "check --strict lsphp acme ocsp otel ktls profiling"
    }
   ]
  },
@@ -678,7 +678,7 @@ window.DOCS_INDEX = [
    {
     "id": "keys",
     "t": "Keys, tiers and the identity guard",
-    "kw": "orig_path orig_query index.php httpjet_pagecache_key_id_collisions_total X-LiteSpeed-Vary: cookie NAME --page-cache-vary-cookies Set-Cookie X-LiteSpeed- xf_user xf_session --page-cache-private --page-cache-shared-paths no-cache httpjet_cache_bypass"
+    "kw": "orig_path orig_query index.php httpjet_pagecache_key_id_collisions_total X-LiteSpeed-Vary: cookie NAME --page-cache-vary-cookies Set-Cookie X-LiteSpeed- --page-cache-shared-paths no-cache httpjet_cache_bypass"
    },
    {
     "id": "store",
@@ -711,7 +711,7 @@ window.DOCS_INDEX = [
    {
     "id": "capsules",
     "t": "XenForo public-shell capsules application-specific",
-    "kw": "--xf-capsule --page-cache --xf-capsule-vhosts --xf-capsule-paths all-get-classified --xf-capsule-stale-secs --xf-capsule-dedicated-store --page-cache-shared-paths --page-cache-private"
+    "kw": "--xf-capsule --page-cache --xf-capsule-vhosts --xf-capsule-paths all-get-classified --xf-capsule-stale-secs --xf-capsule-dedicated-store"
    },
    {
     "id": "generations",
@@ -906,12 +906,12 @@ window.DOCS_INDEX = [
    {
     "id": "serve",
     "t": "serve flags",
-    "kw": "--http-addr --https-addr --workers --no-core-pinning --uring-ring --no-cpu-steering --ready-file --h3-engine --h3-gso-segments --h3-send-batch --h3-ack-eliciting-threshold --h3-max-ack-delay-us --no-multishot-accept --http-uds --ktls --no-mtls --per-ip-rate --request-decompression-extra --trusted-proxy-idle-secs --trusted-proxy-idle-max-conns --tls-session-tickets --auth-user-file-roots --no-php --php-children --php-socket --lsphp-external --lsphp-generation-file --php-max-process-time-ms --page-cache --page-cache-mem --page-cache-disk-mem --page-cache-store-path --page-cache-integrity-key --page-cache-integrity-required --page-cache-hot-mem --page-cache-dict --page-cache-dict-vhost --page-cache-dict-level --page-cache-vary-default --page-cache-opt-in-status --page-cache-303-prefixes --page-cache-stream-fill-vhosts --page-cache-egress-at-rest-vhosts --page-cache-admit-threshold --page-cache-vary-cookies --page-cache-private-cookies --page-cache-private --page-cache-private-session-cookie --page-cache-private-user-cookie --page-cache-shared-paths --page-cache-shared-paths-canary-percent --page-cache-standard-vhosts --page-cache-stale-default-secs --page-cache-stale-max-secs --page-cache-stale-if-error-max-secs --page-cache-stale-if-error-default-secs --xf-capsule --xf-capsule-vhosts --xf-capsule-paths --xf-capsule-safe-get-mode --xf-capsule-stale-secs --xf-capsule-canary-percent --xf-capsule-members --xf-capsule-member-canary-percent --no-fast-memo --no-page-cache-response-memo --fast-early-bridge --cf-send-zstd --rewrite-outcome-ttl-ms --rewrite-ua-classify --buffered-work-min-bytes --mimalloc-trim-secs --mimalloc-trim-threshold-mib --metrics-addr --telemetry-file --telemetry-flush-secs --php-slow-log --php-slow-threshold-ms --request-id-header --profile-token --profile-token-file --admin-addr --admin-write-addr --admin-token-file --admin-resource-root --waf-sidecar-addr --waf-sidecar-uid --waf-sidecar-path --waf-timeout-ms --waf-body-max --waf-concurrency --waf-fail-open --acme-directory --acme-domains --acme-store --acme-accept-terms --acme-bootstrap --acme-reconcile-order --acme-dns-webhook --acme-dns-zones --acme-dns-token-file --acme-test-mode --acme-test-ca-root --acme-test-issuer-root --acme-dns-test-root --ocsp-responder --ocsp-required --ocsp-test-mode --xf-capsule-dedicated-store --root coop legacy defer accelerated auto unix: off perIpRate httpjet_tls_handshakes_resumed_total htaccess PHP_LSAPI_CHILDREN maxConns httpjet lsphp cache enableCache CacheLookup X-LiteSpeed-Cache-Control vhost path level name value xf_style_id X-LiteSpeed-Cache-Control: public whats-new X-LiteSpeed-Vary: cookie private max-age prefixes all-get-classified pipeline::fast_memo HJ_FAST_MEMO --page-cache-response-memo shadow httpjet_fast_early_predicted_total httpjet_fast_early_forfeit_total HJ_FAST_EARLY_BRIDGE path_cacheable X-Request-Id ip:port --cache-peer --cache-peer-fill --cache-purge-secret-file --io-uring --io-uring-h3"
+    "kw": "--http-addr --https-addr --workers --no-core-pinning --uring-ring --no-cpu-steering --ready-file --h3-engine --h3-gso-segments --h3-send-batch --h3-ack-eliciting-threshold --h3-max-ack-delay-us --no-multishot-accept --http-uds --ktls --no-mtls --per-ip-rate --request-decompression-extra --trusted-proxy-idle-secs --trusted-proxy-idle-max-conns --tls-session-tickets --auth-user-file-roots --no-php --php-children --php-socket --lsphp-external --lsphp-generation-file --php-max-process-time-ms --page-cache --page-cache-mem --page-cache-disk-mem --page-cache-store-path --page-cache-integrity-key --page-cache-integrity-required --page-cache-hot-mem --page-cache-dict --page-cache-dict-vhost --page-cache-dict-level --page-cache-vary-default --page-cache-opt-in-status --page-cache-303-prefixes --page-cache-stream-fill-vhosts --page-cache-egress-at-rest-vhosts --page-cache-admit-threshold --page-cache-vary-cookies --page-cache-private-cookies --page-cache-private --page-cache-private-session-cookie --page-cache-private-user-cookie --page-cache-shared-paths --page-cache-shared-paths-canary-percent --page-cache-standard-vhosts --page-cache-stale-default-secs --page-cache-stale-max-secs --page-cache-stale-if-error-max-secs --page-cache-stale-if-error-default-secs --xf-capsule --xf-capsule-vhosts --xf-capsule-paths --xf-capsule-safe-get-mode --xf-capsule-stale-secs --xf-capsule-canary-percent --xf-capsule-members --xf-capsule-member-canary-percent --no-fast-memo --no-page-cache-response-memo --fast-early-bridge --cf-send-zstd --rewrite-outcome-ttl-ms --rewrite-ua-classify --buffered-work-min-bytes --mimalloc-trim-secs --mimalloc-trim-threshold-mib --metrics-addr --telemetry-file --telemetry-flush-secs --php-slow-log --php-slow-threshold-ms --request-id-header --profile-token --profile-token-file --admin-addr --admin-write-addr --admin-token-file --admin-resource-root --waf-sidecar-addr --waf-sidecar-uid --waf-sidecar-path --waf-timeout-ms --waf-body-max --waf-concurrency --waf-fail-open --acme-directory --acme-domains --acme-store --acme-accept-terms --acme-bootstrap --acme-reconcile-order --acme-dns-webhook --acme-dns-zones --acme-dns-token-file --acme-test-mode --acme-test-ca-root --acme-test-issuer-root --acme-dns-test-root --ocsp-responder --ocsp-required --ocsp-test-mode --xf-capsule-dedicated-store --root coop legacy defer accelerated auto unix: off perIpRate httpjet_tls_handshakes_resumed_total htaccess PHP_LSAPI_CHILDREN maxConns httpjet lsphp cache enableCache CacheLookup X-LiteSpeed-Cache-Control vhost path level name value xf_style_id X-LiteSpeed-Cache-Control: public whats-new X-LiteSpeed-Vary: cookie private max-age prefixes all-get-classified pipeline::fast_memo HJ_FAST_MEMO --page-cache-response-memo scripts shadow HJ_FAST_EARLY_BRIDGE path_cacheable X-Request-Id ip:port --cache-peer --cache-peer-fill --cache-purge-secret-file --io-uring --io-uring-h3"
    },
    {
     "id": "env",
     "t": "Environment variables",
-    "kw": "HTTPJET_ACCESS_LOG_FORMAT json HTTPJET_ERROR_LOG_FORMAT schema_version HTTPJET_ACCESS_ROLLING_BYTES HTTPJET_ACCESS_KEEP_DAYS HTTPJET_LOG_DIR HTTPJET_URING_NO_IOWAIT IORING_ENTER_NO_IOWAIT IORING_FEAT_NO_IOWAIT HTTPJET_SYSLOG_TARGET udp: host:514 host:port run systemd journal syslog HTTPJET_SYSLOG_FACILITY _SEVERITY _RFC _HOSTNAME _APP_NAME daemon info httpjet CF_SEND_ZSTD --cf-send-zstd HJ_FAST_MEMO --no-fast-memo HJ_FAST_EARLY_BRIDGE off shadow --fast-early-bridge HJ_LSAPI_FULL_HEADER_ENV HTTP_ _SERVER HTTPJET_OTEL HTTPJET_OTEL_METRICS --features otel HTTPJET_OTEL_SAMPLE_RATIO HTTPJET_OTEL_TRUSTED_PARENTS traceparent OTEL_EXPORTER_OTLP_TRACES_ENDPOINT OTEL_EXPORTER_OTLP_METRICS_ENDPOINT http: traces RUST_LOG debug hj_rewrite trace HJ_ROOT HJ_URING_ HJ_PEBBLE_ HTTPJET_ _TEST_CHILD"
+    "kw": "HTTPJET_ACCESS_LOG_FORMAT json HTTPJET_ERROR_LOG_FORMAT schema_version HTTPJET_ACCESS_ROLLING_BYTES HTTPJET_ACCESS_KEEP_DAYS HTTPJET_LOG_DIR HTTPJET_URING_NO_IOWAIT IORING_ENTER_NO_IOWAIT IORING_FEAT_NO_IOWAIT HTTPJET_SYSLOG_TARGET udp: host:514 host:port run systemd journal syslog HTTPJET_SYSLOG_FACILITY _SEVERITY _RFC _HOSTNAME _APP_NAME daemon info httpjet CF_SEND_ZSTD --cf-send-zstd HJ_FAST_MEMO --no-fast-memo HJ_FAST_EARLY_BRIDGE off shadow scripts --fast-early-bridge HJ_LSAPI_FULL_HEADER_ENV HTTP_ _SERVER HTTPJET_OTEL HTTPJET_OTEL_METRICS --features otel HTTPJET_OTEL_SAMPLE_RATIO HTTPJET_OTEL_TRUSTED_PARENTS traceparent OTEL_EXPORTER_OTLP_TRACES_ENDPOINT OTEL_EXPORTER_OTLP_METRICS_ENDPOINT http: traces RUST_LOG debug hj_rewrite trace HJ_ROOT HJ_URING_ HJ_PEBBLE_ HTTPJET_ _TEST_CHILD"
    },
    {
     "id": "exit",
@@ -938,7 +938,7 @@ window.DOCS_INDEX = [
    {
     "id": "attribution",
     "t": "Where the time actually goes",
-    "kw": "lsphp htaccess access_decision_for_request --trusted-proxy-idle-secs --page-cache-dict-level hj_core::recycle::BODY_BUFS MIMALLOC_PURGE_DELAY"
+    "kw": "htaccess access_decision_for_request --trusted-proxy-idle-secs --page-cache-dict-level hj_core::recycle::BODY_BUFS MIMALLOC_PURGE_DELAY"
    },
    {
     "id": "loopback",

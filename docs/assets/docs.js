@@ -5,7 +5,7 @@
   "use strict";
   var doc = document, root = doc.documentElement;
   var AUDIO_STORAGE_KEY = "hj_epic_audio_v1";
-  var DOCS_ASSET_VER = "20261024n";
+  var DOCS_ASSET_VER = "20261123b";
 
   var makeRng = function (seed) {
     return function () {
@@ -1269,28 +1269,31 @@
     function render() {
       var method = q("[name=method]").value, scheme = q("[name=scheme]").value, host = q("[name=host]").value || "example.test",
           path = q("[name=path]").value || "/", query = q("[name=query]").value,
-          member = q("[name=member]").checked, priv = q("[name=private]").checked, shared = q("[name=shared]").checked,
+          member = q("[name=member]").value, priv = q("[name=private]").checked, shared = q("[name=shared]").checked,
           style = q("[name=style]").value, hdr = q("[name=hdr]").value, origin = q("[name=origin]").checked;
       var lines = [];
       if (method !== "GET" && method !== "HEAD") { lines.push('<span class="bad">bypass</span> — only GET/HEAD are looked up or stored (POST caching is not implemented).'); out.innerHTML = lines.join("\n"); return; }
       var tier = "public";
-      if (member) {
-        if (shared) tier = "public (shared-paths allowlist, sticky canary)";
-        else if (priv) tier = "private";
-        else { lines.push('<span class="bad">bypass</span> — a member-cookie request without <b>--page-cache-private</b> never touches the public tier.'); out.innerHTML = lines.join("\n"); return; }
+      if (priv && member !== "guest") {
+        if (shared) tier = "public (shared-path allowlist and canary)";
+        else if (member === "session") tier = "private";
+        else { lines.push('<span class="bad">bypass</span> — private routing requires a non-empty session; a user marker alone cannot key a private entry.'); out.innerHTML = lines.join("\n"); return; }
+      } else if (!priv && member !== "guest") {
+        lines.push('<span class="warn">public routing</span> — private routing is disabled. Request and response cache guards still apply; this does not guarantee a hit or store.');
       }
       var key = ["epoch·gen", "vhost(" + esc(host) + ")", scheme, esc(host), esc(path) + (query ? "?" + esc(query) : "")];
-      if (style) key.push("vary:xf_style_id=" + esc(style));
+      if (style && tier !== "private") key.push("vary:xf_style_id=" + esc(style));
       if (origin) key.push("origin:<request Origin>");
       if (tier === "private") key.push("session:<xf_session value>");
       lines.push("tier    : <b>" + tier + "</b>");
       lines.push("key     : " + key.join(" · "));
       lines.push("identity: host=" + esc(host) + " raw-path=" + esc(path) + "  (guard: a collision is a miss, never wrong content)");
       var h = hdr.trim();
-      if (!h) lines.push('<span class="warn">not stored</span> — the response carries no accepted cache header (opt-in is the app\'s job).');
+      if (method === "HEAD") lines.push('<span class="warn">lookup only</span> — HEAD may reuse a GET entry but cannot populate one.');
+      else if (!h) lines.push('<span class="warn">not stored</span> — the response carries no accepted cache header (opt-in is the app\'s job).');
       else if (/no-cache|no-store/i.test(h)) lines.push('<span class="bad">not stored</span> — ' + esc(h));
       else if (/private/i.test(h) && tier !== "private") lines.push('<span class="warn">not stored on the public tier</span> — a private opt-in needs a member request and --page-cache-private.');
-      else if (/public/i.test(h) && tier === "private") lines.push('<span class="warn">stored PRIVATE</span> — a member request stores under its session even for a public opt-in (never into the public tier).');
+      else if (/public/i.test(h) && tier === "private") lines.push('<span class="warn">not stored</span> — private routing requires a private cache opt-in; a public opt-in cannot populate the private tier.');
       else {
         var m = /max-age=(\d+)/i.exec(h);
         lines.push('<span class="good">store candidate</span> — TTL ' + (m ? (tier === "private" ? Math.min(+m[1], 300) + " s (private TTL capped at 300 s)" : m[1] + " s") : "default expireInSeconds") + (tier === "private" ? ", stored without the W-TinyLFU admission bar, subject to" : ", subject to W-TinyLFU admission (threshold 2 by default → stored on the 2nd sighting) and") + " the status/Set-Cookie/self-redirect guards.");
@@ -1825,10 +1828,10 @@
       {
         id: "b14", tag: "v0.1.10", short: "Bug/Perf Bash", date: "2026-10-26", commit: "c07d345", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
         regime: "loopback A/B, both run orders, 5 blocks, 16 workloads · x86_64 shared 8-core host · vs public v0.1.5 · 3,068 workspace tests green",
-        title: "v0.1.10 — Bug/Perf Bash: 0 of 80 metric rows worse than v0.1.5",
+        title: "v0.1.10 — Bug/Perf Bash: 0 of 80 rows classified worse beyond noise vs v0.1.5",
         summary: "A five-round review closed 23 issues (22 fixed, 1 closed by decision). Run back to back against the public v0.1.5 build, each with its production flags, no metric row got worse. These are relative changes from a controlled A/B, not production throughput.",
         kpis: [
-          { v: "0 / 80", d: "metric rows worse", n: false, l: "16 workloads × 5 blocks, both run orders" },
+          { v: "0 / 80", d: "rows classified worse beyond noise", n: false, l: "16 workloads; five blocks, both run orders" },
           { v: "−61%", d: "CPU per request", n: false, l: "Page-cache miss → store (throughput +16%)" },
           { v: "−29%", d: "p99 latency", n: false, l: "Open-loop realistic mix at a fixed rate" },
           { v: "−8..−10%", d: "RSS", n: false, l: "Across the dynamic workloads" }
@@ -1888,7 +1891,7 @@
       },
       {
         id: "b16", tag: "v0.1.12", short: "Hot-Path Reductions", date: "2026-11-08", commit: "85b99e16", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
-        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 cores / loadgen 4 cores · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
+        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 vCPUs / loadgen 4 vCPUs · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
         title: "v0.1.12 — Hot-Path Allocation & Contention Reductions",
         summary: "Borrowed vhost routing, a single-pass fast-serve header scan, HPACK header-name reuse, batched request IDs, sharded telemetry counters and page-cache diskstore/metablob refinements. Re-measured with every other release on the lab VM, its static and heavy medians sit within the round spread of v0.1.11; the pair hold the curve's joint-highest page-cache medians.",
         kpis: [
@@ -1899,7 +1902,7 @@
         ],
         chart: {
           title: "v0.1.12 vs v0.1.11, Lab Loopback (k req/s)",
-          sub: "dedicated lab VM c4-highmem-8 · server 4 cores / loadgen 4 cores · median of 3 rotated rounds · unified-gather PGO tag builds",
+          sub: "dedicated lab VM c4-highmem-8 · server 4 vCPUs / loadgen 4 vCPUs · median of 3 rotated rounds · unified-gather PGO tag builds",
           unit: "k rps",
           series: ["v0.1.11", "v0.1.12"],
           rows: [
@@ -1919,7 +1922,7 @@
       },
       {
         id: "b17", tag: "v0.2.0", short: "Audit Fixes + Cold Start", date: "2026-11-11", commit: "8fcb4647", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
-        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 cores / loadgen 4 cores · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
+        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 vCPUs / loadgen 4 vCPUs · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
         title: "v0.2.0 — Security Audit Fixes + Cold-Start Latency",
         summary: "A review of everything added since v0.1.10 closed 20+ issues, each with a regression test (WebSocket handshake validation, capsule revalidation, multi-member gzip, LSAPI packet order, error-log escaping, QUIC handshake cleanup, H3 body budget, listener address checks). The one behaviour change you can measure: the .htaccess chain is parsed once before the first connection and its rewrite prefilter is built off the request path, so a restart no longer stalls every core for the parse.",
         kpis: [
@@ -1930,7 +1933,7 @@
         ],
         chart: {
           title: "v0.2.0 vs v0.1.12, Lab Loopback (k req/s)",
-          sub: "dedicated lab VM c4-highmem-8 · server 4 cores / loadgen 4 cores · median of 3 rotated rounds · unified-gather PGO tag builds",
+          sub: "dedicated lab VM c4-highmem-8 · server 4 vCPUs / loadgen 4 vCPUs · median of 3 rotated rounds · unified-gather PGO tag builds",
           unit: "k rps",
           series: ["v0.1.12", "v0.2.0"],
           rows: [
@@ -1951,7 +1954,7 @@
       },
       {
         id: "b18", tag: "v0.2.1", short: "Admission Fix + Fuzz", date: "2026-11-12", commit: "4345a424", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
-        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 cores / loadgen 4 cores · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
+        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 vCPUs / loadgen 4 vCPUs · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
         title: "v0.2.1 — Admission-Threshold Fix, Hardening & Fuzz",
         summary: "No performance work: the store-admission filter was sized so a never-requested URL reads zero (threshold 2 had decayed into storing every cacheable response), LSAPI length-prefix guards were kept in release builds, HTTP/1 connection ends were counted by cause, HTTP/2 flush metadata was reused, and fuzz targets were added for HTTP/2 frames, HTTP/3 wire parsers, LSAPI packets, FastCGI records and the page-cache container.",
         kpis: [
@@ -1961,7 +1964,7 @@
         ],
         chart: {
           title: "v0.2.1 vs v0.2.0, Lab Loopback (k req/s)",
-          sub: "dedicated lab VM c4-highmem-8 · server 4 cores / loadgen 4 cores · median of 3 rotated rounds · unified-gather PGO tag builds",
+          sub: "dedicated lab VM c4-highmem-8 · server 4 vCPUs / loadgen 4 vCPUs · median of 3 rotated rounds · unified-gather PGO tag builds",
           unit: "k rps",
           series: ["v0.2.0", "v0.2.1"],
           rows: [
@@ -1981,7 +1984,7 @@
       },
       {
         id: "b19", tag: "v0.2.2", short: "Second Review Pass", date: "2026-11-12", commit: "d59a6379", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
-        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 cores / loadgen 4 cores · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
+        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 vCPUs / loadgen 4 vCPUs · unified-gather PGO tag builds of both releases · median of 3 rotated rounds · raw logs published",
         title: "v0.2.2 — Second Review Pass: QUIC Flood-Guard, Stale Access Rules, subFilter, ACME",
         summary: "The QUIC handshake slot survived a re-serviced datagram so spoofed Initials could not stay under the Retry threshold; access files re-parse on ctime/size/inode change (a reload kept old rules after cp -p); subFilter asks proxied upstreams for identity; ACME drops refused orders; the admission filter takes one counter per quarter block; HTTP/2 finds the Link anchor with memchr.",
         kpis: [
@@ -1991,7 +1994,7 @@
         ],
         chart: {
           title: "v0.2.2 vs v0.2.1, Lab Loopback (k req/s)",
-          sub: "dedicated lab VM c4-highmem-8 · server 4 cores / loadgen 4 cores · median of 3 rotated rounds · unified-gather PGO tag builds",
+          sub: "dedicated lab VM c4-highmem-8 · server 4 vCPUs / loadgen 4 vCPUs · median of 3 rotated rounds · unified-gather PGO tag builds",
           unit: "k rps",
           series: ["v0.2.1", "v0.2.2"],
           rows: [
@@ -2011,7 +2014,7 @@
       },
       {
         id: "b20", tag: "v0.2.3", short: "Stream-Fill & Buffered Work", date: "2026-11-16", commit: "0a9899c7", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
-        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 cores / loadgen 4 cores · unified-gather PGO tag builds of all 15 releases · median of 3 rotated rounds · raw logs published",
+        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 vCPUs / loadgen 4 vCPUs · unified-gather PGO tag builds of all 15 releases · median of 3 rotated rounds · raw logs published",
         title: "v0.2.3 — Progressive Stream-Fill, Single-Encode Zstd Caching, Buffered-Work Slicing & Dep Refresh",
         summary: "Unframed cacheable misses on stream-fill vhosts stream straight to the client while a backend-paced task stores at the end; streamed zstd misses encode once and store the sent bytes; --buffered-work-min-bytes slices large buffered encodes in 64 KiB yielding chunks; static fast path borrows request head; proxy pool expires from an ordered prefix; dependencies refreshed.",
         kpis: [
@@ -2021,7 +2024,7 @@
         ],
         chart: {
           title: "v0.2.3 vs v0.2.2, Lab Loopback (k req/s)",
-          sub: "dedicated lab VM c4-highmem-8 · server 4 cores / loadgen 4 cores · median of 3 rotated rounds · unified-gather PGO tag builds",
+          sub: "dedicated lab VM c4-highmem-8 · server 4 vCPUs / loadgen 4 vCPUs · median of 3 rotated rounds · unified-gather PGO tag builds",
           unit: "k rps",
           series: ["v0.2.2", "v0.2.3"],
           rows: [
@@ -2041,7 +2044,7 @@
       },
       {
         id: "b21", tag: "v0.2.4", short: "Waves 1–11 Hot-Path Campaign", date: "2026-11-20", commit: "6b6f1c6", era: 3, eraName: "CPU, TLS & Zero-Fault Campaign",
-        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 cores / loadgen 4 cores · unified-gather PGO tag builds of all 15 releases · median of 3 rotated rounds · raw logs published",
+        regime: "dedicated lab VM (c4-highmem-8) · loopback · server 4 vCPUs / loadgen 4 vCPUs · unified-gather PGO tag builds of all 15 releases · median of 3 rotated rounds · raw logs published",
         title: "v0.2.4 — 11 Waves of Transport, fast_memo, Rewrite, Static & Backend Optimizations + 36 Audit Fixes",
         summary: "Zero-map stack-local fast path for single-frame H2 requests; small-body coalescing across H1/H2/H3; direct HPACK/QPACK encoding without scratch copies; compile-time QPACK static lookup; shared Arc<HeaderMap> fast_memo egress + 50 ms coarse HTTP Date cache; single-probe router resolution; compact ACL bitmasks + TLS peer cache; cached static RootDir descriptors; borrowed .htaccess/rewrite/LSAPI paths; 36 reliability fixes.",
         kpis: [
@@ -2051,7 +2054,7 @@
         ],
         chart: {
           title: "v0.2.4 vs v0.2.3, Lab Loopback (k req/s)",
-          sub: "dedicated lab VM c4-highmem-8 · server 4 cores / loadgen 4 cores · median of 3 rotated rounds · unified-gather PGO tag builds",
+          sub: "dedicated lab VM c4-highmem-8 · server 4 vCPUs / loadgen 4 vCPUs · median of 3 rotated rounds · unified-gather PGO tag builds",
           unit: "k rps",
           series: ["v0.2.3", "v0.2.4"],
           rows: [
@@ -2613,7 +2616,7 @@
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. Dashed segments connect the November 22 and November 23 runs, each measured on a separate VM under the same protocol."
+          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 vCPUs and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. Dashed segments connect the November 22 and November 23 runs, each measured on a separate VM under the same protocol."
         },
         {
           id: "c-static",
@@ -2647,7 +2650,7 @@
             { key: "h1", label: "httpjet HTTP/1.1 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. Dashed segments connect the November 22 and November 23 runs, each measured on a separate VM under the same protocol."
+          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 vCPUs and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. Dashed segments connect the November 22 and November 23 runs, each measured on a separate VM under the same protocol."
         },
         {
           id: "c-php",
@@ -2681,7 +2684,7 @@
             { key: "cache", label: "httpjet page-cache hit H2 (k rps)", color: "#818cf8" }
           ],
           refs: [],
-          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 cores and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. PHP for v0.0.1–v0.0.3 is cold-pool-ramp-bound (warm, v0.0.1 sustains ~32k req/s). Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. Dashed segments connect the November 22 and November 23 runs, each measured on a separate VM under the same protocol."
+          foot: "Every release from v0.0.1 to v0.2.4 re-measured 2026-11-21 under identical conditions on a dedicated lab VM (c4-highmem-8, the production origin's machine type; no production host was loaded): each release PGO-built from its tag with one unified gather profile, served over the lab loopback with the server on 4 vCPUs and h2load on the other 4, current production flags (uniform for all fifteen builds), 3 rounds in rotated order, median shown. PHP for v0.0.1–v0.0.3 is cold-pool-ramp-bound (warm, v0.0.1 sustains ~32k req/s). Per-round data: assets/release-sweep-2026-11-21.tsv; raw h2load logs and checks: assets/release-sweep-2026-11-21/. Dashed segments connect the November 22 and November 23 runs, each measured on a separate VM under the same protocol."
         }
       ];
 

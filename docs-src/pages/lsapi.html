@@ -59,21 +59,21 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
       <h2 id="pool">The UDS connection pool</h2>
       <p>Requests reach <code>lsphp</code> over a Unix socket behind a generation-epoch pool. In external mode you map the 16-byte generation file read-only; in owned mode the epoch stays process-local.</p>
       <ul>
-        <li><strong>Idle reuse.</strong> Idle connections reuse newest-first and expire oldest-first (0.1.10). Limit: post-surge traffic avoids workers marked to retire.</li>
-        <li><strong>Reset replay.</strong> A GET/HEAD reset before any response byte replays up to twice, on fresh dials after 25 ms (0.1.9). Limit: since 0.1.10, any method dropped unread replays if bodiless or fully read (non-multipart POST to 64 KiB).</li>
-        <li><strong>Dial retries.</strong> Refused or missing-socket dials retry within <code>retryTimeout</code>, capped at 15 s. Limit: fresh-dial <code>EAGAIN</code> under backlog retries too; accepted connections keep TCP keepalive.</li>
-        <li><strong>Attribution.</strong> Each connection's worker is found via <code>UNIX_DIAG</code> peer-inode plus <code>/proc</code>, then pinned by pidfd. Limit: stale workers retire via that pidfd after responding; failures count, never guess.</li>
-        <li><strong>Request bodies.</strong> Chunked or no-<code>Content-Length</code> uploads collect first, because LSAPI needs <code>m_reqBodyLen</code>. Limit: <code>collect_to_cap</code> returns 413 the instant <code>maxReqBodySize</code> would pass; bytes charge the process-wide budget until completion or teardown (2026-09-06). See the <a href="#bodies">bodies stub</a>.</li>
+        <li><strong>Idle reuse.</strong> Idle connections reuse newest-first and expire oldest-first (0.1.10). Post-surge traffic avoids workers marked to retire.</li>
+        <li><strong>Reset replay.</strong> A GET/HEAD reset before any response byte replays up to twice, on fresh dials after 25 ms (0.1.9). Since 0.1.10, any method dropped unread replays if bodiless or fully read (non-multipart POST to 64 KiB).</li>
+        <li><strong>Dial retries.</strong> Refused or missing-socket dials retry within <code>retryTimeout</code>, capped at 15 s. Fresh-dial <code>EAGAIN</code> under backlog retries too; accepted connections keep TCP keepalive.</li>
+        <li><strong>Attribution.</strong> Each connection's worker is found via <code>UNIX_DIAG</code> peer-inode plus <code>/proc</code>, then pinned by pidfd. Stale workers retire via that pidfd after responding; failures count, never guess.</li>
+        <li><strong>Request bodies.</strong> Chunked or no-<code>Content-Length</code> uploads collect first, because LSAPI needs <code>m_reqBodyLen</code>. <code>collect_to_cap</code> returns 413 the instant <code>maxReqBodySize</code> would pass; bytes charge the process-wide budget until completion or teardown (2026-09-06). See the <a href="#bodies">bodies stub</a>.</li>
       </ul>
       <div class="tablewrap"><table>
-        <thead><tr><th>Metric</th><th>Meaning. Limit:</th></tr></thead>
+        <thead><tr><th>Metric</th><th>Meaning and limits</th></tr></thead>
         <tbody>
-          <tr><td><code>httpjet_lsapi_generation_advances_total</code></td><td>Epoch advances observed. Limit: this web process only.</td></tr>
-          <tr><td><code>httpjet_lsapi_stale_idle_drops_total</code> / <code>_stale_checked_out_drops_total</code></td><td>Idle sockets discarded / checked-out sockets refused re-pooling. Limit: after an advance.</td></tr>
-          <tr><td><code>httpjet_lsapi_stale_worker_retire_signals_total</code> / <code>_failures_total</code></td><td>Stale workers retired via pidfd / signals failed. Limit: after their responses completed.</td></tr>
-          <tr><td><code>httpjet_lsapi_worker_attribution_failures_total</code></td><td>Workers you could not pin. Limit: counted, never guessed.</td></tr>
-          <tr><td><code>httpjet_lsapi_acquire_seconds</code> · <code>_dispatch_seconds</code> · <code>_ttfb_seconds</code></td><td>Pool contention · backend time · first byte. Limit: TTFB covers pickup plus render start.</td></tr>
-          <tr><td><code>httpjet_lsapi_reset_replays_total</code> / <code>_reset_replay_exhaustions_total</code>, <code>httpjet_lsapi_eagain_*</code></td><td>Reset replays / exhausted replays, backlog retries. Limit: see replay rules above.</td></tr>
+          <tr><td><code>httpjet_lsapi_generation_advances_total</code></td><td>Epoch advances observed. This web process only.</td></tr>
+          <tr><td><code>httpjet_lsapi_stale_idle_drops_total</code> / <code>_stale_checked_out_drops_total</code></td><td>Idle sockets discarded / checked-out sockets refused re-pooling. After an advance.</td></tr>
+          <tr><td><code>httpjet_lsapi_stale_worker_retire_signals_total</code> / <code>_failures_total</code></td><td>Stale workers retired via pidfd / signals failed. After their responses completed.</td></tr>
+          <tr><td><code>httpjet_lsapi_worker_attribution_failures_total</code></td><td>Workers you could not pin. Counted, never guessed.</td></tr>
+          <tr><td><code>httpjet_lsapi_acquire_seconds</code> · <code>_dispatch_seconds</code> · <code>_ttfb_seconds</code></td><td>Pool contention · backend time · first byte. TTFB covers pickup plus render start.</td></tr>
+          <tr><td><code>httpjet_lsapi_reset_replays_total</code> / <code>_reset_replay_exhaustions_total</code>, <code>httpjet_lsapi_eagain_*</code></td><td>Reset replays / exhausted replays, backlog retries. See replay rules above.</td></tr>
         </tbody></table></div>
       <div class="callout measure"><div class="ico">&#9089;</div><div class="body"><span class="tag">Measured</span><p>PHP/LSAPI over HTTP/1.1: <strong>~44.8k req/s vs LiteSpeed's ~38.5k at c=40</strong> (LiteSpeed best ~41.2k at c=60). In production, PHP render is ~90% of wall time; pool acquire is p99.9 &lt; 1 ms.</p><span class="regime">loopback · PGO · 2026-06 · production telemetry 2026-08-30</span></div></div>
     </section>
@@ -82,11 +82,11 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
       <h2 id="supervisor">The lsphp supervisor</h2>
       <p>In spawn mode (<code>serve</code> without <code>--lsphp-external</code>) you supervise <code>lsphp</code> yourself. Start with the external pool above for production; read this for spawn-mode limits.</p>
       <ul>
-        <li><strong>Spawn.</strong> The listen socket passes on fd 0; socket-activation listeners stay out of children via <code>FD_CLOEXEC</code> and <code>close_range(..., CLOSE_RANGE_CLOEXEC)</code>. Limit: <code>setsid()</code> detaches; <code>PR_SET_PDEATHSIG</code> ties workers to the parent; <code>pre_exec</code> uses async-signal-safe calls only.</li>
-        <li><strong>Tracking.</strong> The supervisor is a subreaper for adopted PHP zombies. Limit: each generation family tracks by injected <code>LSAPI_Z_HTTPJET_GENERATION_MARKER</code> plus pidfds.</li>
-        <li><strong>Cap.</strong> Config <code>LSAPI_CHILDREN</code> is stripped, so <code>--php-children</code> / <code>maxConns</code> alone caps workers. Limit: values below 2 normalize to 2.</li>
-        <li><strong>Refusals (2026-09-16).</strong> Workers never run as root, even if suEXEC computes uid/gid 0. Limit: a setuid <code>lsphp</code> binary is also refused.</li>
-        <li><strong>Deadline.</strong> <code>--php-max-process-time-ms</code> gives a total per-request deadline; exceeded means 504. Limit: spawn mode also kills/restarts the worker; external mode has no web-process monitor, so keep it conservative.</li>
+        <li><strong>Spawn.</strong> The listen socket passes on fd 0; socket-activation listeners stay out of children via <code>FD_CLOEXEC</code> and <code>close_range(..., CLOSE_RANGE_CLOEXEC)</code>. <code>setsid()</code> detaches; <code>PR_SET_PDEATHSIG</code> ties workers to the parent; <code>pre_exec</code> uses async-signal-safe calls only.</li>
+        <li><strong>Tracking.</strong> The supervisor is a subreaper for adopted PHP zombies. Each generation family tracks by injected <code>LSAPI_Z_HTTPJET_GENERATION_MARKER</code> plus pidfds.</li>
+        <li><strong>Cap.</strong> Config <code>LSAPI_CHILDREN</code> is stripped, so <code>--php-children</code> / <code>maxConns</code> alone caps workers. Values below 2 normalize to 2.</li>
+        <li><strong>Refusals (2026-09-16).</strong> Workers never run as root, even if suEXEC computes uid/gid 0. A setuid <code>lsphp</code> binary is also refused.</li>
+        <li><strong>Deadline.</strong> <code>--php-max-process-time-ms</code> gives a total per-request deadline; exceeded means 504. Spawn mode also kills/restarts the worker; external mode has no web-process monitor, so keep it conservative.</li>
       </ul>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Packaging boundary</span><p>httpjet ships no PHP runtime; you manage the executable, extensions, <code>php.ini</code>, opcache, and writable paths. The repo's hardening runbook (<code>systemd/httpjet-lsphp.service.d/hardening.conf</code>, <code>MemoryDenyWriteExecute=no</code> for opcache JIT) is validated live but off by default.</p></div></div>
     </section>
@@ -97,9 +97,9 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>proto</b> · the NUL-inclusive length prefix</span></div><pre><code><span class="t-c">// each env/header field:  [u16 BE = byte_len + 1] [bytes…] [0x00]</span>
 <span class="t-k">const</span> MAX_FIELD: usize = (u16::MAX <span class="t-k">as</span> usize) - 1;   <span class="t-c">// 65534</span></code></pre></div>
       <ul>
-        <li>Fields cap at <code>u16::MAX − 1</code> bytes. Limit: longer fields would wrap and desync every later frame, so the handler answers 431 first.</li>
-        <li>Bodies scan for an embedded <code>BEGIN_REQUEST</code> signature before sending; negative env counts fail at the builder. Limit: the response-header parser is fuzz target <code>lsapi_resp_header</code>, one of eight.</li>
-        <li>A worker dying before <code>LSAPI_RESP_END</code> aborts the body, never truncates silently. Limit: use the shipped <code>packaging/lsphp/lsapilib-hardening.patch</code> for upstream <code>lsapilib.c</code>; tracing reaches PHP as <code>HTTP_TRACEPARENT</code> with <a href="observability.html#otel">OpenTelemetry</a> on.</li>
+        <li>Fields cap at <code>u16::MAX − 1</code> bytes. Longer fields would wrap and desync every later frame, so the handler answers 431 first.</li>
+        <li>Bodies scan for an embedded <code>BEGIN_REQUEST</code> signature before sending; negative env counts fail at the builder. The response-header parser is fuzz target <code>lsapi_resp_header</code>, one of eight.</li>
+        <li>A worker dying before <code>LSAPI_RESP_END</code> aborts the body, never truncates silently. Use the shipped <code>packaging/lsphp/lsapilib-hardening.patch</code> for upstream <code>lsapilib.c</code>; tracing reaches PHP as <code>HTTP_TRACEPARENT</code> with <a href="observability.html#otel">OpenTelemetry</a> on.</li>
       </ul>
     </section>
 
@@ -107,15 +107,15 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
       <h2 id="cgi-env">The CGI environment</h2>
       <p>The builder keeps what was requested apart from what runs. <code>LsapiScript</code> pins <code>SCRIPT_FILENAME</code> while the original <code>REQUEST_URI</code> survives, so front-controller routing stays correct.</p>
       <div class="tablewrap"><table>
-        <thead><tr><th>Variable</th><th>Meaning. Limit:</th></tr></thead>
+        <thead><tr><th>Variable</th><th>Meaning and limits</th></tr></thead>
         <tbody>
-          <tr><td><code>REQUEST_URI</code></td><td>Original request URI. Limit: preserved through rewrites.</td></tr>
-          <tr><td><code>SCRIPT_FILENAME</code> / <code>SCRIPT_NAME</code></td><td>Resolved on-disk script / URI-space name. Limit: <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> upsert via <code>ctx.env</code>.</td></tr>
-          <tr><td><code>REMOTE_ADDR</code>, <code>SERVER_NAME</code>, <code>HTTPS</code>, <code>CONTENT_LENGTH</code>, <code>HTTP_AUTHORIZATION</code>, <code>PHP_VALUE</code>, <code>PHP_ADMIN_VALUE</code>, …</td><td>Server-computed or special-env only. Limit: since 2026-09-16, <code>[E=…]</code>/<code>SetEnv</code>/processor <code>env</code> naming one is denied (shared with FastCGI).</td></tr>
-          <tr><td><code>HTTP_*</code></td><td>Validated request headers (2026-10-06 rule for CGI, LSAPI, FastCGI). Limit: <code>Proxy</code> and underscore names never pass; forwarding-authority names pass only from a trusted, certificate-presenting proxy.</td></tr>
-          <tr><td><code>HTTP_*</code> via LSAPI block</td><td>Since 0.1.8, lsphp builds these from the header block. Limit: env table also carries only <code>Host</code>, <code>Content-Type</code>/<code>Content-Length</code>, <code>Transfer-Encoding</code>, names over 250 bytes, and repeats; <code>HJ_LSAPI_FULL_HEADER_ENV=1</code> restores all (FastCGI keeps all).</td></tr>
-          <tr><td><code>REMOTE_USER</code></td><td>Set by successful <a href="rewrite.html#basic-auth">Basic auth</a>. Limit: realm-authenticated requests only.</td></tr>
-          <tr><td>Special-env section</td><td><code>php_value</code> / <code>php_admin_value</code> / <code>php_flag</code> / <code>php_admin_flag</code> from <code>.htaccess</code>. Limit: carried on the special-env wire path; plain <code>lsphp</code> ignores regular CGI <code>PHP_VALUE</code>.</td></tr>
+          <tr><td><code>REQUEST_URI</code></td><td>Original request URI. Preserved through rewrites.</td></tr>
+          <tr><td><code>SCRIPT_FILENAME</code> / <code>SCRIPT_NAME</code></td><td>Resolved on-disk script / URI-space name. <code>SCRIPT_NAME</code>/<code>QUERY_STRING</code> upsert via <code>ctx.env</code>.</td></tr>
+          <tr><td><code>REMOTE_ADDR</code>, <code>SERVER_NAME</code>, <code>HTTPS</code>, <code>CONTENT_LENGTH</code>, <code>HTTP_AUTHORIZATION</code>, <code>PHP_VALUE</code>, <code>PHP_ADMIN_VALUE</code>, …</td><td>Server-computed or special-env only. Since 2026-09-16, <code>[E=…]</code>/<code>SetEnv</code>/processor <code>env</code> naming one is denied (shared with FastCGI).</td></tr>
+          <tr><td><code>HTTP_*</code></td><td>Validated request headers (2026-10-06 rule for CGI, LSAPI, FastCGI). <code>Proxy</code> and underscore names never pass; forwarding-authority names pass only from a trusted, certificate-presenting proxy.</td></tr>
+          <tr><td><code>HTTP_*</code> via LSAPI block</td><td>Since 0.1.8, lsphp builds these from the header block. Env table also carries only <code>Host</code>, <code>Content-Type</code>/<code>Content-Length</code>, <code>Transfer-Encoding</code>, names over 250 bytes, and repeats; <code>HJ_LSAPI_FULL_HEADER_ENV=1</code> restores all (FastCGI keeps all).</td></tr>
+          <tr><td><code>REMOTE_USER</code></td><td>Set by successful <a href="rewrite.html#basic-auth">Basic auth</a>. Realm-authenticated requests only.</td></tr>
+          <tr><td>Special-env section</td><td><code>php_value</code> / <code>php_admin_value</code> / <code>php_flag</code> / <code>php_admin_flag</code> from <code>.htaccess</code>. Carried on the special-env wire path; plain <code>lsphp</code> ignores regular CGI <code>PHP_VALUE</code>.</td></tr>
         </tbody></table></div>
     </section>
 
@@ -123,8 +123,8 @@ httpjet lsphp-reload --control-socket /run/httpjet/lsphp-control.sock --timeout-
       <h2 id="jail">The jail</h2>
       <p>You fence PHP with suEXEC (<code>&lt;suexec&gt;</code>, <code>uidMin</code>/<code>gidMin</code> floors), chroot (<code>chrootMode</code> 0–2, per-vhost <code>chrootPath</code>), and optional namespaces. Namespaces cover <code>mount</code>, <code>net</code>, <code>uts</code>, <code>ipc</code>; <code>pid</code> is accepted but not honored.</p>
       <ul>
-        <li>suEXEC off, non-root process, or no per-vhost isolation gives the all-None default <code>"php"</code> pool. Limit: single-pool behaviour preserved byte-for-byte.</li>
-        <li>An unsafe configured jail disables PHP for that vhost with 503. Limit: uid 0, below-floor uid, bad chroot, out-of-range modes (2026-09-16), or credential-less chroot (0.0.5); never unjailed or static.</li>
+        <li>suEXEC off, non-root process, or no per-vhost isolation gives the all-None default <code>"php"</code> pool. Single-pool behaviour preserved byte-for-byte.</li>
+        <li>An unsafe configured jail disables PHP for that vhost with 503. Uid 0, below-floor uid, bad chroot, out-of-range modes (2026-09-16), or credential-less chroot (0.0.5); never unjailed or static.</li>
       </ul>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Source-disclosure guard</span><p>An unavailable pool returns 503, always. Falling through to static would serve raw <code>.php</code> source; shared-pool vhosts share worker credentials, so isolation is your suEXEC decision.</p></div></div>
     </section>

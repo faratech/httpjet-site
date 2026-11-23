@@ -20,55 +20,55 @@ This page lists 25 capabilities, 6 build features and 14 operational bounds. **S
 
 | Area | Status | Scope and important limits |
 
-| HTTP/1.1 | supported | Keep-alive, pipelining, chunked bodies and 103 Early Hints. Limit: `CONNECT` gets 405; limits configure headers, URL, body and timeouts. → |
+| HTTP/1.1 | supported | Keep-alive, pipelining, chunked bodies and 103 Early Hints. `CONNECT` gets 405; limits configure headers, URL, body and timeouts. → |
 
-| HTTP/2 | supported | Native TLS h2 and h2c prior knowledge with h2spec 146/146. Limit: no server push and no `Upgrade: h2c`. → |
+| HTTP/2 | supported | Native TLS h2 and h2c prior knowledge with h2spec 146/146. No server push and no `Upgrade: h2c`. → |
 
-| HTTP/3 | supported | QUIC over UDP through the same pipeline. Limit: publish TCP and UDP HTTPS ports; migration stays disabled. → |
+| HTTP/3 | supported | QUIC over UDP through the same pipeline. Publish TCP and UDP HTTPS ports; migration stays disabled. → |
 
-| TLS | supported | rustls (aws-lc-rs) TLS 1.2/1.3 with SNI and ALPN. Limit: dual ECDSA+RSA, reload, client certs and CRLs only as configured. → |
+| TLS | supported | rustls (aws-lc-rs) TLS 1.2/1.3 with SNI and ALPN. Dual ECDSA+RSA, reload, client certs and CRLs only as configured. → |
 
-| Automatic certificates | optional | HTTP-01 and DNS-01 behind `--features acme` plus CLI opt-in. Limit: one account/identifier set per process; DNS-01 needs your webhook. → |
+| Automatic certificates | optional | HTTP-01 and DNS-01 behind `--features acme` plus CLI opt-in. One account/identifier set per process; DNS-01 needs your webhook. → |
 
-| OCSP stapling | optional | Stapling behind `--features ocsp` with OpenSSL 3.x. Limit: your responder must cover every issuer; not for Let's Encrypt. → |
+| OCSP stapling | optional | Stapling behind `--features ocsp` with OpenSSL 3.x. Your responder must cover every issuer; not for Let's Encrypt. → |
 
-| kTLS / sendfile | partial | Plain-TCP H1 file bodies always use `sendfile(2)`. Limit: TLS 1.3 H1 sendfile needs `--features ktls`, `--ktls=auto` and `tls-hw-tx-offload`. → |
+| kTLS / sendfile | partial | Plain-TCP H1 file bodies always use `sendfile(2)`. TLS 1.3 H1 sendfile needs `--features ktls`, `--ktls=auto` and `tls-hw-tx-offload`. → |
 
-| Virtual hosts | supported | Exact Host/SNI maps with parent-domain and bare `*` fallback. Limit: glob patterns like `*.example.test` never match; `check` warns. |
+| Virtual hosts | supported | Exact Host/SNI maps with parent-domain and bare `*` fallback. Glob patterns like `*.example.test` never match; `check` warns. |
 
-| Static content | supported | Conditional requests, LiteSpeed ETags and ranges. Limit: precompressed `.br`/`.gz` siblings only; opens stay traversal-safe. → |
+| Static content | supported | Conditional requests, LiteSpeed ETags and ranges. Precompressed `.br`/`.gz` siblings only; opens stay traversal-safe. → |
 
-| Reverse proxy | supported | HTTP/1 upstreams plus explicit `h2://`/`h2s://` with streaming and SSE. Limit: upstream mTLS only as configured. → |
+| Reverse proxy | supported | HTTP/1 upstreams plus explicit `h2://`/`h2s://` with streaming and SSE. Upstream mTLS only as configured. → |
 
-| WebSocket | partial | HTTP/1 upgrade and raw relay. Limit: relay excludes TLS, H2 and Unix-socket upstreams. → |
+| WebSocket | partial | HTTP/1 upgrade and raw relay. Relay excludes TLS, H2 and Unix-socket upstreams. → |
 
-| Upstream groups | supported | Primary-first, weighted selection and passive breaker. Limit: probes use connect/GET/HEAD only; unsafe requests never replay. → |
+| Upstream groups | supported | Primary-first, weighted selection and passive breaker. Probes use connect/GET/HEAD only; unsafe requests never replay. → |
 
-| PHP / LSAPI | supported | Native LSAPI with owned or external pools. Limit: external pools need generation tracking and candidate-first reload. → |
+| PHP / LSAPI | supported | Native LSAPI with owned or external pools. External pools need generation tracking and candidate-first reload. → |
 
-| FastCGI | supported opt-in | Explicit `fcgi`/`fastcgi` routing over TCP or Unix sockets. Limit: you supervise the app externally; bodies buffer. → |
+| FastCGI | supported opt-in | Explicit `fcgi`/`fastcgi` routing over TCP or Unix sockets. You supervise the app externally; bodies buffer. → |
 
-| CGI execution, uWSGI | unsupported | Design contracts exist for both. Limit: nothing routes; a bare `cgi` handler fails closed. → |
+| CGI execution, uWSGI | unsupported | Design contracts exist for both. Nothing routes; a bare `cgi` handler fails closed. → |
 
-| Rewrites & `.htaccess` | partial | Common rewrite, access, auth, header, expiry, cache and env directives. Limit: `Header edit`, `Header setifempty`, `Header echo` and `RequestHeader` are ignored. → |
+| Rewrites & `.htaccess` | partial | Common rewrite, access, auth, header, expiry, cache and env directives. `Header edit`, `Header setifempty`, `Header echo` and `RequestHeader` are ignored. → |
 
-| Compression | supported | Dynamic gzip/brotli/zstd plus precompressed siblings. Limit: gzip request decoding defaults on; brotli/zstd decoding is opt-in and bounded. → |
+| Compression | supported | Dynamic gzip/brotli/zstd plus precompressed siblings. Gzip request decoding defaults on; brotli/zstd decoding is opt-in and bounded. → |
 
-| Origin page cache | supported opt-in | Public/private tiers, vary, purge tags, stale, single flight and file tiers. Limit: route-level *microcache policy* is specified, not implemented. → |
+| Origin page cache | supported opt-in | Public/private tiers, vary, purge tags, stale, single flight and file tiers. Route-level *microcache policy* is specified, not implemented. → |
 
-| Access controls | supported | Peer ACLs, trusted-proxy IP, GeoIP/ASN rules, rate and body limits. Limit: bcrypt caps at 14; use bcrypt, `$apr1$`, `$1$` or `{SHA}`; files need docroot or `--auth-user-file-roots`. → |
+| Access controls | supported | Peer ACLs, trusted-proxy IP, GeoIP/ASN rules, rate and body limits. Bcrypt caps at 14; use bcrypt, `$apr1$`, `$1$` or `{SHA}`; files need docroot or `--auth-user-file-roots`. → |
 
-| WAF | external opt-in | Bounded sidecar inspection over Unix or loopback TCP. Limit: it fails closed by default; no embedded ModSecurity/CRS. → |
+| WAF | external opt-in | Bounded sidecar inspection over Unix or loopback TCP. It fails closed by default; no embedded ModSecurity/CRS. → |
 
-| Logs and metrics | supported | Combined or JSON access logs and Prometheus metrics. Limit: error logs redact; syslog and slow logs stay optional. → |
+| Logs and metrics | supported | Combined or JSON access logs and Prometheus metrics. Error logs redact; syslog and slow logs stay optional. → |
 
-| OpenTelemetry | optional | OTLP traces and metrics behind `--features otel` plus `HTTPJET_OTEL=1`. Limit: queues bound output; payloads never export. → |
+| OpenTelemetry | optional | OTLP traces and metrics behind `--features otel` plus `HTTPJET_OTEL=1`. Queues bound output; payloads never export. → |
 
-| Runtime APIs | opt-in | Loopback status API and authenticated config API. Limit: boot-owned resources stay restart-required. → |
+| Runtime APIs | opt-in | Loopback status API and authenticated config API. Boot-owned resources stay restart-required. → |
 
-| Extensions | compile-time only | Trusted Rust crates register handlers and transforms. Limit: no dynamic ABI and no in-process sandbox. → |
+| Extensions | compile-time only | Trusted Rust crates register handlers and transforms. No dynamic ABI and no in-process sandbox. → |
 
-| Deployment | examples | Generic systemd units and a hardened OCI example. Limit: your runtime must still permit io_uring. → |
+| Deployment | examples | Generic systemd units and a hardened OCI example. Your runtime must still permit io_uring. → |
 
 ## Deliberately unsupported or deferred
 
@@ -120,7 +120,7 @@ Request limits come from ` ` and per-context overrides. Inspect effective values
 
 | Page-cache single object | 100 MiB — larger responses serve uncached |
 
-| Page-cache budgets | Index `--page-cache-mem`; file `--page-cache-disk-mem`; hot `--page-cache-hot-mem`. Limit: files need `--page-cache-integrity-key` (single-link, root/serving uid, no group/other); `--page-cache-integrity-required` enforces it. |
+| Page-cache budgets | Index `--page-cache-mem`; file `--page-cache-disk-mem`; hot `--page-cache-hot-mem`. Files need `--page-cache-integrity-key` (single-link, root/serving uid, no group/other); `--page-cache-integrity-required` enforces it. |
 
 | Bridge buffering | Bodies ≤ 256 KiB buffered, larger streamed (H1/H2/H3) |
 

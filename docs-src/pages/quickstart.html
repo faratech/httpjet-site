@@ -41,10 +41,10 @@ docker compose up -d</code></pre></div>
       <div class="tablewrap"><table>
         <thead><tr><th>Requirement</th><th>Why</th></tr></thead>
         <tbody>
-          <tr><td>Linux with <strong>io_uring</strong></td><td>The monoio/io_uring transport is the only transport. Limit: runtimes must allow <code>io_uring_setup</code>/<code>io_uring_enter</code>/<code>io_uring_register</code> (see <a href="operations.html#oci">OCI</a>).</td></tr>
-          <tr><td><strong>Rust 1.99.1+</strong>, edition 2024</td><td>The workspace MSRV. Limit: you also need a C toolchain for aws-lc-rs and mimalloc.</td></tr>
-          <tr><td>OpenSSL 3.x headers + pkg-config</td><td>Required only for <code>--features ocsp</code>. Limit: other builds do not need it.</td></tr>
-          <tr><td>An LSAPI-capable <code>lsphp</code></td><td>Required only for PHP. Limit: static, proxy and FastCGI deployments need no PHP.</td></tr>
+          <tr><td>Linux with <strong>io_uring</strong></td><td>The monoio/io_uring transport is the only transport. Runtimes must allow <code>io_uring_setup</code>/<code>io_uring_enter</code>/<code>io_uring_register</code> (see <a href="operations.html#oci">OCI</a>).</td></tr>
+          <tr><td><strong>Rust 1.100.0+</strong>, edition 2024</td><td>The workspace MSRV. You also need a C toolchain for aws-lc-rs and mimalloc.</td></tr>
+          <tr><td>OpenSSL 3.x headers + pkg-config</td><td>Required only for <code>--features ocsp</code>. Other builds do not need it.</td></tr>
+          <tr><td>An LSAPI-capable <code>lsphp</code></td><td>Required only for PHP. Static, proxy and FastCGI deployments need no PHP.</td></tr>
         </tbody></table></div>
     </section>
 

@@ -15,10 +15,10 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 `--metrics-addr` (default `127.0.0.1:9090`; empty disables) serves `/metrics` in Prometheus text format. You watch the families below first:
 
-| Family | Meaning. Limit: |
-| `httpjet_requests_total` | Served requests. Limit: pair with 5xx counters. |
-| `httpjet_pagecache_*` | Cache activity. Limit: watch hit ratio first. |
-| `httpjet_lsapi_*` | PHP pool health. Limit: watch TTFB next. |
+| Family | Meaning and limits |
+| `httpjet_requests_total` | Served requests. Pair with 5xx counters. |
+| `httpjet_pagecache_*` | Cache activity. Watch hit ratio first. |
+| `httpjet_lsapi_*` | PHP pool health. Watch TTFB next. |
 
 | Metric | Type | Meaning |
 
@@ -94,7 +94,7 @@ Everything httpjet tells you about itself: **Prometheus metrics** on a loopback 
 
 ## The cache-entries report
 
-You fetch `GET /cache-entries` on the metrics listener. It reports entries, bytes, and health. Limit: diagnostic routes require your Bearer [REDACTED]; missing tokens return 403.
+You fetch `GET /cache-entries` on the metrics listener. It reports entries, bytes, and health. Diagnostic routes require your Bearer [REDACTED]; missing tokens return 403.
 
 ## Logs
 
@@ -125,7 +125,7 @@ Every request gets a 64-bit correlation id (a per-process seed mixed into a lock
 
 - **`--php-slow-log logs/php-slow.tsv`**: A TSV line for every LSAPI request whose render TTFB exceeds `--php-slow-threshold-ms` (50), plus a 1-in-128 sample of *all* PHP requests as the population baseline — the per-URL / user-class attribution behind `httpjet_lsapi_ttfb_seconds`. Rolls at 64 MiB, gzip archives, 7-day prune.
 
-These files produced the 2026-08-30 sample on Performance : mean request 9.99 ms, of which 8.96 ms is inside PHP.
+These files produced the 2026-08-30 sample on Performance : mean request 9.99 ms, including 8.96 ms of LSAPI time to first byte. That elapsed interval includes backend wait; it is not PHP CPU time.
 
 ## OpenTelemetry --features otel
 
@@ -137,9 +137,9 @@ Build with `--features otel`, then set `HTTPJET_OTEL=1`; without it no provider 
 
 - **Propagation.** Named configured proxy targets and WebSocket maps receive the generated traceparent; LSAPI receives it as `HTTP_TRACEPARENT`; ad-hoc targets get nothing.
 
-- **Completion.** Spans end at local write completion. Limit: peer receipt stays unproven.
+- **Completion.** Spans end at local write completion. Peer receipt stays unproven.
 
-- **Bounds.** You queue 2048 spans in 256-span batches. Limit: saturation drops telemetry, never serving.
+- **Bounds.** You queue 2048 spans in 256-span batches. Saturation drops telemetry, never serving.
 
 - **Metrics instruments.** `httpjet.pipeline.requests.completed` and `httpjet.pipeline.response_head.duration` (seconds, bounded status labels), plus `httpjet.otel.http.exports`.
 

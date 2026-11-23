@@ -433,7 +433,7 @@ html.js.revealed .reveal{animation:none}
 
 /* ---------- mermaid-rendered diagrams (pre-rendered SVG, no runtime JS) ---------- */
 .figure.diagram{padding:14px 10px 12px;overflow-x:auto}
-.figure.diagram > svg{width:100%;height:auto;max-width:100%;font-family:var(--mono)}
+.figure.diagram > svg{width:100%;height:auto;min-width:var(--diagram-width);max-width:none;font-family:var(--mono)}
 .figure.diagram > svg a{cursor:pointer}
 .figure.diagram > svg a:hover .nodeLabel,.figure.diagram > svg a:hover text{fill:var(--c1)!important}
 .figure.diagram > svg a:hover rect,.figure.diagram > svg a:hover path.basic{stroke:var(--c1)!important}
@@ -444,8 +444,7 @@ html.js.revealed .reveal{animation:none}
 .diagram__src[open] summary::before{transform:rotate(90deg)}
 .diagram__src summary::-webkit-details-marker{display:none}
 .diagram__src pre{margin:10px 0 0;padding:12px 14px;background:var(--code-bg);border:1px solid var(--line);border-radius:var(--r-sm);font-family:var(--mono);font-size:12px;line-height:1.55;color:var(--code-ink);overflow-x:auto;text-align:left;white-space:pre}
-.diagram--wide > svg{min-width:880px}
-@media (max-width:920px){.figure.diagram > svg{min-width:560px}}
+
 
 /* ---------- status badges ---------- */
 .badge{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-dim);background:var(--panel);white-space:nowrap;vertical-align:middle}
@@ -677,3 +676,7 @@ body.has-expanded{overflow:hidden}
 .is-expanded.bexp .chart svg{max-height:54vh!important;width:100%!important}
 
 
+
+/* Diagrams keep their text legible on narrow screens; the figure can scroll. */
+.diagram__hint{display:block;color:var(--muted);font-size:12px;margin:0 8px 10px}
+.is-expanded.figure.diagram > svg{width:100%!important;min-width:var(--diagram-width)!important;max-width:none!important;max-height:none!important;margin:0!important}

@@ -7,7 +7,7 @@
         <thead><tr><th>Area</th><th>Standard / reference</th><th>Status</th><th>Notes</th></tr></thead>
         <tbody>
           <tr><td>HTTP/1.1</td><td>RFC 9110 · RFC 9111 · RFC 9112</td><td>Strict framing, conditionals, ranges, <code>Vary</code>, 103.</td><td>Targets below.</td></tr>
-          <tr><td>HTTP/2</td><td>RFC 9113 (native <code>hj-h2</code>)</td><td>Full TLS pass. Limit: see lede.</td><td>h2c 145/146, one exception.</td></tr>
+          <tr><td>HTTP/2</td><td>RFC 9113 (native <code>hj-h2</code>)</td><td>Full TLS pass. See lede.</td><td>h2c 145/146, one exception.</td></tr>
           <tr><td>HPACK</td><td>RFC 7541</td><td>Zero-allocation codec.</td><td>Two fuzz targets.</td></tr>
           <tr><td>HTTP/3 / QUIC</td><td>RFC 9114 over RFC 9000 (quinn-proto), QPACK RFC 9204</td><td>aioquic + OTel fixtures in CI.</td><td>Migration disabled.</td></tr>
           <tr><td>TLS</td><td>rustls + aws-lc-rs · RFC 8446 mandatory suite</td><td>SNI mirrors OLS; mTLS + CRLs.</td><td>Single-use tickets; 0-RTT off.</td></tr>

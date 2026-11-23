@@ -32,10 +32,10 @@ Outcome::Unchanged</code></pre></div>
       <div class="tablewrap"><table>
         <thead><tr><th>Pattern shape</th><th>Engine</th><th>Why</th></tr></thead>
         <tbody>
-          <tr><td>Anchors, classes, alternation, repetition</td><td><code>regex_automata::meta</code></td><td>Linear time. Limit: per-pattern thread-local cache, no shared lock.</td></tr>
-          <tr><td>Lookahead <code>(?=…)</code> / <code>(?!…)</code>, lookbehind</td><td><code>fancy-regex</code></td><td>Not a finite automaton. Limit: backtracking only here.</td></tr>
-          <tr><td>In-pattern backreference <code>\1</code></td><td><code>fancy-regex</code></td><td>Requires backtracking. Limit: backtracking only here.</td></tr>
-          <tr><td>Pure lookahead conjunction <code>^(?=.*A)(?=.*B)…</code></td><td><code>regex_automata::meta</code> per part</td><td>One linear search per part. Limit: <code>fancy-regex</code> only for captures (0.1.10: 29 → 1 µs).</td></tr>
+          <tr><td>Anchors, classes, alternation, repetition</td><td><code>regex_automata::meta</code></td><td>Linear time. Per-pattern thread-local cache, no shared lock.</td></tr>
+          <tr><td>Lookahead <code>(?=…)</code> / <code>(?!…)</code>, lookbehind</td><td><code>fancy-regex</code></td><td>Not a finite automaton. Backtracking only here.</td></tr>
+          <tr><td>In-pattern backreference <code>\1</code></td><td><code>fancy-regex</code></td><td>Requires backtracking. Backtracking only here.</td></tr>
+          <tr><td>Pure lookahead conjunction <code>^(?=.*A)(?=.*B)…</code></td><td><code>regex_automata::meta</code> per part</td><td>One linear search per part. <code>fancy-regex</code> only for captures (0.1.10: 29 → 1 µs).</td></tr>
         </tbody></table></div>
       <p>A regex error at match time <strong>fails closed toward the rule's polarity</strong>. A failing deny counts as matched; a failing allow is withheld (hardened 2026-09-06).</p>
     </section>
@@ -105,9 +105,9 @@ RewriteRule ^/expensive/ - [E=no-cache:1]      <span class="t-c"># [E=no-cache] 
       <h2 id="basic-auth">HTTP Basic auth</h2>
       <p>Protect a subtree with <code>AuthType Basic</code> + <code>AuthName</code> + <code>AuthUserFile</code> + <code>Require valid-user | user …</code>:</p>
       <ul>
-        <li>Resolve requirements in scope order. Limit: metadata-only sections cannot erase inherited requirements; explicit <code>Require</code> replaces them.</li>
-        <li>Enforce before cache lookup, on original/rewritten/index/script targets. Limit: valid credentials set <code>REMOTE_USER</code>; failures return 401.</li>
-        <li>Fail closed on unsupported auth. Limit: exact usernames stay preserved.</li>
+        <li>Resolve requirements in scope order. Metadata-only sections cannot erase inherited requirements; explicit <code>Require</code> replaces them.</li>
+        <li>Enforce before cache lookup, on original/rewritten/index/script targets. Valid credentials set <code>REMOTE_USER</code>; failures return 401.</li>
+        <li>Fail closed on unsupported auth. Exact usernames stay preserved.</li>
       </ul>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>.htaccess</b> · a protected subtree</span></div><pre><code>AuthType Basic
 AuthName "Staging"
@@ -115,9 +115,9 @@ AuthUserFile /srv/example.test/conf/htpasswd
 Require valid-user</code></pre></div>
       <p>Accepted htpasswd hashes — verify each in constant time:</p>
       <ul>
-        <li><strong>bcrypt</strong> (<code>$2y$</code>/<code>$2b$</code>/<code>$2a$</code>, <code>htpasswd -B</code>). Limit: cost capped at 14; higher is refused before hashing.</li>
+        <li><strong>bcrypt</strong> (<code>$2y$</code>/<code>$2b$</code>/<code>$2a$</code>, <code>htpasswd -B</code>). Cost capped at 14; higher is refused before hashing.</li>
         <li><strong>APR1-MD5</strong> (<code>$apr1$</code>), <strong>MD5-crypt</strong> (<code>$1$</code>) and <code>{SHA}</code>.</li>
-        <li>Plaintext, DES, <code>$5$</code> and <code>$6$</code> <code>crypt()</code>. Limit: these verify <em>false</em> with a parse-time warning.</li>
+        <li>Plaintext, DES, <code>$5$</code> and <code>$6$</code> <code>crypt()</code>. These verify <em>false</em> with a parse-time warning.</li>
       </ul>
       <p>An unknown user pays dummy bcrypt/MD5 work at the file's recorded cost. Charge Basic-auth attempts per client before hashing. Refuse repeated <code>Authorization</code> headers.</p>
       <p>Resolve <code>AuthUserFile</code> <strong>inside the docroot</strong>, or under <code>--auth-user-file-roots</code>. Check the descriptor's real path; cap reads at 1 MiB. An unreadable or out-of-root file returns 500, never a silent 401; <code>check</code> warns. Authenticated statics get <code>Cache-Control: private, no-store</code> without an explicit policy (#414).</p>
@@ -130,24 +130,24 @@ Require valid-user</code></pre></div>
       <div class="tablewrap"><table id="dirtable" class="flagtable"><colgroup><col class="c-key"><col class="c-mid"><col class="c-txt"></colgroup><thead><tr><th>Directive</th><th>Status</th><th>Notes</th></tr></thead>
         <tbody>
           <tr><th>RewriteEngine · RewriteBase</th><td><span class="badge ok">supported</span></td><td class="wrap">Toggle and base-path resolution.</td></tr>
-          <tr><th>RewriteCond · RewriteRule</th><td><span class="badge ok">supported</span></td><td class="wrap"><ul><li>Flags: <code>L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F</code>; <code>OR</code> on conditions.</li><li>File tests: <code>-f/-F -d -e -l/-L/-h -s -x</code> (<code>-U</code> always matches).</li><li>Variables: <code>REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME</code>, <code>%{HTTP:Name}</code>, <code>%{ENV:NAME}</code>, <code>%{LA-U:…}</code>/<code>%{LA-F:…}</code>.</li><li><code>%{TIME*}</code> yields the empty string.</li><li><code>RewriteMap</code>, <code>${map:key}</code>, <code>T=</code>/<code>H=</code> fail closed at parse time. Limit: other flags (e.g. <code>DPI</code>, <code>CO=</code>) are ignored.</li></ul></td></tr>
-          <tr><th>SetEnvIf · SetEnvIfNoCase</th><td><span class="badge ok">supported</span></td><td class="wrap">Lazy header access. Limit: server-computed CGI names stay protected.</td></tr>
-          <tr><th>Order · Allow from · Deny from</th><td><span class="badge ok">supported</span></td><td class="wrap">Apache accumulation per scope. Limit: <code>env=</code>, host and CIDR operands make the chain memo-ineligible.</td></tr>
-          <tr><th>Require</th><td><span class="badge part">partial</span></td><td class="wrap"><code>all granted</code>, <code>valid-user</code>, <code>user …</code>. Limit: everything else fails closed to deny.</td></tr>
-          <tr><th>AuthType · AuthName · AuthUserFile</th><td><span class="badge ok">supported</span></td><td class="wrap">Basic only. Limit: bcrypt, APR1 (<code>$apr1$</code>), MD5-crypt (<code>$1$</code>) and <code>{SHA}</code> only.</td></tr>
-          <tr><th>Header set / add / append / merge / unset</th><td><span class="badge ok">supported</span></td><td class="wrap"><ul><li>Guards: <code>always</code>/<code>onsuccess</code>, <code>env=</code>/<code>env=!</code>, <code>%{NAME}e</code>.</li><li>Scopes merge directory, then <code>&lt;Files*&gt;</code>, then <code>&lt;If&gt;</code>. Limit: applied in <code>finalize</code>; CR/LF rejected.</li></ul></td></tr>
+          <tr><th>RewriteCond · RewriteRule</th><td><span class="badge ok">supported</span></td><td class="wrap"><ul><li>Flags: <code>L END R R=code F G P PT E= N NC QSA QSD NE C S=n B B=chars BNE= BNP BCTLS UnsafeAllow3F</code>; <code>OR</code> on conditions.</li><li>File tests: <code>-f/-F -d -e -l/-L/-h -s -x</code> (<code>-U</code> always matches).</li><li>Variables: <code>REQUEST_URI REQUEST_FILENAME REQUEST_METHOD REQUEST_SCHEME QUERY_STRING THE_REQUEST HTTPS HTTP_HOST HTTP_USER_AGENT HTTP_COOKIE HTTP_REFERER HTTP_ACCEPT REMOTE_ADDR REMOTE_PORT SERVER_ADDR SERVER_NAME SERVER_PORT SERVER_PROTOCOL DOCUMENT_ROOT SCRIPT_FILENAME</code>, <code>%{HTTP:Name}</code>, <code>%{ENV:NAME}</code>, <code>%{LA-U:…}</code>/<code>%{LA-F:…}</code>.</li><li><code>%{TIME*}</code> yields the empty string.</li><li><code>RewriteMap</code>, <code>${map:key}</code>, <code>T=</code>/<code>H=</code> fail closed at parse time. Other flags (e.g. <code>DPI</code>, <code>CO=</code>) are ignored.</li></ul></td></tr>
+          <tr><th>SetEnvIf · SetEnvIfNoCase</th><td><span class="badge ok">supported</span></td><td class="wrap">Lazy header access. Server-computed CGI names stay protected.</td></tr>
+          <tr><th>Order · Allow from · Deny from</th><td><span class="badge ok">supported</span></td><td class="wrap">Apache accumulation per scope. <code>env=</code>, host and CIDR operands make the chain memo-ineligible.</td></tr>
+          <tr><th>Require</th><td><span class="badge part">partial</span></td><td class="wrap"><code>all granted</code>, <code>valid-user</code>, <code>user …</code>. Everything else fails closed to deny.</td></tr>
+          <tr><th>AuthType · AuthName · AuthUserFile</th><td><span class="badge ok">supported</span></td><td class="wrap">Basic only. Bcrypt, APR1 (<code>$apr1$</code>), MD5-crypt (<code>$1$</code>) and <code>{SHA}</code> only.</td></tr>
+          <tr><th>Header set / add / append / merge / unset</th><td><span class="badge ok">supported</span></td><td class="wrap"><ul><li>Guards: <code>always</code>/<code>onsuccess</code>, <code>env=</code>/<code>env=!</code>, <code>%{NAME}e</code>.</li><li>Scopes merge directory, then <code>&lt;Files*&gt;</code>, then <code>&lt;If&gt;</code>. Applied in <code>finalize</code>; CR/LF rejected.</li></ul></td></tr>
 
-          <tr><th>Header echo</th><td><span class="badge part">partial</span></td><td class="wrap">Parses without error. Limit: emits nothing.</td></tr>
-          <tr><th>Header edit / edit* / note / setifempty / echo · RequestHeader *</th><td><span class="badge no">ignored</span></td><td class="wrap">Line ignored. Limit: see <code>docs/header-directive-compatibility.md</code> for the exact boundary.</td></tr>
-          <tr><th>Header condition expr= / value expr=</th><td><span class="badge part">partial</span></td><td class="wrap">Only <code>%{REQUEST_URI} =~ / !~</code> conjunctions evaluate. Limit: value expressions are not implemented.</td></tr>
-          <tr><th>ErrorDocument</th><td><span class="badge ok">supported</span></td><td class="wrap">Path, inline and external forms. Limit: never clobbers an app's own JSON error body.</td></tr>
+          <tr><th>Header echo</th><td><span class="badge part">partial</span></td><td class="wrap">Parses without error. Emits nothing.</td></tr>
+          <tr><th>Header edit / edit* / note / setifempty / echo · RequestHeader *</th><td><span class="badge no">ignored</span></td><td class="wrap">Line ignored. See <code>docs/header-directive-compatibility.md</code> for the exact boundary.</td></tr>
+          <tr><th>Header condition expr= / value expr=</th><td><span class="badge part">partial</span></td><td class="wrap">Only <code>%{REQUEST_URI} =~ / !~</code> conjunctions evaluate. Value expressions are not implemented.</td></tr>
+          <tr><th>ErrorDocument</th><td><span class="badge ok">supported</span></td><td class="wrap">Path, inline and external forms. Never clobbers an app's own JSON error body.</td></tr>
           <tr><th>DirectoryIndex</th><td><span class="badge ok">supported</span></td><td class="wrap">Including the <code>Disabled</code> form.</td></tr>
-          <tr><th>SetHandler · AddHandler · AddType · ForceType · RemoveHandler · RemoveType</th><td><span class="badge ok">supported</span></td><td class="wrap"><code>application/x-httpd-php</code> forces PHP. Limit: other handlers and <code>Remove*</code> record a non-PHP reset; <code>AddType</code>/<code>ForceType</code> override <code>Content-Type</code>.</td></tr>
-          <tr><th>CacheLookup · CacheEnable · CacheDisable · CacheKeyModify</th><td><span class="badge ok">supported</span></td><td class="wrap">LSCache directives for the <a href="page-cache.html">page cache</a>. Limit: <code>CacheKeyModify</code> strips query parameters from the key.</td></tr>
-          <tr><th>php_value · php_admin_value · php_flag · php_admin_flag</th><td><span class="badge ok">supported</span></td><td class="wrap">Per-request PHP ini overrides. Limit: LSAPI special-env path only.</td></tr>
-          <tr><th>&lt;Files&gt; &lt;FilesMatch&gt; &lt;Directory&gt; &lt;DirectoryMatch&gt; &lt;If&gt; &lt;IfModule&gt;</th><td><span class="badge part">partial</span></td><td class="wrap">Common scopes honored. Limit: <code>&lt;If&gt;</code> only for the modeled REQUEST_URI shape; <code>&lt;IfModule&gt;</code> bodies evaluate.</td></tr>
+          <tr><th>SetHandler · AddHandler · AddType · ForceType · RemoveHandler · RemoveType</th><td><span class="badge ok">supported</span></td><td class="wrap"><code>application/x-httpd-php</code> forces PHP. Other handlers and <code>Remove*</code> record a non-PHP reset; <code>AddType</code>/<code>ForceType</code> override <code>Content-Type</code>.</td></tr>
+          <tr><th>CacheLookup · CacheEnable · CacheDisable · CacheKeyModify</th><td><span class="badge ok">supported</span></td><td class="wrap">LSCache directives for the <a href="page-cache.html">page cache</a>. <code>CacheKeyModify</code> strips query parameters from the key.</td></tr>
+          <tr><th>php_value · php_admin_value · php_flag · php_admin_flag</th><td><span class="badge ok">supported</span></td><td class="wrap">Per-request PHP ini overrides. LSAPI special-env path only.</td></tr>
+          <tr><th>&lt;Files&gt; &lt;FilesMatch&gt; &lt;Directory&gt; &lt;DirectoryMatch&gt; &lt;If&gt; &lt;IfModule&gt;</th><td><span class="badge part">partial</span></td><td class="wrap">Common scopes honored. <code>&lt;If&gt;</code> only for the modeled REQUEST_URI shape; <code>&lt;IfModule&gt;</code> bodies evaluate.</td></tr>
           <tr><th>FileETag · H2EarlyHints · esi · AddOutputFilterByType · AllowOverride · Options</th><td><span class="badge no">no-op</span></td><td class="wrap">Recognized and dropped.</td></tr>
-          <tr><th>ExpiresActive · ExpiresDefault · ExpiresByType</th><td><span class="badge ok">supported</span></td><td class="wrap">Scoped across directory, <code>&lt;Files*&gt;</code> and <code>&lt;If&gt;</code>. Limit: shares the <code>A/M</code> grammar; overrides vhost XML <code>&lt;expires&gt;</code> when active.</td></tr>
+          <tr><th>ExpiresActive · ExpiresDefault · ExpiresByType</th><td><span class="badge ok">supported</span></td><td class="wrap">Scoped across directory, <code>&lt;Files*&gt;</code> and <code>&lt;If&gt;</code>. Shares the <code>A/M</code> grammar; overrides vhost XML <code>&lt;expires&gt;</code> when active.</td></tr>
         </tbody></table></div>
       <p class="mini">Unrecognized directives are ignored, so vendor files stay loadable.</p>
     </section>

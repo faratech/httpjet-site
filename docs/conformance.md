@@ -17,7 +17,7 @@ Judge httpjet on LiteSpeed compatibility plus wire conformance. Headline result:
 
 | HTTP/1.1 | RFC 9110 · RFC 9111 · RFC 9112 | Strict framing, conditionals, ranges, `Vary`, 103. | Targets below. |
 
-| HTTP/2 | RFC 9113 (native `hj-h2`) | Full TLS pass. Limit: see lede. | h2c 145/146, one exception. |
+| HTTP/2 | RFC 9113 (native `hj-h2`) | Full TLS pass. See lede. | h2c 145/146, one exception. |
 
 | HPACK | RFC 7541 | Zero-allocation codec. | Two fuzz targets. |
 

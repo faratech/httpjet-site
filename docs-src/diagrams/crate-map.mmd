@@ -1,0 +1,9 @@
+flowchart TB
+  config["hj-config<br/>XML configuration"] --> core["hj-core<br/>request and handler contracts"]
+  core --> handlers["Protocol and handler crates<br/>HTTP/2 · LSAPI · proxy · static · TLS"]
+  compress["hj-compress"] --> rewrite["hj-rewrite"]
+  cache["hj-cache<br/>shared cache primitive"] --> pagecache["hj-pagecache"]
+  handlers --> binary["httpjet binary<br/>transport · pipeline · orchestration"]
+  rewrite --> binary
+  pagecache --> binary
+  roots["Other independent roots<br/>hj-log · hj-geo · hj-acme · hj-ocsp"] --> binary

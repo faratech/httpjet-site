@@ -15,13 +15,13 @@ Rust offers no stable trait-object ABI across shared libraries. Native modules w
 
 | Need | Hooks | Sidecar |
 
-| Custom headers/policy | Yes. Limit: rebuild + restart. | No. Limit: inspection only. |
+| Custom headers/policy | Yes. Rebuild + restart. | No. Inspection only. |
 
-| Blocking rules | Yes, in Rust. Limit: in-process. | Yes. Limit: external engine. |
+| Blocking rules | Yes, in Rust. In-process. | Yes. External engine. |
 
-| Independent deploy | No. Limit: linked build. | Yes. Limit: call per request. |
+| Independent deploy | No. Linked build. | Yes. Call per request. |
 
-| Untrusted code | No. Limit: trusted only. | Outside process. Limit: bounded document. |
+| Untrusted code | No. Trusted only. | Outside process. Bounded document. |
 
 ## Compile-time extensions
 

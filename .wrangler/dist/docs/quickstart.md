@@ -66,13 +66,13 @@ You need the items below for a source build. You serve the example on loopback a
 
 | Requirement | Why |
 
-| Linux with **io_uring** | The monoio/io_uring transport is the only transport. Limit: runtimes must allow `io_uring_setup`/`io_uring_enter`/`io_uring_register` (see OCI ). |
+| Linux with **io_uring** | The monoio/io_uring transport is the only transport. Runtimes must allow `io_uring_setup`/`io_uring_enter`/`io_uring_register` (see OCI ). |
 
-| **Rust 1.99.1+**, edition 2024 | The workspace MSRV. Limit: you also need a C toolchain for aws-lc-rs and mimalloc. |
+| **Rust 1.100.0+**, edition 2024 | The workspace MSRV. You also need a C toolchain for aws-lc-rs and mimalloc. |
 
-| OpenSSL 3.x headers + pkg-config | Required only for `--features ocsp`. Limit: other builds do not need it. |
+| OpenSSL 3.x headers + pkg-config | Required only for `--features ocsp`. Other builds do not need it. |
 
-| An LSAPI-capable `lsphp` | Required only for PHP. Limit: static, proxy and FastCGI deployments need no PHP. |
+| An LSAPI-capable `lsphp` | Required only for PHP. Static, proxy and FastCGI deployments need no PHP. |
 
 ## 1 · Build the binary
 

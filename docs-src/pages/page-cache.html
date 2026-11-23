@@ -33,8 +33,9 @@ X-LiteSpeed-Purge: tag=T1234                              <span class="t-c"># dr
 
     <section>
       <h2 id="lookup">The lookup path</h2>
-      <!--diagram:cache-lookup|<strong>Lookup, tier routing and freshness.</strong> Member-cookie requests route to the private tier (or, for allow-listed visitor-invariant endpoints, to the shared public tier); the key is derived from the <em>original</em> URI; a found entry serves only if its stored identity matches; stale entries within their windows serve immediately with a background refresh; concurrent misses collapse onto one render.-->
-      <p>Route member requests to the private tier; allow-listed invariant endpoints go shared-public instead. Key on the <em>original</em> URI. Serve only on identity match. Serve stale in-window with background refresh; collapse concurrent misses.</p>
+      <!--diagram:cache-lookup|<strong>Choosing a cache route.</strong> This diagram assumes the request has passed the initial lookup gates. Public and private paths still apply their respective policy and response guards.-->
+      <!--diagram:cache-freshness|<strong>Finding a response.</strong> The original URI and vary dimensions form the key; identity is checked before serving. Misses may share a single backend render, while stale entries follow their configured windows.-->
+      <p>With private caching enabled, user or session markers select private routing when a session is available and the vhost permits it. Missing sessions or a disabled private policy bypass the cache; an admitted allowlisted invariant path uses public routing. With the private tier disabled, public routing still applies its other cache eligibility guards. Key on the <em>original</em> URI. Serve only on identity match. Serve stale in-window with background refresh; collapse concurrent misses.</p>
     </section>
 
     <section>
@@ -50,34 +51,34 @@ X-LiteSpeed-Purge: tag=T1234                              <span class="t-c"># dr
           <label>vary cookie xf_style_id<input type="text" name="style" value="" placeholder="(absent)"></label>
         </div>
         <div class="widget__row">
-          <label class="inline"><input type="checkbox" name="member"> request carries the member cookie (xf_user)</label>
+          <label>login markers<select name="member"><option value="guest">none</option><option value="session">non-empty xf_session</option><option value="user">xf_user without session</option></select></label>
           <label class="inline"><input type="checkbox" name="private" checked> --page-cache-private on</label>
-          <label class="inline"><input type="checkbox" name="shared"> path matches --page-cache-shared-paths</label>
+          <label class="inline"><input type="checkbox" name="shared"> path matches shared allowlist and canary admits it</label>
           <label class="inline"><input type="checkbox" name="origin"> the .htaccess chain reads Origin</label>
         </div>
         <div class="widget__row"><label>X-LiteSpeed-Cache-Control on the response<input type="text" name="hdr" value="public,max-age=3600"></label></div>
         <div class="widget__out" aria-live="polite"></div>
-        <p class="widget__hint">Illustrative composition, not the byte layout. The real key is a compact id plus the stored identity; the guard makes any id collision a miss.</p>
+        <p class="widget__hint">Illustrative routing: assumes the vhost permits caching, the private policy is enabled when selected, and shared-path canary selection succeeds. Other request and response guards still apply. The key shown is not its byte layout.</p>
       </div>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Invariant 1 · key by the original URI</span><p>Key on <code>orig_path</code>/<code>orig_query</code>, never the rewrite-resolved path. XenForo rewrites every page to <code>/index.php</code>; resolved-path keying once served one page to everyone.</p></div></div>
       <p>Every entry records its host and raw request path. Serve only when both match; a collision degrades to a miss (<code>httpjet_pagecache_key_id_collisions_total</code>), never wrong content. Add three key dimensions: <strong>per-URL cookie vary</strong> (<code>X-LiteSpeed-Vary: cookie=NAME</code>, plus <code>--page-cache-vary-cookies</code>; header vary hashes with SHA-256), <strong>Origin</strong> when the chain reads it (2026-09-16), and <strong>epoch + generation</strong> from the first <a href="admin-api.html#write">API publication</a>. Only the canonical Host spelling reads or populates an entry. An absent Origin keeps the historic base key.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>Tier</th><th>Routed when</th><th>Keyed by</th><th>Notes</th></tr></thead>
         <tbody>
-          <tr><td><strong>Public</strong></td><td>No member cookie</td><td>vhost · scheme · host · original path?query · vary cookies (· Origin)</td><td>Strip <code>Set-Cookie</code> and <code>X-LiteSpeed-*</code>. Limit: a private-cookie response never stores.</td></tr>
-          <tr><td><strong>Private</strong></td><td>Member marker (<code>xf_user</code>, or bare <code>xf_session</code>, 2026-10-04) + <code>--page-cache-private</code></td><td>public key + session-cookie value</td><td>Never touches public entries. Limit: TTL capped at 300 s.</td></tr>
-          <tr><td><strong>Shared paths</strong></td><td>Member cookie + <code>--page-cache-shared-paths</code> match, within canary %</td><td>public key</td><td>Visitor-invariant HMAC image endpoints only. Limit: never HTML; malformed specs abort startup.</td></tr>
-          <tr><td><strong>Bypass</strong></td><td>Non-GET/HEAD, <code>[E=no-cache]</code>, no header, member without private tier</td><td>—</td><td>Counted as <code>httpjet_cache_bypass</code>.</td></tr>
+          <tr><td><strong>Public</strong></td><td>No login marker, or private tier disabled; also admitted shared paths</td><td>vhost · scheme · host · original path?query · vary cookies (· Origin)</td><td>Strip <code>Set-Cookie</code> and <code>X-LiteSpeed-*</code>. A private-cookie response never stores.</td></tr>
+          <tr><td><strong>Private</strong></td><td>Private tier enabled, non-empty session, and private policy allowed</td><td>public key + session-cookie value</td><td>Never touches public entries. TTL capped at 300 s.</td></tr>
+          <tr><td><strong>Shared paths</strong></td><td>Member cookie + <code>--page-cache-shared-paths</code> match, within canary %</td><td>public key</td><td>Visitor-invariant HMAC image endpoints only. Never HTML; malformed specs abort startup.</td></tr>
+          <tr><td><strong>Bypass</strong></td><td>Non-GET/HEAD, <code>[E=no-cache]</code>, or private routing without a session or permission</td><td>—</td><td>Counted as <code>httpjet_cache_bypass</code>.</td></tr>
         </tbody></table></div>
     </section>
 
     <section>
       <h2 id="store">The store path and admission</h2>
-      <!--diagram:cache-store|<strong>Store gates.</strong> After the app opts in, the response still has to pass the status list, the private-cookie guard, the proxied-header strip, the self-redirect guard, the purge-race check and the object cap, and then earn admission. Only then is the stored copy written — into RAM, or at birth into an immutable tmpfs file.-->
-      <p>Pass the status list, private-cookie guard and proxied-header strip first. Pass the self-redirect guard, purge-race check and object cap next. Earn W-TinyLFU admission last. Write the stored copy only then — into RAM, or at birth into an immutable tmpfs file.</p>
+      <!--diagram:cache-store|<strong>Store gates.</strong> Responses must pass request, response, policy, vary and size checks. Public entries also pass frequency admission; private entries do not. The file tier is optional.-->
+      <p>A response must pass the request, status, policy, vary, self-redirect, purge-race and size checks before it can be stored. Public entries must also pass the private-cookie guard and W-TinyLFU admission; private entries use session identity and skip the admission threshold. The file tier is optional.</p>
       <h3 id="admission">W-TinyLFU admission</h3>
-      <!--diagram:admission|A fixed-memory frequency sketch rejects one-hit wonders: at the default threshold of 2 a URL is stored on its second sighting. One request is ONE sighting — the on-core fast path probes uncounted and records only a hit it serves. Size weighting adds +1 per 256 KiB. With dictionaries making storage cheap, <code>--page-cache-admit-threshold 1</code> caches on first sight. Tune by <code>httpjet_cache_hit_ratio_real</code> and <code>httpjet_cache_admit_ratio</code>.-->
-      <p>Reject one-hit wonders with a fixed-memory frequency sketch. At threshold 2 (default) you store on the second sighting; one request counts as one sighting. Size weighting adds +1 per 256 KiB. Set <code>--page-cache-admit-threshold 1</code> to cache on first sight. Tune by <code>httpjet_cache_hit_ratio_real</code> and <code>httpjet_cache_admit_ratio</code>.</p>
+      <!--diagram:admission|For public entries, a fixed-memory frequency sketch rejects one-hit wonders: at the default threshold of 2 an eligible URL can be stored on its second sighting. One request is ONE sighting — the on-core fast path probes uncounted and records only a hit it serves. Size weighting adds +1 per 256 KiB. With dictionaries making storage cheap, <code>--page-cache-admit-threshold 1</code> caches on first sight. Tune by <code>httpjet_cache_hit_ratio_real</code> and <code>httpjet_cache_admit_ratio</code>.-->
+      <p>Reject one-hit wonders with a fixed-memory frequency sketch. For public entries at threshold 2 (default), the second sighting can be stored; one request counts as one sighting. Size weighting adds +1 per 256 KiB. Set <code>--page-cache-admit-threshold 1</code> to cache on first sight. Tune by <code>httpjet_cache_hit_ratio_real</code> and <code>httpjet_cache_admit_ratio</code>.</p>
       <p>Decline a cacheable 3xx whose <code>Location</code> is the request's own URL (hosts normalized without port). Re-check that guard at serve time; the XF add-on refuses at a third layer. De-cache cacheable redirects from the CDN via the deny-CDN-cache transform.</p>
     </section>
 
@@ -86,10 +87,10 @@ X-LiteSpeed-Purge: tag=T1234                              <span class="t-c"># dr
       <!--diagram:cache-tiers|<strong>Dual-cap tier model.</strong> The RAM index describes every entry; with a file tier, bodies live as immutable HJPC files and are charged metadata-only against <code>--page-cache-mem</code> while their footprint counts against <code>--page-cache-disk-mem</code>. A small hot tier fronts the files. Every teardown path (evict, expire, purge, replace) is synchronous under the shard lock; only the <code>unlink(2)</code> syscall is deferred to just after the lock is released.-->
       <p>Default to in-RAM only; restarts flush it. Set <code>--page-cache-store-path /dev/shm/jetcache</code> (or <code>default</code>/<code>jetcache</code>) for a <strong>tmpfs-primary</strong> tier. <code>PageStore::store</code> offloads every body to an immutable file at birth, off the heap. HJPC containers authenticate with <code>--page-cache-integrity-key</code>. The LiteSpeed <code>cacheStorePath</code> parses but stays unused.</p>
       <ul>
-        <li><strong>Survives restarts.</strong> A boot scan (up to 8 threads) rebuilds the index — ~300k entries in seconds. Limit: <code>/__hj_cache_ready</code> returns 503 while scanning, then 200 + <code>x-hj-cache-ready: 1</code> + <code>x-hj-cache-loaded: N</code>.</li>
-        <li><strong>Reclaim invariant.</strong> Live entries resolve to live bodies. Limit: a missing file fails closed to a miss and counts <code>disk_read_err</code>.</li>
-        <li><strong>Durable purges.</strong> Purges unlink eagerly and keep a purge-all stamp. Limit: a restart cannot resurrect purged entries.</li>
-        <li><strong>Dictionaries compress at store.</strong> A background task dict-recompresses the identity birth copy (~3.5–9× smaller), never inline. Limit: incompressible types never encode; vhosts in <code>--page-cache-egress-at-rest-vhosts</code> skip this job (0.1.6).</li>
+        <li><strong>Survives restarts.</strong> A boot scan (up to 8 threads) rebuilds the index — ~300k entries in seconds. <code>/__hj_cache_ready</code> returns 503 while scanning, then 200 + <code>x-hj-cache-ready: 1</code> + <code>x-hj-cache-loaded: N</code>.</li>
+        <li><strong>Reclaim invariant.</strong> Live entries resolve to live bodies. A missing file fails closed to a miss and counts <code>disk_read_err</code>.</li>
+        <li><strong>Durable purges.</strong> Purges unlink eagerly and keep a purge-all stamp. A restart cannot resurrect purged entries.</li>
+        <li><strong>Dictionaries compress at store.</strong> A background task dict-recompresses the identity birth copy (~3.5–9× smaller), never inline. Incompressible types never encode; vhosts in <code>--page-cache-egress-at-rest-vhosts</code> skip this job (0.1.6).</li>
       </ul>
       <div class="widget" id="budget">
         <p class="widget__title">budget calculator — how many pages fit?</p>
@@ -106,15 +107,15 @@ X-LiteSpeed-Purge: tag=T1234                              <span class="t-c"># dr
       <div class="tablewrap"><table>
         <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
         <tbody>
-          <tr><td><code>--page-cache-mem</code></td><td>128 MiB</td><td>RAM index budget. Limit: file-tier bodies charge metadata-only here.</td></tr>
-          <tr><td><code>--page-cache-disk-mem</code></td><td>2 GiB</td><td>tmpfs footprint cap. Limit: 0 falls back to <code>--page-cache-mem</code>.</td></tr>
-          <tr><td><code>--page-cache-hot-mem</code></td><td>192 MiB</td><td>Hot bodies in RAM before files. Limit: cold hits pay one tmpfs read + decode.</td></tr>
-          <tr><td><code>--page-cache-store-path</code></td><td><em>none</em></td><td>Enables the file tier. Limit: deploy gate <code>ALLOW_PAGE_CACHE_FILE_TIER=1</code>.</td></tr>
-          <tr><td><code>--page-cache-dict-vhost</code> / <code>--page-cache-dict</code> / <code>--page-cache-dict-level</code></td><td>—</td><td>Per-vhost / fallback dictionaries; level 1–19 (default 12). Limit: rotation needs a restart.</td></tr>
-          <tr><td><code>--page-cache-vary-default</code></td><td><em>empty</em></td><td><code>name=value</code> keyed as absent. Limit: e.g. <code>xf_style_id=50</code>.</td></tr>
-          <tr><td><code>--page-cache-opt-in-status</code> / <code>--page-cache-303-prefixes</code></td><td><em>empty</em></td><td>Cache 303/404/410 on explicit public opt-in only. Limit: TTL ≤ 300 s, no stale; default caches 200/301.</td></tr>
-          <tr><td><code>--page-cache-stream-fill-vhosts</code></td><td><em>empty</em></td><td>Stream length-less public 200 misses frame by frame. Limit: errors and over-cap bodies never store.</td></tr>
-          <tr><td><code>--page-cache-egress-at-rest-vhosts</code></td><td><em>empty</em></td><td>Keep dictionary-less zstd at rest; skip re-encode. Limit: stored copy stays larger; capsules keep the dictionary path.</td></tr>
+          <tr><td><code>--page-cache-mem</code></td><td>128 MiB</td><td>RAM index budget. File-tier bodies charge metadata-only here.</td></tr>
+          <tr><td><code>--page-cache-disk-mem</code></td><td>2 GiB</td><td>tmpfs footprint cap. 0 falls back to <code>--page-cache-mem</code>.</td></tr>
+          <tr><td><code>--page-cache-hot-mem</code></td><td>192 MiB</td><td>Hot bodies in RAM before files. Cold hits pay one tmpfs read + decode.</td></tr>
+          <tr><td><code>--page-cache-store-path</code></td><td><em>none</em></td><td>Enables the file tier. Deploy gate <code>ALLOW_PAGE_CACHE_FILE_TIER=1</code>.</td></tr>
+          <tr><td><code>--page-cache-dict-vhost</code> / <code>--page-cache-dict</code> / <code>--page-cache-dict-level</code></td><td>—</td><td>Per-vhost / fallback dictionaries; level 1–19 (default 12). Rotation needs a restart.</td></tr>
+          <tr><td><code>--page-cache-vary-default</code></td><td><em>empty</em></td><td><code>name=value</code> keyed as absent. E.g. <code>xf_style_id=50</code>.</td></tr>
+          <tr><td><code>--page-cache-opt-in-status</code> / <code>--page-cache-303-prefixes</code></td><td><em>empty</em></td><td>Cache 303/404/410 on explicit public opt-in only. TTL ≤ 300 s, no stale; default caches 200/301.</td></tr>
+          <tr><td><code>--page-cache-stream-fill-vhosts</code></td><td><em>empty</em></td><td>Stream length-less public 200 misses frame by frame. Errors and over-cap bodies never store.</td></tr>
+          <tr><td><code>--page-cache-egress-at-rest-vhosts</code></td><td><em>empty</em></td><td>Keep dictionary-less zstd at rest; skip re-encode. Stored copy stays larger; capsules keep the dictionary path.</td></tr>
         </tbody></table></div>
       <div class="callout gotcha"><div class="ico">!</div><div class="body"><span class="tag">Dictionaries can retain content</span><p>Train only on public, logged-out pages of one vhost. Served bytes are never dictionary-encoded. A missing compatible dictionary is a miss, never undecodable output.</p></div></div>
     </section>
@@ -137,16 +138,16 @@ curl -s -X POST -H 'x-litespeed-purge: *' http://127.0.0.1/__hj_cache_purge     
       <div class="tablewrap"><table>
         <thead><tr><th>Mechanism</th><th>Flags</th><th>Behavior</th></tr></thead>
         <tbody>
-          <tr><td>stale-while-revalidate</td><td><code>--page-cache-stale-default-secs</code> (0), <code>--page-cache-stale-max-secs</code> (86400)</td><td>Serve stale now; refresh in background via full dispatch. Limit: an <code>X-LiteSpeed</code> opt-in never merges standard <code>Cache-Control</code> stale values (2026-10-04).</td></tr>
-          <tr><td>stale-if-error</td><td><code>--page-cache-stale-if-error-default-secs</code> (0), <code>--page-cache-stale-if-error-max-secs</code> (86400)</td><td>Serve the retained entry on backend 5xx as <code>hit,stale-if-error</code>. Limit: <code>public,max-age=30</code> egress, Age reset; production sets 30 s.</td></tr>
-          <tr><td>single flight</td><td>built in</td><td>Collapse concurrent misses onto one leader via <code>Notify</code>. Limit: followers wait instead of rendering.</td></tr>
+          <tr><td>stale-while-revalidate</td><td><code>--page-cache-stale-default-secs</code> (0), <code>--page-cache-stale-max-secs</code> (86400)</td><td>Serve stale now; refresh in background via full dispatch. An <code>X-LiteSpeed</code> opt-in never merges standard <code>Cache-Control</code> stale values (2026-10-04).</td></tr>
+          <tr><td>stale-if-error</td><td><code>--page-cache-stale-if-error-default-secs</code> (0), <code>--page-cache-stale-if-error-max-secs</code> (86400)</td><td>Serve the retained entry on backend 5xx as <code>hit,stale-if-error</code>. <code>public,max-age=30</code> egress, Age reset; production sets 30 s.</td></tr>
+          <tr><td>single flight</td><td>built in</td><td>Collapse concurrent misses onto one leader via <code>Notify</code>. Followers wait instead of rendering.</td></tr>
         </tbody></table></div>
     </section>
 
     <section>
       <h2 id="capsules">XenForo public-shell capsules <span class="badge hj">application-specific</span></h2>
       <p>Enable <code>--xf-capsule</code> (requires <code>--page-cache</code>) for a public HTML <em>shell</em> on member requests; the add-on fills member bits client-side. Empty <code>--xf-capsule-vhosts</code> disables every vhost. Cover routes with <code>--xf-capsule-paths</code> or <code>all-get-classified</code>. Set <code>--xf-capsule-stale-secs</code> (production 3600). Since 2026-10-04 members use the <em>public</em> entry; <code>--xf-capsule-dedicated-store</code> (default off) restores a dedicated copy.</p>
-      <!--diagram:xf-capsule|<strong>Guest vs logged-in member routing across the four cache surfaces.</strong> Guests use the public tier directly; logged-in members route visitor-invariant HMAC image paths (<code>--page-cache-shared-paths</code>) to the public tier, eligible forum routes (<code>--xf-capsule</code>) to the anonymized public HTML shell, and remaining opt-in pages to the per-session <code>--page-cache-private</code> tier.-->
+      <!--diagram:xf-capsule|<strong>Cache surfaces for XenForo.</strong> The arrows identify possible paths rather than evaluation order. Each surface has its own request, policy and response gates; ineligible requests bypass it. The capsule shell is anonymized and member state is hydrated in the browser.-->
     </section>
 
     <section>

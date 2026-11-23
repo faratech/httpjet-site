@@ -19,7 +19,7 @@ httpjet --root /abs/root check [--strict]     # parse + summary + lint; --strict
 httpjet --root /abs/root serve [flags…]       # bind the configured listeners and serve
 httpjet --root /abs/root lsphp [flags…]       # run a standalone persistent lsphp pool (the PHP half of a zero-downtime deploy)
 httpjet lsphp-reload [flags…]                 # ask a running pool to replace its worker generation without closing the listener
-httpjet --version                             # httpjet 0.2.4
+httpjet --version                             # prints the installed version
 ```
 
 | Subcommand · flag | Default | Meaning |
@@ -66,9 +66,9 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --h3-engine   | legacy | HTTP/3 request engine. The accelerated engine tries the shared on-core cache path before dispatching misses through the io_uring bridge Values: `legacy`, `accelerated`, `auto`. |
 
-| --h3-gso-segments   | 10 | Maximum HTTP/3 datagrams in one GSO transmit. The experimental value 20 retains the same 20-datagram flush budget; the default remains 10 Values: `10`, `20`. |
+| --h3-gso-segments   | 10 or 20 | Maximum HTTP/3 datagrams per GSO transmit. Defaults to 20 for accelerated or auto mode on x86_64; otherwise 10. Values: `10`, `20`. |
 
-| --h3-send-batch   | 1 | Maximum UDP messages per send syscall; 1 retains the scalar path Values: `1`, `4`, `8`, `16`. |
+| --h3-send-batch   | 1 or 4 | UDP messages per send syscall. Defaults to 4 for accelerated or auto mode on x86_64; otherwise 1 (scalar sends). Values: `1`, `4`, `8`, `16`. |
 
 | --h3-ack-eliciting-threshold   | 0 | Ask HTTP/3 peers that support QUIC ACK_FREQUENCY to acknowledge every N ack-eliciting packets instead of every second one. 0 (default) asks nothing |
 
@@ -78,7 +78,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --http-uds   | — | Additionally serve plain HTTP on this unix domain socket (H1 + h2c prior knowledge, one accept core). Peers have no address: ACLs and logs see fabricated loopback and the access log renders `unix:` — the socket file's mode/owner is the real access boundary. A socket-activated fd at the same path (socket unit) is adopted for zero-downtime restarts |
 
-| --ktls [ ] | auto | Controls kernel TLS: `auto`, `on`, or `off`. Limit: TLS 1.3 only; validate first. |
+| --ktls [ ] | auto | Controls kernel TLS: `auto`, `on`, or `off`. TLS 1.3 only; validate first. |
 
 | Security & limits |
 
@@ -108,7 +108,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --lsphp-generation-file   | — | Shared lsphp generation epoch used to invalidate pooled external connections after a supervisor reload or restart. When supplied with --lsphp-external, startup fails if the 16-byte mapping cannot be opened |
 
-| --php-max-process-time-ms   | — | Sets the PHP processing deadline. Limit: external pools return 504 only; workers stay wedged. |
+| --php-max-process-time-ms   | — | Sets the PHP processing deadline. External pools return 504 only; workers stay wedged. |
 
 | Page cache — you enable the tier, then size storage, then tune admission and vary rules. Most sites need only `--page-cache` plus memory sizing. |
 
@@ -126,7 +126,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --page-cache-hot-mem   | 201326592 | Byte cap of the in-RAM hot tier in front of the file store (zero-syscall zero-copy serves for the hottest bodies). Only meaningful with --page-cache-store-path. Default 192 MiB |
 
-| --page-cache-dict   | (empty) | Sets the shared zstd dictionary path. Limit: absent stores plain identity. |
+| --page-cache-dict   | (empty) | Sets the shared zstd dictionary path. Absent stores plain identity. |
 
 | --page-cache-dict-vhost   | (empty) | Comma-separated `vhost=path` pairs: a PER-VHOST zstd dictionary, trained on that vhost's own content (train one local corpus per vhost). A shared dictionary trained on one site's boilerplate does little for a differently templated site, so each vhost compresses against its own. A vhost not listed here falls back to --page-cache-dict if set, else stores identity (today's behaviour). Example: `forum.example=conf/pagecache-forum.dict,moon.example=conf/pagecache-moon.dict` |
 
@@ -140,9 +140,9 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --page-cache-stream-fill-vhosts   | (empty) | Comma-separated vhost names whose cacheable page-cache misses WITHOUT a Content-Length (progressive template output) are sent to the client as the backend writes them and stored once the backend finishes, instead of being buffered whole first. Only identity-encoded public 200s; a body that errors, is cut short or grows past the object cap is served but never stored. Empty = off |
 
-| --page-cache-egress-at-rest-vhosts   | (empty) | Keeps plain zstd storage for listed vhosts. Limit: buffered misses only; storage grows. |
+| --page-cache-egress-at-rest-vhosts   | (empty) | Keeps plain zstd storage for listed vhosts. Buffered misses only; storage grows. |
 
-| --page-cache-admit-threshold   | 2 | Sets the W-TinyLFU admission bar. Limit: size adds +1 per 256 KiB. |
+| --page-cache-admit-threshold   | 2 | Sets the W-TinyLFU admission bar. Size adds +1 per 256 KiB. |
 
 | --page-cache-vary-cookies   | xf_style_variation,xf_style_id,xf_language_id | Comma-separated public-vary cookie names: a cacheable public response may declare `X-LiteSpeed-Vary: cookie=NAME,...` and the entry is keyed by these cookies' values (shared, non-sensitive prefs). Default matches the XenForo style/language set |
 
@@ -152,13 +152,13 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --page-cache-private-session-cookie   | xf_session | Request cookie whose VALUE keys a private entry's owner (the session) |
 
-| --page-cache-private-user-cookie   | xf_user | Request cookie whose PRESENCE routes a request to the private tier (the logged-in marker; XenForo's remember cookie) |
+| --page-cache-private-user-cookie   | xf_user | User marker used when private routing is enabled. Private caching also needs a non-empty session and an allowed private policy; admitted shared paths can use public routing. |
 
-| --page-cache-shared-paths   | (empty) | Lists visitor-invariant endpoints members may share publicly. Limit: list identical bytes only, never HTML. |
+| --page-cache-shared-paths   | (empty) | Lists visitor-invariant endpoints members may share publicly. List identical bytes only, never HTML. |
 
 | --page-cache-shared-paths-canary-percent   | 100 | Deterministic percentage (0-100) of member requests matching --page-cache-shared-paths that actually route to the public tier; the rest keep today's private-tier behavior. Sticky per member (bucketed by a hash of the user/session cookie value, exactly like --xf-capsule-member-canary-percent), so one member never flickers between tiers. 100 = all matching requests |
 
-| --page-cache-standard-vhosts   | (empty) | Puts listed vhosts in standards mode. Limit: unlisted vhosts stay X-LiteSpeed-only. |
+| --page-cache-standard-vhosts   | (empty) | Puts listed vhosts in standards mode. Unlisted vhosts stay X-LiteSpeed-only. |
 
 | --page-cache-stale-default-secs   | 0 | Stale-while-revalidate window (seconds) applied when the app declares none. 0 = off (serve only fresh unless the app sets stale-while-revalidate / max-stale) |
 
@@ -192,9 +192,9 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | --no-page-cache-response-memo | off | Disable the per-worker memo of finalized public page-cache hits (default ON since 0.1.11, with `--page-cache`; cookieless GET only; entries keep exact freshness/Age/purge fences and share the fast-memo budget). The old `--page-cache-response-memo` opt-in still parses for existing units |
 
-| --fast-early-bridge   | off | Bridge a cookieless request to the full pipeline before the on-core prefix when nothing on-core can serve it: the page cache cannot answer the path and the static branch would decline. `off` (default) is today's path; `shadow` only counts what `on` would do (`httpjet_fast_early_predicted_total`, `httpjet_fast_early_forfeit_total`). Env `HJ_FAST_EARLY_BRIDGE` is equivalent and takes precedence. Values: `off, shadow, on`. |
+| --fast-early-bridge   | architecture-dependent | Route eligible cookieless requests early to the full pipeline. `scripts` checks script suffixes; `on` also checks route-shaped paths; `off` disables it; `shadow` counts predictions only. By default x86_64 checks scripts on all protocols, and AArch64 checks scripts on accelerated H3. `HJ_FAST_EARLY_BRIDGE` overrides the flag. |
 
-| --cf-send-zstd | off | Sends zstd to trusted Cloudflare peers. Limit: never applies to direct clients. |
+| --cf-send-zstd | off | Sends zstd to trusted Cloudflare peers. Never applies to direct clients. |
 
 | --rewrite-outcome-ttl-ms   | 1000 | TTL in milliseconds for the rewrite-outcome cache (memoized rewrite decisions for `path_cacheable` chains, keyed by vhost/scheme/ method/host/path/query + any keyable header vars). 0 disables the cache entirely. The default (1000 ms) matches the historical hard-coded TTL — it bounds `-f`/`-d` filesystem staleness exactly like the StatCache and lets `.htaccess` edits take effect within ~1 s |
 
@@ -311,7 +311,7 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 
 | `HJ_FAST_MEMO` | `1` | `0` ≡ `--no-fast-memo`. |
 
-| `HJ_FAST_EARLY_BRIDGE` | unset | `off` · `shadow` · `on` ≡ `--fast-early-bridge`; takes precedence over the flag when set. |
+| `HJ_FAST_EARLY_BRIDGE` | unset | `off` · `shadow` · `scripts` · `on` ≡ `--fast-early-bridge`; takes precedence over the flag when set. |
 
 | `HJ_LSAPI_FULL_HEADER_ENV` | unset | `1` also sends every request header's `HTTP_*` copy in the LSAPI env table (kill switch for the 0.1.8 dedupe; lsphp's `$_SERVER` is unchanged either way). Read once. |
 

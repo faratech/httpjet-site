@@ -7,7 +7,7 @@
 
 ---
 
-httpjet · documentation · v0.2.4
+httpjet · documentation · release overview
 
 # httpjet
 
@@ -39,7 +39,7 @@ A from-scratch **Rust web server** and **drop-in LiteSpeed replacement**: it rea
 
 ## What httpjet is
 
-Point `--root` at your LiteSpeed Web Server (LSWS 6.3.5) or OpenLiteSpeed tree. httpjet runs it unchanged. Compatibility is the feature. Native additions stay opt-in.
+httpjet reads LiteSpeed Web Server (LSWS 6.3.5) and OpenLiteSpeed configuration trees. Check the supported directives and limits , validate your configuration, and test it before migrating. Native additions are opt-in.
 
 ### Compatible surface
 
@@ -66,7 +66,7 @@ Point `--root` at your LiteSpeed Web Server (LSWS 6.3.5) or OpenLiteSpeed tree. 
 - Loopback admin API , WAF sidecar , compile-time extensions
 
         i   Where it runs
-httpjet serves WindowsForum.com (x86_64) and MoonTimeNow.com + ThisDayInHistory.ai (ARM64) behind Cloudflare, on pure io_uring with the file tier live. It replaced LiteSpeed for all three (0.2.4, Rust 1.99.1+, edition 2024, GPL-3.0-only). Run `check --strict` and test on alternate ports before cutover. See Capabilities & limits .
+httpjet serves WindowsForum.com (x86_64) and MoonTimeNow.com + ThisDayInHistory.ai (ARM64) behind Cloudflare, on pure io_uring with the file tier live. It replaced LiteSpeed for all three. The project is GPL-3.0-only; running versions and deployment settings can differ by host. Run `check --strict` and test on alternate ports before cutover. See Capabilities & limits .
 
 ## How the pieces fit
 
@@ -95,16 +95,16 @@ See Performance for method and receipts.
           44.8 k rps   PHP/LSAPI h1, PGO loopback (2026-06): LiteSpeed ~38.5k
           40 ×   cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms
           146 /146   h2spec, native HTTP/2, TLS, three runs
-          0.2 %   httpjet phases, June 2026 production (~138 µs/req); PHP 86.5–98.8% of wall time
+          0.2 %   httpjet phases, June 2026 production (~138 µs/req); LSAPI elapsed time 86.5–98.8% of wall time
           3,200 +   test functions, 20 crates; suite green at v0.2.4 (3,237 tests)
 
 ## Project status
 
 | Aspect | State |
 
-| Version | **0.2.4** · November 20, 2026 · latest public release |
+| Version | Check the latest public release |
 
-| Release detail | 11 waves of hot-path optimizations (zero-map single-frame H2 fast path, small-body coalescing across H1/H2/H3, direct HPACK/QPACK encoding, shared `Arc ` `fast_memo` egress, 50 ms coarse HTTP Date cache, single-probe router resolution, compact ACL bitmasks + TLS peer cache, cached static `RootDir` descriptors, borrowed `.htaccess`/rewrite/LSAPI paths) plus 36 reliability fixes across transport, page cache, rewrite, proxy, and lifecycle. Dedicated lab VM, 2026-11-21 (15 releases, 4 server / 4 loadgen cores, Unified PGO, median of 3): 0.2.4 vs 0.2.3 — H2 empty **1,291.7k** vs 860.1k (+50.2%), H2 1 KiB static **1,092.6k** vs 849.1k (+28.7%), heavy-`.htaccess` H2 **879.5k** vs 656.9k (+33.9%), page-cache hits **849.6k** vs 720.3k (+18.0%), PHP/LSAPI **41.8k** vs 39.6k (+5.6%); see Performance . Semantic versioning adopted 2026-09-17; MSRV Rust 1.99.1, edition 2024. |
+| Release history | Version 0.2.6 includes HTTP/1.1 and HTTP/2 request-path work, a guarded page-cache encoding change, and architecture-specific defaults for the optional accelerated HTTP/3 engine. Explore dated measurements and their methods in Performance . For release changes and packages, see GitHub Releases . |
 
 | Configuration | LiteSpeed XML stays authoritative. Native directives stay opt-in. `check --strict` gates deploys. |
 
