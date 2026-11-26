@@ -5,7 +5,7 @@
   "use strict";
   var doc = document, root = doc.documentElement;
   var AUDIO_STORAGE_KEY = "hj_epic_audio_v1";
-  var DOCS_ASSET_VER = "20261126a";
+  var DOCS_ASSET_VER = "20261126b";
 
   var makeRng = function (seed) {
     return function () {
@@ -2306,49 +2306,50 @@
   "summary": "On-core monoio LSAPI for H1 & H2 PHP, borrowed H2 memo hints, pre-rendered CLF log prefixes, single-inline H2 flushes, and reusable H1 write_watch slots. All 1,710,000 sweep requests succeeded with 0 errors.",
   "kpis": [
     {
-      "v": "54.9k rps",
-      "d": "+20.4% vs pub 0.2.6 · p99 1.18 ms",
-      "n": false,
-      "l": "H1 PHP/LSAPI"
-    },
-    {
-      "v": "50.6k rps",
-      "d": "on-core monoio LSAPI",
-      "n": false,
-      "l": "H2 PHP/LSAPI"
-    },
-    {
-      "v": "1,386.4k rps",
-      "d": "p99 0.145 ms",
+      "v": "1,668.9k rps",
+      "d": "+12.7% matched · p99 0.141 ms",
       "n": false,
       "l": "H2 empty body"
     },
     {
-      "v": "990.9k rps",
-      "d": "+20.5% matched vs 0.2.6",
+      "v": "1,451.2k rps",
+      "d": "+13.6% matched · p99 0.171 ms",
+      "n": false,
+      "l": "H2 static 1 KiB"
+    },
+    {
+      "v": "1,311.1k rps",
+      "d": "+20.5% matched · p99 0.581 ms",
       "n": false,
       "l": "H2 page-cache hit"
+    },
+    {
+      "v": "60.4k rps",
+      "d": "+32.3% matched · p99 1.145 ms",
+      "n": false,
+      "l": "H1 PHP/LSAPI"
     }
   ],
   "chart": {
-    "title": "Lab throughput by release",
-    "sub": "Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds",
+    "title": "Same-VM matched throughput: 0.2.6 vs 0.2.7",
+    "sub": "Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (73.5M reqs)",
     "unit": "k req/s",
     "series": [
-      "0.2.6 · Nov 23",
-      "0.2.7 · Nov 26"
+      "0.2.6 · Matched",
+      "0.2.7 · Matched"
     ],
     "rows": [
-      ["H2 empty body", [1524.4, 1386.4]],
-      ["H2 static 1 KiB", [1353.9, 1187.1]],
-      ["H2 static 64 KiB", [129.1, 123.7]],
-      ["H2 heavy .htaccess", [1002.1, 930.5]],
-      ["H2 page-cache hit", [1001.0, 990.9]],
-      ["H1 static 1 KiB", [406.4, 354.9]],
-      ["H1 heavy .htaccess", [390.4, 326.9]],
-      ["H1 PHP/LSAPI", [45.6, 54.9]]
+      ["H2 empty body", [1496.7, 1668.9]],
+      ["H2 static 1 KiB", [1176.3, 1451.2]],
+      ["H2 page-cache hit", [1149.5, 1311.1]],
+      ["H2 heavy .htaccess", [948.8, 1045.4]],
+      ["H2 static 64 KiB", [130.5, 130.2]],
+      ["H1 static 1 KiB", [391.7, 390.8]],
+      ["H1 heavy .htaccess", [364.2, 375.3]],
+      ["H1 PHP/LSAPI", [44.8, 60.4]],
+      ["H2 PHP/LSAPI", [46.7, 55.1]]
     ],
-    "foot": "Separate VMs have inter-VM placement shift; in a same-VM 10-round matched run (73.5M reqs), 0.2.7 beat 0.2.6 on all workloads (PHP H1 +32.3%, Cached H2 +20.5%, PHP H2 +17.9%, Static H2 +13.6%, Empty H2 +12.7%)."
+    "foot": "Both releases ran back-to-back on the exact same c4-highmem-8 VM across 10 interleaved rounds (0 errors)."
   },
   "notes": [
     "The November 26 run measured 0.2.7 (b403ea2) under the exact website 3-round protocol, plus php-h2 (50.6k req/s), wrk-h1 (416.6k req/s), and perf stat (0.44 minor faults/1k req).",
@@ -2671,7 +2672,7 @@
             { idx: 20, tag: "v0.2.4", h2: 879.5, h1: 381.5, note: "Waves 1–11 optimizations" },
             {"idx": 21, "tag": "v0.2.5", "h2": 840.7, "h1": 382.6, "note": "Separate November 22 dedicated lab run", "separateRun": true},
             {"idx": 22, "tag": "v0.2.6", "h2": 1002.1, "h1": 390.4, "note": "Separate November 23 dedicated lab run", "separateRun": true},
-            {"idx": 23, "tag": "v0.2.7", "h2": 930.5, "h1": 326.9, "note": "Separate November 26 dedicated lab run (+10.0% matched H2 vs 0.2.6)", "separateRun": true}
+            {"idx": 23, "tag": "v0.2.7", "h2": 1045.4, "h1": 375.3, "note": "November 26 10-round matched lab (+10.0% H2 vs 0.2.6)", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2705,7 +2706,7 @@
             { idx: 20, tag: "v0.2.4", h2: 1092.6, h1: 415.7, note: "Waves 1–11 optimizations" },
             {"idx": 21, "tag": "v0.2.5", "h2": 1166.5, "h1": 406.2, "note": "Separate November 22 dedicated lab run", "separateRun": true},
             {"idx": 22, "tag": "v0.2.6", "h2": 1353.9, "h1": 406.4, "note": "Separate November 23 dedicated lab run", "separateRun": true},
-            {"idx": 23, "tag": "v0.2.7", "h2": 1187.1, "h1": 354.9, "note": "Separate November 26 dedicated lab run (+13.6% matched H2 vs 0.2.6)", "separateRun": true}
+            {"idx": 23, "tag": "v0.2.7", "h2": 1451.2, "h1": 390.8, "note": "November 26 10-round matched lab (+13.6% H2 vs 0.2.6)", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2739,7 +2740,7 @@
             { idx: 20, tag: "v0.2.4", php: 41.8, cache: 849.6, note: "Waves 1–11 optimizations" },
             {"idx": 21, "tag": "v0.2.5", "php": 42.1, "cache": 900.3, "note": "Separate November 22 dedicated lab run", "separateRun": true},
             {"idx": 22, "tag": "v0.2.6", "php": 45.6, "cache": 1001.0, "note": "Separate November 23 dedicated lab run", "separateRun": true},
-            {"idx": 23, "tag": "v0.2.7", "php": 54.9, "cache": 990.9, "note": "Separate November 26 dedicated lab run (+32.3% matched PHP, +20.5% matched cache vs 0.2.6)", "separateRun": true}
+            {"idx": 23, "tag": "v0.2.7", "php": 60.4, "cache": 1311.1, "note": "November 26 10-round matched lab (+32.3% PHP, +20.5% cache vs 0.2.6)", "separateRun": true}
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
@@ -2753,7 +2754,7 @@
       var curCurve = 0;
       function renderCurve() {
         var c = CURVES[curCurve];
-        var W = 860, H = 370, padL = 64, padR = 235, padT = 24, padB = 58;
+        var W = 860, H = 370, padL = 64, padR = c.refs.length ? 235 : 36, padT = 28, padB = 62;
         var plotW = W - padL - padR, plotH = H - padT - padB;
         var n = c.pts.length;
         var values = c.pts.flatMap(function (point) {
@@ -2834,14 +2835,15 @@
             runStart = k;
           }
           drawRun(coords.slice(runStart));
-          coords.forEach(function (p) {
+          coords.forEach(function (p, ci) {
             var isSel = (p[3].idx === curIdx);
             var r = isSel ? 5.5 : 3.8;
             h.push('<g style="cursor:pointer" data-cjump="' + p[3].idx + '">');
             h.push('<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + r + '" fill="' + (isSel ? "#fff" : sr.color) + '" stroke="' + sr.color + '" stroke-width="2"><title>' + esc(p[3].tag + " (" + p[3].note + ") · " + sr.label + ": " + p[2] + " " + c.unit) + '</title></circle>');
-            {
+            var showLbl = isSel || ci === 0 || ci === coords.length - 1 || ci % 2 === 0;
+            if (showLbl) {
               var dy = sIdx === 0 ? -9 : 14;
-              h.push('<text x="' + p[0].toFixed(1) + '" y="' + (p[1] + dy).toFixed(1) + '" text-anchor="middle" style="font-size:10px;font-weight:700;fill:#fff">' + fmtVal(p[2]) + '</text>');
+              h.push('<text x="' + p[0].toFixed(1) + '" y="' + (p[1] + dy).toFixed(1) + '" text-anchor="middle" style="font-size:9.5px;font-weight:700;fill:#fff">' + fmtVal(p[2]) + '</text>');
             }
             h.push('</g>');
           });

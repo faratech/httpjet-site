@@ -11,8 +11,8 @@
 
 httpjet is fast — and these docs are strict about *where* the time goes. Every figure names its regime, because a **loopback benchmark** (synthetic, on-box, PGO build) is not the same thing as **production telemetry** (real CDN-fronted traffic). The historical production samples describe one site and traffic mix; they are not a prediction for every deployment.
 
-        1,386.4 k rps   0.2.7 H2 empty body, dedicated lab, median of 3 (p99 0.145 ms)
-        54.9 k rps   0.2.7 PHP/LSAPI over H1, dedicated lab, median of 3 (+20.4% vs pub 0.2.6)
+        1,668.9 k rps   0.2.7 H2 empty body, dedicated lab, 10-round matched (+12.7% vs 0.2.6, p99 0.141 ms)
+        60.4 k rps   0.2.7 PHP/LSAPI over H1, dedicated lab, 10-round matched (+32.3% vs 0.2.6)
         40 ×   cache hit vs the same page through PHP
         0.2 %   httpjet's request phases, June 2026 production telemetry
         1.55 IPC   h2 hit path at saturation, June 2026 (hardware counters)
@@ -133,13 +133,13 @@ The November 26, 2026 run measured `0.2.7` (on-core monoio LSAPI for HTTP/1.1 & 
 
 Because separate GCE VMs can shift baseline numbers by ~10%, we also ran a **same-VM 10-round matched PGO sweep** (73.5M requests, 0 errors): `0.2.7` beat `0.2.6` on every workload — **PHP H1 +32.3%** (p99 −33.2%), **Cached H2 +20.5%** (p99 −19.3%), **PHP H2 +17.9%** (p99 −33.7%), **Static H2 +13.6%** (p99 −34.2%), **Empty H2 +12.7%** (p99 −37.6%), and **Rewrite-heavy H2 +10.0%** (p99 −17.8%).
 
-> [Benchmark Chart: v027-throughput — Throughput by release (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+> [Benchmark Chart: v027-throughput — Same-VM matched throughput: 0.2.6 vs 0.2.7 (Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (73.5M reqs, 0 errors))]
 
-> [Benchmark Chart: v027-p99 — p99 response time by release (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+> [Benchmark Chart: v027-p99 — Same-VM matched p99 latency: 0.2.6 vs 0.2.7 (lower is better) (Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds)]
 
-> [Benchmark Chart: v027-static-servers — Static throughput across dedicated lab runs (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+> [Benchmark Chart: v027-static-servers — Static throughput: nginx vs httpjet 0.2.6 & 0.2.7 (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO)]
 
-Per-round sweep TSV · Extended static & PHP H2 TSV · Perf software counters · Functional checks · Raw results and hashes
+Same-VM 10-round matched TSV · 3-round sweep TSV · Extended static & PHP H2 TSV · Perf software counters · Functional checks · Raw results and hashes
 
 ## 0.2.6 dedicated lab benchmarks
 

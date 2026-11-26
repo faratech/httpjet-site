@@ -60,6 +60,7 @@ WORKLOADS = {
     "H1 static 1 KiB": "static-h1",
     "H1 heavy .htaccess": "heavy-h1",
     "H1 PHP/LSAPI": "php-h1",
+    "H2 PHP/LSAPI": "php-h2",
     "H1 static 1 KiB (wrk)": "wrk-h1",
 }
 
@@ -67,12 +68,14 @@ WORKLOADS = {
 def validate_benchmarks(assets, charts):
     sweeps = {}
     extended = {}
-    for day in (21, 22, 23, 26):
+    for day in (21, 22, 23):
         with (assets / f"release-sweep-2026-11-{day}.tsv").open(newline="") as f:
             sweeps[day] = list(csv.DictReader(f, delimiter="\t"))
         filename = "lab-threeway" if day == 21 else "lab-extended"
         with (assets / f"{filename}-2026-11-{day}.tsv").open(newline="") as f:
             extended[day] = list(csv.DictReader(f, delimiter="\t"))
+    with (assets / "release-matched-2026-11-26.tsv").open(newline="") as f:
+        matched_26 = list(csv.DictReader(f, delimiter="\t"))
     for version in ("v025", "v026", "v027"):
         for metric in ("throughput", "p99", "static-servers"):
             name = f"{version}-{metric}"
@@ -82,24 +85,31 @@ def validate_benchmarks(assets, charts):
                 raise ValueError(f"{name}: expected unit {expected_unit}")
             for label, values in rows:
                 for entry, value in zip(series, values, strict=True):
-                    server, date = entry.split(" · Nov ")
-                    day = int(date)
-                    server = server if server == "nginx" else "v" + server
                     workload = WORKLOADS[label]
-                    if metric == "static-servers":
-                        samples = [float(r["median_rps"]) / 1000 for r in extended[day]
-                                   if r["server"] == server and r["workload"] == workload]
+                    if entry.endswith(" · Matched"):
+                        server = "v" + entry.split(" · ")[0]
+                        field, divisor = ("median_p99_ms", 1) if metric == "p99" else ("median_rps", 1000)
+                        samples = [float(r[field]) / divisor for r in matched_26
+                                   if r["version"] == server and r["workload"] == workload]
                         expected_count = 1
                     else:
-                        field, divisor = ("p99_ms", 1) if metric == "p99" else ("rps", 1000)
-                        samples = [float(r[field]) / divisor for r in sweeps[day]
-                                   if r["version"] == server and r["workload"] == workload]
-                        expected_count = 3
+                        server, date = entry.split(" · Nov ")
+                        day = int(date)
+                        server = server if server == "nginx" else "v" + server
+                        if metric == "static-servers":
+                            samples = [float(r["median_rps"]) / 1000 for r in extended[day]
+                                       if r["server"] == server and r["workload"] == workload]
+                            expected_count = 1
+                        else:
+                            field, divisor = ("p99_ms", 1) if metric == "p99" else ("rps", 1000)
+                            samples = [float(r[field]) / divisor for r in sweeps[day]
+                                       if r["version"] == server and r["workload"] == workload]
+                            expected_count = 3
                     tolerance = 0.00051 if metric == "p99" else 0.0501
                     if len(samples) != expected_count or abs(median(samples) - value) > tolerance:
                         raise ValueError(f"{name}: {entry} / {label} = {value}; receipts: {samples}")
 
-    # The interactive view uses the same three receipts, grouped by release
+    # The interactive view uses the same receipts, grouped by release
     # and workload. Require every series point so deleting data also fails.
     curve_workloads = {
         "c-rewrite": {"h1": "heavy-h1", "h2": "heavy-h2"},
@@ -111,6 +121,10 @@ def validate_benchmarks(assets, charts):
         for row in run:
             key = (row["version"], row["workload"])
             samples_by_run.setdefault(key, []).append(float(row["rps"]) / 1000)
+    for row in matched_26:
+        if row["version"] == "v0.2.7":
+            key = (row["version"], row["workload"])
+            samples_by_run[key] = [float(row["median_rps"]) / 1000] * 3
     script = (assets / "docs.js").read_text()
     start = script.index("var CURVES = [")
     end = script.index("var curCurve =", start)

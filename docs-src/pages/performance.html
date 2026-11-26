@@ -2,8 +2,8 @@
     <p class="lede">httpjet is fast — and these docs are strict about <em>where</em> the time goes. Every figure names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real CDN-fronted traffic). The historical production samples describe one site and traffic mix; they are not a prediction for every deployment.</p>
 
     <div class="stats">
-      <div class="stat accent"><div class="v">1,386.4<span class="u">k rps</span></div><div class="l">0.2.7 H2 empty body, dedicated lab, median of 3 (p99 0.145 ms)</div></div>
-      <div class="stat"><div class="v">54.9<span class="u">k rps</span></div><div class="l">0.2.7 PHP/LSAPI over H1, dedicated lab, median of 3 (+20.4% vs pub 0.2.6)</div></div>
+      <div class="stat accent"><div class="v">1,668.9<span class="u">k rps</span></div><div class="l">0.2.7 H2 empty body, dedicated lab, 10-round matched (+12.7% vs 0.2.6, p99 0.141 ms)</div></div>
+      <div class="stat"><div class="v">60.4<span class="u">k rps</span></div><div class="l">0.2.7 PHP/LSAPI over H1, dedicated lab, 10-round matched (+32.3% vs 0.2.6)</div></div>
       <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs the same page through PHP</div></div>
       <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's request phases, June 2026 production telemetry</div></div>
       <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation, June 2026 (hardware counters)</div></div>
@@ -120,7 +120,7 @@
       <!--chart:v027-throughput-->
       <!--chart:v027-p99-->
       <!--chart:v027-static-servers-->
-      <p><a href="assets/release-sweep-2026-11-26.tsv">Per-round sweep TSV</a> · <a href="assets/lab-extended-2026-11-26.tsv">Extended static &amp; PHP H2 TSV</a> · <a href="assets/lab-perf-2026-11-26.tsv">Perf software counters</a> · <a href="assets/lab-checks-2026-11-26.tsv">Functional checks</a> · <a href="/benchmarks/data/lab-receipts-2026-11-26.tar.gz">Raw results and hashes</a></p>
+      <p><a href="assets/release-matched-2026-11-26.tsv">Same-VM 10-round matched TSV</a> · <a href="assets/release-sweep-2026-11-26.tsv">3-round sweep TSV</a> · <a href="assets/lab-extended-2026-11-26.tsv">Extended static &amp; PHP H2 TSV</a> · <a href="assets/lab-perf-2026-11-26.tsv">Perf software counters</a> · <a href="assets/lab-checks-2026-11-26.tsv">Functional checks</a> · <a href="/benchmarks/data/lab-receipts-2026-11-26.tar.gz">Raw results and hashes</a></p>
     </section>
 
     <section>
