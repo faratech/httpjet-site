@@ -2,8 +2,8 @@
     <p class="lede">httpjet is fast — and these docs are strict about <em>where</em> the time goes. Every figure names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real CDN-fronted traffic). The historical production samples describe one site and traffic mix; they are not a prediction for every deployment.</p>
 
     <div class="stats">
-      <div class="stat accent"><div class="v">1,524.4<span class="u">k rps</span></div><div class="l">0.2.6 H2 empty body, dedicated lab, median of 3</div></div>
-      <div class="stat"><div class="v">45.6<span class="u">k rps</span></div><div class="l">0.2.6 PHP/LSAPI over H1, dedicated lab, median of 3</div></div>
+      <div class="stat accent"><div class="v">1,386.4<span class="u">k rps</span></div><div class="l">0.2.7 H2 empty body, dedicated lab, median of 3 (p99 0.145 ms)</div></div>
+      <div class="stat"><div class="v">54.9<span class="u">k rps</span></div><div class="l">0.2.7 PHP/LSAPI over H1, dedicated lab, median of 3 (+20.4% vs pub 0.2.6)</div></div>
       <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs the same page through PHP</div></div>
       <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's request phases, June 2026 production telemetry</div></div>
       <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation, June 2026 (hardware counters)</div></div>
@@ -24,9 +24,9 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>The <strong>Release Speed Curve</strong> shows the November 21 sweep and the separate 0.2.5 and 0.2.6 runs on November 22 and 23. Dashed segments mark the boundary between runs.</p>
+      <p>The <strong>Release Speed Curve</strong> shows the November 21 sweep and the separate 0.2.5, 0.2.6, and 0.2.7 runs on November 22, 23, and 26. Dashed segments mark the boundary between runs.</p>
       <p>Each run used a dedicated <code>c4-highmem-8</code> VM, loopback traffic, four vCPUs per side, the same eight workloads, and the median of three rounds. Explore the charts, build slides, or comparison view.</p>
-      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve through 0.2.6 with separate November 21, 22, and 23 runs">
+      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve through 0.2.7 with separate November 21, 22, 23, and 26 runs">
         <div class="bexp__curve"></div>
       </div>
 
@@ -111,6 +111,16 @@
         </table>
       </div>
       <p class="mini">Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: <code>docs/pagecache-response-memo-experiment.md</code> in the source tree.</p>
+    </section>
+
+    <section>
+      <h2 id="release-0-2-7">0.2.7 dedicated lab benchmarks</h2>
+      <p>The November 26, 2026 run measured <code>0.2.7</code> (on-core monoio LSAPI for HTTP/1.1 &amp; HTTP/2 PHP, borrowed H2 memo hints, pre-rendered CLF log prefixes, single-inline H2 flushes, and reusable <code>write_watch::Slot</code> H1 write timers) with Unified PGO on a dedicated VM. All <strong>1,710,000 sweep requests</strong> succeeded across eight workloads and three rounds, plus <code>php-h2</code> (<strong>50.6k req/s</strong>) and <code>wrk</code> H1 (<strong>416.6k req/s</strong>) in the extended sweep, with <code>0.44</code> minor faults / 1k req on <code>perf stat</code>.</p>
+      <p>Because separate GCE VMs can shift baseline numbers by ~10%, we also ran a <strong>same-VM 10-round matched PGO sweep</strong> (73.5M requests, 0 errors): <code>0.2.7</code> beat <code>0.2.6</code> on every workload — <strong>PHP H1 +32.3%</strong> (p99 &minus;33.2%), <strong>Cached H2 +20.5%</strong> (p99 &minus;19.3%), <strong>PHP H2 +17.9%</strong> (p99 &minus;33.7%), <strong>Static H2 +13.6%</strong> (p99 &minus;34.2%), <strong>Empty H2 +12.7%</strong> (p99 &minus;37.6%), and <strong>Rewrite-heavy H2 +10.0%</strong> (p99 &minus;17.8%).</p>
+      <!--chart:v027-throughput-->
+      <!--chart:v027-p99-->
+      <!--chart:v027-static-servers-->
+      <p><a href="assets/release-sweep-2026-11-26.tsv">Per-round sweep TSV</a> · <a href="assets/lab-extended-2026-11-26.tsv">Extended static &amp; PHP H2 TSV</a> · <a href="assets/lab-perf-2026-11-26.tsv">Perf software counters</a> · <a href="assets/lab-checks-2026-11-26.tsv">Functional checks</a> · <a href="/benchmarks/data/lab-receipts-2026-11-26.tar.gz">Raw results and hashes</a></p>
     </section>
 
     <section>
@@ -214,6 +224,11 @@
             <tr><td>HTTP/2 static 64 KiB</td><td><strong>68,689 req/s</strong></td><td>35,063 req/s</td><td>—</td></tr>
             <tr><td>Heavy <code>.htaccess</code> vhost, HTTP/2 (c100)</td><td><strong>271,118 req/s</strong></td><td>131,955 req/s</td><td>333,519 req/s</td></tr>
             <tr><td>Warm page-cache hit, HTTP/2 (c32/m32)</td><td><strong>110,158 req/s</strong></td><td>—</td><td>—</td></tr>
+            <tr>
+              <th><code>v0.2.7</code> &middot; Dedicated lab benchmarks<span class="mini">2026-11-26</span></th>
+              <td>Dedicated VM, 4 server / 4 load-generator vCPUs</td>
+              <td class="wrap"><a href="#release-0-2-7">0.2.7 results</a> · PHP H1 54.9k (+20.4% vs pub 0.2.6; +32.3% same-VM matched), PHP H2 50.6k, H2 empty 1,386.4k (p99 0.145 ms), eight workloads, three rounds, all checks passed.</td>
+            </tr>
             <tr>
               <th><code>v0.2.6</code> &middot; Dedicated lab benchmarks<span class="mini">2026-11-23</span></th>
               <td>Dedicated VM, 4 server / 4 load-generator vCPUs</td>

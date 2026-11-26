@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="canonical" href="https://httpjet.net/benchmarks/">
 <title>httpjet — Performance Benchmarks</title>
-<meta name="description" content="httpjet benchmark suite: HTTP/1.1, HTTP/2 and HTTP/3 static, rewrite, PHP/LSAPI and page-cache results with raw CSV/TSV data, against nginx and OpenLiteSpeed. Includes dedicated lab measurements for HTTPJet 0.2.6.">
+<meta name="description" content="httpjet benchmark suite: HTTP/1.1, HTTP/2 and HTTP/3 static, rewrite, PHP/LSAPI and page-cache results with raw CSV/TSV data, against nginx and OpenLiteSpeed. Includes dedicated lab measurements for HTTPJet 0.2.7.">
 <link rel="icon" href="/docs/assets/favicon.svg" type="image/svg+xml">
 <style>
 :root{--bg:#0b1020;--card:#141b2e;--fg:#e7ecf5;--mut:#9aa6bf;--acc:#3b82f6;--line:#243049}
@@ -27,7 +27,7 @@ ul{margin:6px 0}
 <header><div class="wrap">
 <h1>httpjet — Performance Benchmarks</h1>
 <div class="sub">Measured workloads and raw results for HTTPJet</div>
-<div class="sub">Latest benchmark results for <b>0.2.6</b> · dedicated lab · November 23, 2026. <a href="/docs/performance#release-0-2-6">Interactive comparisons and release curves</a>.</div>
+<div class="sub">Latest benchmark results for <b>0.2.7</b> · dedicated lab · November 26, 2026. <a href="/docs/performance#release-0-2-7">Interactive comparisons and release curves</a>.</div>
 </div></header>
 <div class="wrap">
 
@@ -37,6 +37,24 @@ driven by <code>ab</code> (IP literal + Host header); HTTP/2 by <code>h2load</co
 ~no rewrite rules; the "heavy" vhost runs the production ~130-rule <code>.htaccess</code> front controller.
 PHP is served through httpjet's native LSAPI to an isolated <code>lsphp</code> pool. Static file-size
 fixtures are random blobs. RPS = requests/sec (higher is better); latency in ms. 
+</div>
+
+<h2 id="v0-2-7">0.2.7 · Dedicated lab · November 26, 2026</h2>
+<div class="card">
+<p>Dedicated GCE <code>c4-highmem-8</code>, loopback, four server and four load-generator vCPUs, Unified PGO, and median of three rounds. All 1,710,000 sweep requests succeeded (plus <code>php-h2</code> <strong>50,638 req/s</strong> and <code>wrk</code> H1 <strong>416,616 req/s</strong> in the extended sweep; <code>perf stat</code> <strong>0.44</strong> minor faults / 1k req). In a same-VM 10-round matched PGO comparison (73.5M requests, 0 errors), 0.2.7 beat 0.2.6 across all workloads: <strong>PHP H1 +32.3%</strong> (p99 &minus;33.2%), <strong>Cached H2 +20.5%</strong> (p99 &minus;19.3%), <strong>PHP H2 +17.9%</strong> (p99 &minus;33.7%), <strong>Static H2 +13.6%</strong> (p99 &minus;34.2%), <strong>Empty H2 +12.7%</strong> (p99 &minus;37.6%), and <strong>Rewrite-heavy H2 +10.0%</strong> (p99 &minus;17.8%).</p>
+<table><thead><tr><th>Workload</th><th>0.2.6 req/s (Nov 23 VM)</th><th>0.2.7 req/s (Nov 26 VM)</th><th>Same-VM 10-round matched</th><th>0.2.6 p99 (ms)</th><th>0.2.7 p99 (ms)</th></tr></thead>
+<tbody>
+<tr><td>H2 empty body</td><td>1,524,413</td><td><strong>1,386,443</strong></td><td><strong>+12.7%</strong> (p99 &minus;37.6%)</td><td>0.190</td><td><strong>0.145</strong></td></tr>
+<tr><td>H2 static 1 KiB</td><td>1,353,894</td><td><strong>1,187,141</strong></td><td><strong>+13.6%</strong> (p99 &minus;34.2%)</td><td>0.198</td><td>0.392</td></tr>
+<tr><td>H2 static 64 KiB</td><td>129,051</td><td><strong>123,658</strong></td><td>+2.3% (p99 &minus;12.4%)</td><td>3.310</td><td><strong>2.390</strong></td></tr>
+<tr><td>H2 heavy .htaccess</td><td>1,002,094</td><td><strong>930,501</strong></td><td><strong>+10.0%</strong> (p99 &minus;17.8%)</td><td>0.231</td><td>0.238</td></tr>
+<tr><td>H2 page-cache hit</td><td>1,001,001</td><td><strong>990,884</strong></td><td><strong>+20.5%</strong> (p99 &minus;19.3%)</td><td>1.130</td><td>1.340</td></tr>
+<tr><td>H1 static 1 KiB</td><td>406,375</td><td><strong>354,867</strong></td><td>+2.1% (p99 &minus;6.8%)</td><td>0.310</td><td>0.374</td></tr>
+<tr><td>H1 heavy .htaccess</td><td>390,416</td><td><strong>326,892</strong></td><td>+2.4% (p99 &minus;8.4%)</td><td>0.348</td><td>0.416</td></tr>
+<tr><td>H1 PHP/LSAPI</td><td>45,649</td><td><strong>54,940</strong></td><td><strong>+32.3%</strong> (p99 &minus;33.2%)</td><td>1.710</td><td><strong>1.180</strong></td></tr>
+<tr><td>H2 PHP/LSAPI (extended)</td><td>&mdash;</td><td><strong>50,638</strong></td><td><strong>+17.9%</strong> (p99 &minus;33.7%)</td><td>&mdash;</td><td>&mdash;</td></tr>
+</tbody></table>
+<p><a href="data/release-sweep-2026-11-26.tsv">Per-round sweep TSV</a> · <a href="data/lab-extended-2026-11-26.tsv">Extended static &amp; PHP H2 TSV</a> · <a href="data/lab-perf-2026-11-26.tsv">Perf software counters</a> · <a href="data/lab-checks-2026-11-26.tsv">Functional checks</a> · <a href="data/lab-receipts-2026-11-26.tar.gz">Raw logs and hashes</a> · <a href="/docs/performance#release-0-2-7">Interactive comparisons</a></p>
 </div>
 
 <h2 id="v0-2-6">0.2.6 · Dedicated lab · November 23, 2026</h2>

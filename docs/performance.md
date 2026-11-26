@@ -11,8 +11,8 @@
 
 httpjet is fast — and these docs are strict about *where* the time goes. Every figure names its regime, because a **loopback benchmark** (synthetic, on-box, PGO build) is not the same thing as **production telemetry** (real CDN-fronted traffic). The historical production samples describe one site and traffic mix; they are not a prediction for every deployment.
 
-        1,524.4 k rps   0.2.6 H2 empty body, dedicated lab, median of 3
-        45.6 k rps   0.2.6 PHP/LSAPI over H1, dedicated lab, median of 3
+        1,386.4 k rps   0.2.7 H2 empty body, dedicated lab, median of 3 (p99 0.145 ms)
+        54.9 k rps   0.2.7 PHP/LSAPI over H1, dedicated lab, median of 3 (+20.4% vs pub 0.2.6)
         40 ×   cache hit vs the same page through PHP
         0.2 %   httpjet's request phases, June 2026 production telemetry
         1.55 IPC   h2 hit path at saturation, June 2026 (hardware counters)
@@ -30,7 +30,7 @@ Loopback removes the external network and CDN, but a test may still include TLS 
 
 ## Performance across builds — interactive presentation
 
-The **Release Speed Curve** shows the November 21 sweep and the separate 0.2.5 and 0.2.6 runs on November 22 and 23. Dashed segments mark the boundary between runs.
+The **Release Speed Curve** shows the November 21 sweep and the separate 0.2.5, 0.2.6, and 0.2.7 runs on November 22, 23, and 26. Dashed segments mark the boundary between runs.
 
 Each run used a dedicated `c4-highmem-8` VM, loopback traffic, four vCPUs per side, the same eight workloads, and the median of three rounds. Explore the charts, build slides, or comparison view.
 
@@ -126,6 +126,20 @@ Memo alone, instructions/request, frozen non-PGO binary, SINGULARITY loopback, 1
 | H3 | 98,293 | 68,024 | **−30.8%** |
 
 Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: `docs/pagecache-response-memo-experiment.md` in the source tree.
+
+## 0.2.7 dedicated lab benchmarks
+
+The November 26, 2026 run measured `0.2.7` (on-core monoio LSAPI for HTTP/1.1 & HTTP/2 PHP, borrowed H2 memo hints, pre-rendered CLF log prefixes, single-inline H2 flushes, and reusable `write_watch::Slot` H1 write timers) with Unified PGO on a dedicated VM. All **1,710,000 sweep requests** succeeded across eight workloads and three rounds, plus `php-h2` (**50.6k req/s**) and `wrk` H1 (**416.6k req/s**) in the extended sweep, with `0.44` minor faults / 1k req on `perf stat`.
+
+Because separate GCE VMs can shift baseline numbers by ~10%, we also ran a **same-VM 10-round matched PGO sweep** (73.5M requests, 0 errors): `0.2.7` beat `0.2.6` on every workload — **PHP H1 +32.3%** (p99 −33.2%), **Cached H2 +20.5%** (p99 −19.3%), **PHP H2 +17.9%** (p99 −33.7%), **Static H2 +13.6%** (p99 −34.2%), **Empty H2 +12.7%** (p99 −37.6%), and **Rewrite-heavy H2 +10.0%** (p99 −17.8%).
+
+> [Benchmark Chart: v027-throughput — Throughput by release (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+
+> [Benchmark Chart: v027-p99 — p99 response time by release (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+
+> [Benchmark Chart: v027-static-servers — Static throughput across dedicated lab runs (Dedicated c4-highmem-8 VMs · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · median of 3 rounds)]
+
+Per-round sweep TSV · Extended static & PHP H2 TSV · Perf software counters · Functional checks · Raw results and hashes
 
 ## 0.2.6 dedicated lab benchmarks
 
@@ -261,6 +275,8 @@ Loopback, production x86_64 host, PGO, 8 cores, live traffic shared, 2026-11-08,
 | Heavy `.htaccess` vhost, HTTP/2 (c100) | **271,118 req/s** | 131,955 req/s | 333,519 req/s |
 
 | Warm page-cache hit, HTTP/2 (c32/m32) | **110,158 req/s** | — | — |
+
+| `v0.2.7` · Dedicated lab benchmarks 2026-11-26 | Dedicated VM, 4 server / 4 load-generator vCPUs | 0.2.7 results · PHP H1 54.9k (+20.4% vs pub 0.2.6; +32.3% same-VM matched), PHP H2 50.6k, H2 empty 1,386.4k (p99 0.145 ms), eight workloads, three rounds, all checks passed. |
 
 | `v0.2.6` · Dedicated lab benchmarks 2026-11-23 | Dedicated VM, 4 server / 4 load-generator vCPUs | 0.2.6 results · Eight workloads, three rounds, all functional checks passed. |
 

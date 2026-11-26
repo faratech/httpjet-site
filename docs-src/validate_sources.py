@@ -67,13 +67,13 @@ WORKLOADS = {
 def validate_benchmarks(assets, charts):
     sweeps = {}
     extended = {}
-    for day in (21, 22, 23):
+    for day in (21, 22, 23, 26):
         with (assets / f"release-sweep-2026-11-{day}.tsv").open(newline="") as f:
             sweeps[day] = list(csv.DictReader(f, delimiter="\t"))
         filename = "lab-threeway" if day == 21 else "lab-extended"
         with (assets / f"{filename}-2026-11-{day}.tsv").open(newline="") as f:
             extended[day] = list(csv.DictReader(f, delimiter="\t"))
-    for version in ("v025", "v026"):
+    for version in ("v025", "v026", "v027"):
         for metric in ("throughput", "p99", "static-servers"):
             name = f"{version}-{metric}"
             _, _, unit, series, rows, _ = charts[name]
