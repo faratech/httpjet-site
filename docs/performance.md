@@ -11,14 +11,14 @@
 
 httpjet is fast — and these docs are strict about *where* the time goes. Every figure names its regime, because a **loopback benchmark** (synthetic, on-box, PGO build) is not the same thing as **production telemetry** (real CDN-fronted traffic). The historical production samples describe one site and traffic mix; they are not a prediction for every deployment.
 
-        1,668.9 k rps   0.2.7 H2 empty body, dedicated lab, 10-round matched (+12.7% vs 0.2.6, p99 0.141 ms)
-        60.4 k rps   0.2.7 PHP/LSAPI over H1, dedicated lab, 10-round matched (+32.3% vs 0.2.6)
+        2,239.7 k rps   0.2.8 H2 empty body, dedicated lab, 10-round matched (+14.8% vs 0.2.7, p99 0.316 ms)
+        145.0 k rps   0.2.8 HTTP/3 empty body, dedicated lab, 10-round matched (+15.9% vs 0.2.7)
+        +658.5 %   0.2.8 H2 cookied guest page-cache hit RPS vs 0.2.7 (863.5k req/s, p99 −76.9%)
+        50.2 k rps   0.2.8 PHP/LSAPI over H1, dedicated lab, 10-round matched (+14.8% vs 0.2.7)
         40 ×   cache hit vs the same page through PHP
         0.2 %   httpjet's request phases, June 2026 production telemetry
         1.55 IPC   h2 hit path at saturation, June 2026 (hardware counters)
         0.0002 flt   v0.1.5 h2 static minor page faults/req
-        0 / 80   rows classified worse beyond noise, 0.1.10 vs 0.1.5 (controlled A/B)
-        +27.6 %   h2 page-cache hit RPS, 0.1.11 defaults (coop ring + response memo, x86 ABBA)
 
 ## Read the regime, not just the number
 
@@ -30,9 +30,9 @@ Loopback removes the external network and CDN, but a test may still include TLS 
 
 ## Performance across builds — interactive presentation
 
-The **Release Speed Curve** shows the November 21 sweep and the separate 0.2.5, 0.2.6, and 0.2.7 runs on November 22, 23, and 26. Dashed segments mark the boundary between runs.
+The **Release Speed Curve** shows the November 21 sweep and the separate 0.2.5, 0.2.6, 0.2.7, and 0.2.8 runs on November 22, 23, 26, and 27. Dashed segments mark the boundary between runs.
 
-Each run used a dedicated `c4-highmem-8` VM, loopback traffic, four vCPUs per side, the same eight workloads, and the median of three rounds. Explore the charts, build slides, or comparison view.
+Each run used a dedicated `c4-highmem-8` VM, loopback traffic, four vCPUs per side, the same workloads, and interleaved rounds. Explore the charts, build slides, or comparison view.
 
 ## Where the time actually goes
 
@@ -126,6 +126,22 @@ Memo alone, instructions/request, frozen non-PGO binary, SINGULARITY loopback, 1
 | H3 | 98,293 | 68,024 | **−30.8%** |
 
 Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: `docs/pagecache-response-memo-experiment.md` in the source tree.
+
+## 0.2.8 dedicated lab benchmarks (HTTP/1.1, HTTP/2 & HTTP/3)
+
+The November 27, 2026 runs compared `0.2.8` (synchronous borrowed H3 memo fast path, cached QPACK `field_section_size`, fast H3 `:method` match, H2 Frame-1 single-shot batching, cookied guest response-memo fast path with strict member isolation, O(1) LSAPI wire-header lookup + framed `BEGIN_REQUEST`, batched `reqid` minting, 64 KiB access-log chunk/writer batching, and 29 security/RFC bug fixes across Waves 1–7; **3,302 workspace tests** green) against `0.2.7` on dedicated GCE `c4-highmem-8` VMs (4 server / 4 load-generator vCPUs, Unified PGO, **10 interleaved rounds per suite, 340 runs, 0 errors**).
+
+**HTTP/1.1 & HTTP/2 matched 10-round A/B:** **Cookied Cache H2 +658.5%** (863.5k req/s, p99 −76.9%), **Empty H2 +14.8%** (2,239.7k req/s, p99 −28.8%), **PHP H1 +14.8%** (50.2k req/s, p99 −6.3%), **PHP H2 +9.9%** (46.6k req/s, p99 −9.2%), **Big H2 +6.2%** (108.5k req/s, p99 −33.2%), **Static H2 +5.1%** (1,316.2k req/s), **Static H1 +4.7%** (321.6k req/s), and **Heavy H1 +4.2%** (309.5k req/s). Heavy H2 mean was +0.13% (p99 −0.7%) and Cached H2 p99 fell −11.1%.
+
+**HTTP/3 matched 10-round A/B** (native Rust `quinn`+`h3` load generator): every workload improved in both throughput and p99 latency — **Cookied Cache H3 +47.4%** (97.5k req/s, p99 −80.0%), **Cached H3 +34.5%** (107.3k req/s, p99 −20.6%), **Heavy H3 +32.8%** (98.2k req/s, p99 −7.9%), **Empty H3 +15.9%** (145.0k req/s, p99 −9.8%), **Static H3 +13.2%** (116.9k req/s, p99 −8.4%), **PHP H3 +3.2%** (38.1k req/s, p99 −2.1%), and **Big H3 +1.2%** (11.3k req/s, p99 −2.6%).
+
+> [Benchmark Chart: v028-throughput — Same-VM matched H1/H2 throughput: 0.2.7 vs 0.2.8 (Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (0 errors))]
+
+> [Benchmark Chart: v028-p99 — Same-VM matched H1/H2 p99 latency: 0.2.7 vs 0.2.8 (lower is better) (Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds)]
+
+> [Benchmark Chart: v028-h3-throughput — Same-VM matched HTTP/3 throughput: 0.2.7 vs 0.2.8 (Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (0 errors))]
+
+Same-VM 10-round matched H1/H2 TSV · Same-VM 10-round matched HTTP/3 TSV
 
 ## 0.2.7 dedicated lab benchmarks
 

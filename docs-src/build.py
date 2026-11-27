@@ -20,7 +20,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261126b'
+VERSION = '20261127a'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -122,6 +122,18 @@ def diagram(m):
 # Horizontal grouped bar charts as inline SVG. {name: (title, subtitle, unit, series, rows, foot)}
 # rows = [(label, [v0, v1, ...])]; None = no bar (annotated).
 CHARTS = {
+ 'v028-throughput': ('Same-VM matched H1/H2 throughput: 0.2.7 vs 0.2.8', 'Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (0 errors)', 'k req/s',
+   ['0.2.7 · Nov 27 Matched', '0.2.8 · Nov 27 Matched'],
+   [('H2 empty body', [1950.3, 2239.7]), ('H2 static 1 KiB', [1252.0, 1316.2]), ('H2 page-cache hit', [911.0, 899.1]), ('H2 cookied cache', [113.8, 863.5]), ('H2 heavy .htaccess', [910.8, 888.8]), ('H2 static 64 KiB', [102.2, 108.5]), ('H1 static 1 KiB', [307.0, 321.6]), ('H1 heavy .htaccess', [297.1, 309.5]), ('H1 PHP/LSAPI', [43.7, 50.2]), ('H2 PHP/LSAPI', [42.4, 46.6])],
+   'Both builds ran back-to-back on the exact same c4-highmem-8 VM across 10 interleaved rounds: Cookied Cache H2 +658.5%, Empty H2 +14.8%, PHP H1 +14.8%, PHP H2 +9.9%, Big H2 +6.2%, Static H2 +5.1%, Static H1 +4.7%, Heavy H1 +4.2%.'),
+ 'v028-p99': ('Same-VM matched H1/H2 p99 latency: 0.2.7 vs 0.2.8 (lower is better)', 'Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds', 'ms',
+   ['0.2.7 · Nov 27 Matched', '0.2.8 · Nov 27 Matched'],
+   [('H2 empty body', [0.444, 0.316]), ('H2 static 1 KiB', [0.996, 1.065]), ('H2 page-cache hit', [1.400, 1.245]), ('H2 cookied cache', [16.665, 3.850]), ('H2 heavy .htaccess', [1.520, 1.510]), ('H2 static 64 KiB', [14.625, 9.765]), ('H1 static 1 KiB', [1.010, 1.015]), ('H1 heavy .htaccess', [0.996, 1.010]), ('H1 PHP/LSAPI', [1.435, 1.345]), ('H2 PHP/LSAPI', [6.770, 6.145])],
+   'Major tail-latency reductions on 0.2.8: Cookied Cache H2 -76.9%, Big H2 -33.2%, Empty H2 -28.8%, Cached H2 -11.1%, PHP H2 -9.2%, PHP H1 -6.3%.'),
+ 'v028-h3-throughput': ('Same-VM matched HTTP/3 throughput: 0.2.7 vs 0.2.8', 'Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (0 errors)', 'k req/s',
+   ['0.2.7 · H3 Matched', '0.2.8 · H3 Matched'],
+   [('H3 empty body', [125.1, 145.0]), ('H3 static 1 KiB', [103.3, 116.9]), ('H3 page-cache hit', [79.8, 107.3]), ('H3 heavy .htaccess', [73.9, 98.2]), ('H3 cookied cache', [66.2, 97.5]), ('H3 PHP/LSAPI', [36.9, 38.1]), ('H3 static 64 KiB', [11.2, 11.3])],
+   'Every HTTP/3 workload improved in both throughput and p99 latency on 0.2.8: Cookied Cache H3 +47.4% (p99 -80.0%), Cached H3 +34.5% (p99 -20.6%), Heavy H3 +32.8%, Empty H3 +15.9%, Static H3 +13.2%, PHP H3 +3.2%, Big H3 +1.2%.'),
  'v027-throughput': ('Same-VM matched throughput: 0.2.6 vs 0.2.7', 'Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (73.5M reqs, 0 errors)', 'k req/s',
    ['0.2.6 · Matched', '0.2.7 · Matched'],
    [('H2 empty body', [1496.7, 1668.9]), ('H2 static 1 KiB', [1176.3, 1451.2]), ('H2 page-cache hit', [1149.5, 1311.1]), ('H2 heavy .htaccess', [948.8, 1045.4]), ('H2 static 64 KiB', [130.5, 130.2]), ('H1 static 1 KiB', [391.7, 390.8]), ('H1 heavy .htaccess', [364.2, 375.3]), ('H1 PHP/LSAPI', [44.8, 60.4]), ('H2 PHP/LSAPI', [46.7, 55.1])],

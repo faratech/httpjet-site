@@ -57,11 +57,19 @@ WORKLOADS = {
     "H2 static 64 KiB": "big-h2",
     "H2 heavy .htaccess": "heavy-h2",
     "H2 page-cache hit": "cache-h2",
+    "H2 cookied cache": "cache-cookie-h2",
     "H1 static 1 KiB": "static-h1",
     "H1 heavy .htaccess": "heavy-h1",
     "H1 PHP/LSAPI": "php-h1",
     "H2 PHP/LSAPI": "php-h2",
     "H1 static 1 KiB (wrk)": "wrk-h1",
+    "H3 empty body": "empty-h3",
+    "H3 static 1 KiB": "static-h3",
+    "H3 heavy .htaccess": "heavy-h3",
+    "H3 page-cache hit": "cache-h3",
+    "H3 cookied cache": "cache-cookie-h3",
+    "H3 PHP/LSAPI": "php-h3",
+    "H3 static 64 KiB": "big-h3",
 }
 
 
@@ -76,8 +84,18 @@ def validate_benchmarks(assets, charts):
             extended[day] = list(csv.DictReader(f, delimiter="\t"))
     with (assets / "release-matched-2026-11-26.tsv").open(newline="") as f:
         matched_26 = list(csv.DictReader(f, delimiter="\t"))
-    for version in ("v025", "v026", "v027"):
-        for metric in ("throughput", "p99", "static-servers"):
+    with (assets / "release-matched-2026-11-27.tsv").open(newline="") as f:
+        matched_27 = list(csv.DictReader(f, delimiter="\t"))
+    with (assets / "release-matched-h3-2026-11-27.tsv").open(newline="") as f:
+        matched_27_h3 = list(csv.DictReader(f, delimiter="\t"))
+    chart_checks = [
+        ("v025", ("throughput", "p99", "static-servers")),
+        ("v026", ("throughput", "p99", "static-servers")),
+        ("v027", ("throughput", "p99", "static-servers")),
+        ("v028", ("throughput", "p99", "h3-throughput")),
+    ]
+    for version, metrics in chart_checks:
+        for metric in metrics:
             name = f"{version}-{metric}"
             _, _, unit, series, rows, _ = charts[name]
             expected_unit = "ms" if metric == "p99" else "k req/s"
@@ -86,7 +104,19 @@ def validate_benchmarks(assets, charts):
             for label, values in rows:
                 for entry, value in zip(series, values, strict=True):
                     workload = WORKLOADS[label]
-                    if entry.endswith(" · Matched"):
+                    if entry.endswith(" · Nov 27 Matched"):
+                        server = "v" + entry.split(" · ")[0]
+                        field, divisor = ("median_p99_ms", 1) if metric == "p99" else ("median_rps", 1000)
+                        samples = [float(r[field]) / divisor for r in matched_27
+                                   if r["version"] == server and r["workload"] == workload]
+                        expected_count = 1
+                    elif entry.endswith(" · H3 Matched"):
+                        server = "v" + entry.split(" · ")[0]
+                        field, divisor = ("median_p99_ms", 1) if metric == "p99" else ("median_rps", 1000)
+                        samples = [float(r[field]) / divisor for r in matched_27_h3
+                                   if r["version"] == server and r["workload"] == workload]
+                        expected_count = 1
+                    elif entry.endswith(" · Matched"):
                         server = "v" + entry.split(" · ")[0]
                         field, divisor = ("median_p99_ms", 1) if metric == "p99" else ("median_rps", 1000)
                         samples = [float(r[field]) / divisor for r in matched_26
@@ -123,6 +153,10 @@ def validate_benchmarks(assets, charts):
             samples_by_run.setdefault(key, []).append(float(row["rps"]) / 1000)
     for row in matched_26:
         if row["version"] == "v0.2.7":
+            key = (row["version"], row["workload"])
+            samples_by_run[key] = [float(row["median_rps"]) / 1000] * 3
+    for row in matched_27:
+        if row["version"] == "v0.2.8":
             key = (row["version"], row["workload"])
             samples_by_run[key] = [float(row["median_rps"]) / 1000] * 3
     script = (assets / "docs.js").read_text()

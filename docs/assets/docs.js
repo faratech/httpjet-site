@@ -5,7 +5,7 @@
   "use strict";
   var doc = document, root = doc.documentElement;
   var AUDIO_STORAGE_KEY = "hj_epic_audio_v1";
-  var DOCS_ASSET_VER = "20261126b";
+  var DOCS_ASSET_VER = "20261127a";
 
   var makeRng = function (seed) {
     return function () {
@@ -2355,6 +2355,67 @@
     "The November 26 run measured 0.2.7 (b403ea2) under the exact website 3-round protocol, plus php-h2 (50.6k req/s), wrk-h1 (416.6k req/s), and perf stat (0.44 minor faults/1k req).",
     "Same-VM 10-round matched PGO comparison vs 0.2.6 confirmed positive throughput and p99 latency gains across all 9 workloads."
   ]
+},
+{
+  "id": "b25",
+  "tag": "v0.2.8",
+  "short": "HTTP/3 fast path, cookied cache & LSAPI",
+  "date": "2026-11-27",
+  "commit": "90be304",
+  "era": 3,
+  "eraName": "CPU, TLS & Zero-Fault Campaign",
+  "regime": "dedicated VM · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds",
+  "title": "0.2.8 — H1/H2 & HTTP/3 dedicated lab benchmarks",
+  "summary": "Synchronous borrowed H3 memo fast path, cached QPACK field_section_size, H2 Frame-1 single-shot batching, cookied guest response-memo with strict member isolation, O(1) LSAPI wire-header lookup, batched reqid minting, 64 KiB access-log batching, and 29 bug fixes (3,302 tests green, 0 errors across 340 benchmark runs).",
+  "kpis": [
+    {
+      "v": "2,239.7k rps",
+      "d": "+14.8% matched · p99 0.316 ms",
+      "n": false,
+      "l": "H2 empty body"
+    },
+    {
+      "v": "863.5k rps",
+      "d": "+658.5% matched · p99 -76.9%",
+      "n": false,
+      "l": "H2 cookied cache"
+    },
+    {
+      "v": "145.0k rps",
+      "d": "+15.9% matched · p99 4.825 ms",
+      "n": false,
+      "l": "H3 empty body"
+    },
+    {
+      "v": "50.2k rps",
+      "d": "+14.8% matched · p99 1.345 ms",
+      "n": false,
+      "l": "H1 PHP/LSAPI"
+    }
+  ],
+  "chart": {
+    "title": "Same-VM matched HTTP/3 throughput: 0.2.7 vs 0.2.8",
+    "sub": "Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds",
+    "unit": "k req/s",
+    "series": [
+      "0.2.7 · H3 Matched",
+      "0.2.8 · H3 Matched"
+    ],
+    "rows": [
+      ["H3 empty body", [125.1, 145.0]],
+      ["H3 static 1 KiB", [103.3, 116.9]],
+      ["H3 page-cache hit", [79.8, 107.3]],
+      ["H3 heavy .htaccess", [73.9, 98.2]],
+      ["H3 cookied cache", [66.2, 97.5]],
+      ["H3 PHP/LSAPI", [36.9, 38.1]],
+      ["H3 static 64 KiB", [11.2, 11.3]]
+    ],
+    "foot": "Every HTTP/3 workload improved in both throughput and p99 latency on 0.2.8 (0 errors across 140 runs)."
+  },
+  "notes": [
+    "Same-VM 10-round matched H1/H2 A/B vs 0.2.7: Cookied Cache H2 +658.5%, Empty H2 +14.8%, PHP H1 +14.8%, PHP H2 +9.9%, Big H2 +6.2%, Static H2 +5.1%, Static H1 +4.7%, Heavy H1 +4.2%.",
+    "Same-VM 10-round matched HTTP/3 A/B vs 0.2.7: Cookied Cache H3 +47.4% (p99 -80.0%), Cached H3 +34.5%, Heavy H3 +32.8%, Empty H3 +15.9%, Static H3 +13.2%, PHP H3 +3.2%, Big H3 +1.2%."
+  ]
 }
     ];
 
@@ -2672,7 +2733,8 @@
             { idx: 20, tag: "v0.2.4", h2: 879.5, h1: 381.5, note: "Waves 1–11 optimizations" },
             {"idx": 21, "tag": "v0.2.5", "h2": 840.7, "h1": 382.6, "note": "Separate November 22 dedicated lab run", "separateRun": true},
             {"idx": 22, "tag": "v0.2.6", "h2": 1002.1, "h1": 390.4, "note": "Separate November 23 dedicated lab run", "separateRun": true},
-            {"idx": 23, "tag": "v0.2.7", "h2": 1045.4, "h1": 375.3, "note": "November 26 10-round matched lab (+10.0% H2 vs 0.2.6)", "separateRun": true}
+            {"idx": 23, "tag": "v0.2.7", "h2": 1045.4, "h1": 375.3, "note": "November 26 10-round matched lab (+10.0% H2 vs 0.2.6)", "separateRun": true},
+            {"idx": 24, "tag": "v0.2.8", "h2": 888.8, "h1": 309.5, "note": "November 27 10-round matched lab (+4.2% H1, +0.1% H2 mean vs 0.2.7)", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2706,7 +2768,8 @@
             { idx: 20, tag: "v0.2.4", h2: 1092.6, h1: 415.7, note: "Waves 1–11 optimizations" },
             {"idx": 21, "tag": "v0.2.5", "h2": 1166.5, "h1": 406.2, "note": "Separate November 22 dedicated lab run", "separateRun": true},
             {"idx": 22, "tag": "v0.2.6", "h2": 1353.9, "h1": 406.4, "note": "Separate November 23 dedicated lab run", "separateRun": true},
-            {"idx": 23, "tag": "v0.2.7", "h2": 1451.2, "h1": 390.8, "note": "November 26 10-round matched lab (+13.6% H2 vs 0.2.6)", "separateRun": true}
+            {"idx": 23, "tag": "v0.2.7", "h2": 1451.2, "h1": 390.8, "note": "November 26 10-round matched lab (+13.6% H2 vs 0.2.6)", "separateRun": true},
+            {"idx": 24, "tag": "v0.2.8", "h2": 1316.2, "h1": 321.6, "note": "November 27 10-round matched lab (+5.1% H2, +4.7% H1 vs 0.2.7)", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2740,7 +2803,8 @@
             { idx: 20, tag: "v0.2.4", php: 41.8, cache: 849.6, note: "Waves 1–11 optimizations" },
             {"idx": 21, "tag": "v0.2.5", "php": 42.1, "cache": 900.3, "note": "Separate November 22 dedicated lab run", "separateRun": true},
             {"idx": 22, "tag": "v0.2.6", "php": 45.6, "cache": 1001.0, "note": "Separate November 23 dedicated lab run", "separateRun": true},
-            {"idx": 23, "tag": "v0.2.7", "php": 60.4, "cache": 1311.1, "note": "November 26 10-round matched lab (+32.3% PHP, +20.5% cache vs 0.2.6)", "separateRun": true}
+            {"idx": 23, "tag": "v0.2.7", "php": 60.4, "cache": 1311.1, "note": "November 26 10-round matched lab (+32.3% PHP, +20.5% cache vs 0.2.6)", "separateRun": true},
+            {"idx": 24, "tag": "v0.2.8", "php": 50.2, "cache": 899.1, "note": "November 27 10-round matched lab (+14.8% PHP H1, +658.5% cookied cache vs 0.2.7)", "separateRun": true}
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },

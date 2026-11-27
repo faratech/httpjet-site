@@ -955,6 +955,11 @@ window.DOCS_INDEX = [
     "kw": "coop --uring-ring legacy defer --no-page-cache-response-memo DIGESTS docs pagecache-response-memo-experiment.md"
    },
    {
+    "id": "release-0-2-8",
+    "t": "0.2.8 dedicated lab benchmarks (HTTP/1.1, HTTP/2 & HTTP/3)",
+    "kw": "field_section_size method BEGIN_REQUEST reqid c4-highmem-8 quinn"
+   },
+   {
     "id": "release-0-2-7",
     "t": "0.2.7 dedicated lab benchmarks",
     "kw": "write_watch::Slot php-h2 wrk perf stat"

@@ -2,14 +2,14 @@
     <p class="lede">httpjet is fast — and these docs are strict about <em>where</em> the time goes. Every figure names its regime, because a <strong>loopback benchmark</strong> (synthetic, on-box, PGO build) is not the same thing as <strong>production telemetry</strong> (real CDN-fronted traffic). The historical production samples describe one site and traffic mix; they are not a prediction for every deployment.</p>
 
     <div class="stats">
-      <div class="stat accent"><div class="v">1,668.9<span class="u">k rps</span></div><div class="l">0.2.7 H2 empty body, dedicated lab, 10-round matched (+12.7% vs 0.2.6, p99 0.141 ms)</div></div>
-      <div class="stat"><div class="v">60.4<span class="u">k rps</span></div><div class="l">0.2.7 PHP/LSAPI over H1, dedicated lab, 10-round matched (+32.3% vs 0.2.6)</div></div>
+      <div class="stat accent"><div class="v">2,239.7<span class="u">k rps</span></div><div class="l">0.2.8 H2 empty body, dedicated lab, 10-round matched (+14.8% vs 0.2.7, p99 0.316 ms)</div></div>
+      <div class="stat accent"><div class="v">145.0<span class="u">k rps</span></div><div class="l">0.2.8 HTTP/3 empty body, dedicated lab, 10-round matched (+15.9% vs 0.2.7)</div></div>
+      <div class="stat accent"><div class="v">+658.5<span class="u">%</span></div><div class="l">0.2.8 H2 cookied guest page-cache hit RPS vs 0.2.7 (863.5k req/s, p99 &minus;76.9%)</div></div>
+      <div class="stat"><div class="v">50.2<span class="u">k rps</span></div><div class="l">0.2.8 PHP/LSAPI over H1, dedicated lab, 10-round matched (+14.8% vs 0.2.7)</div></div>
       <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs the same page through PHP</div></div>
       <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet's request phases, June 2026 production telemetry</div></div>
       <div class="stat"><div class="v">1.55<span class="u">IPC</span></div><div class="l">h2 hit path at saturation, June 2026 (hardware counters)</div></div>
       <div class="stat accent"><div class="v">0.0002<span class="u">flt</span></div><div class="l">v0.1.5 h2 static minor page faults/req</div></div>
-      <div class="stat accent"><div class="v">0<span class="u">/ 80</span></div><div class="l">rows classified worse beyond noise, 0.1.10 vs 0.1.5 (controlled A/B)</div></div>
-      <div class="stat accent"><div class="v">+27.6<span class="u">%</span></div><div class="l">h2 page-cache hit RPS, 0.1.11 defaults (coop ring + response memo, x86 ABBA)</div></div>
     </div>
 
     <section>
@@ -24,9 +24,9 @@
 
     <section>
       <h2 id="timeline">Performance across builds — interactive presentation</h2>
-      <p>The <strong>Release Speed Curve</strong> shows the November 21 sweep and the separate 0.2.5, 0.2.6, and 0.2.7 runs on November 22, 23, and 26. Dashed segments mark the boundary between runs.</p>
-      <p>Each run used a dedicated <code>c4-highmem-8</code> VM, loopback traffic, four vCPUs per side, the same eight workloads, and the median of three rounds. Explore the charts, build slides, or comparison view.</p>
-      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve through 0.2.7 with separate November 21, 22, 23, and 26 runs">
+      <p>The <strong>Release Speed Curve</strong> shows the November 21 sweep and the separate 0.2.5, 0.2.6, 0.2.7, and 0.2.8 runs on November 22, 23, 26, and 27. Dashed segments mark the boundary between runs.</p>
+      <p>Each run used a dedicated <code>c4-highmem-8</code> VM, loopback traffic, four vCPUs per side, the same workloads, and interleaved rounds. Explore the charts, build slides, or comparison view.</p>
+      <div class="bexp" id="all-builds-curve" aria-label="Release speed curve through 0.2.8 with separate November 21, 22, 23, 26, and 27 runs">
         <div class="bexp__curve"></div>
       </div>
 
@@ -111,6 +111,17 @@
         </table>
       </div>
       <p class="mini">Instructions show less native cache-hit work here. They count user-mode PMU over warmup plus measurement. They show no whole-machine CPU saving. Throughput and tails mixed under compiler load. The shipped claim therefore rests on the x86 ABBA. Source: <code>docs/pagecache-response-memo-experiment.md</code> in the source tree.</p>
+    </section>
+
+    <section>
+      <h2 id="release-0-2-8">0.2.8 dedicated lab benchmarks (HTTP/1.1, HTTP/2 &amp; HTTP/3)</h2>
+      <p>The November 27, 2026 runs compared <code>0.2.8</code> (synchronous borrowed H3 memo fast path, cached QPACK <code>field_section_size</code>, fast H3 <code>:method</code> match, H2 Frame-1 single-shot batching, cookied guest response-memo fast path with strict member isolation, O(1) LSAPI wire-header lookup + framed <code>BEGIN_REQUEST</code>, batched <code>reqid</code> minting, 64 KiB access-log chunk/writer batching, and 29 security/RFC bug fixes across Waves 1–7; <strong>3,302 workspace tests</strong> green) against <code>0.2.7</code> on dedicated GCE <code>c4-highmem-8</code> VMs (4 server / 4 load-generator vCPUs, Unified PGO, <strong>10 interleaved rounds per suite, 340 runs, 0 errors</strong>).</p>
+      <p><strong>HTTP/1.1 &amp; HTTP/2 matched 10-round A/B:</strong> <strong>Cookied Cache H2 +658.5%</strong> (863.5k req/s, p99 &minus;76.9%), <strong>Empty H2 +14.8%</strong> (2,239.7k req/s, p99 &minus;28.8%), <strong>PHP H1 +14.8%</strong> (50.2k req/s, p99 &minus;6.3%), <strong>PHP H2 +9.9%</strong> (46.6k req/s, p99 &minus;9.2%), <strong>Big H2 +6.2%</strong> (108.5k req/s, p99 &minus;33.2%), <strong>Static H2 +5.1%</strong> (1,316.2k req/s), <strong>Static H1 +4.7%</strong> (321.6k req/s), and <strong>Heavy H1 +4.2%</strong> (309.5k req/s). Heavy H2 mean was +0.13% (p99 &minus;0.7%) and Cached H2 p99 fell &minus;11.1%.</p>
+      <p><strong>HTTP/3 matched 10-round A/B</strong> (native Rust <code>quinn</code>+<code>h3</code> load generator): every workload improved in both throughput and p99 latency — <strong>Cookied Cache H3 +47.4%</strong> (97.5k req/s, p99 &minus;80.0%), <strong>Cached H3 +34.5%</strong> (107.3k req/s, p99 &minus;20.6%), <strong>Heavy H3 +32.8%</strong> (98.2k req/s, p99 &minus;7.9%), <strong>Empty H3 +15.9%</strong> (145.0k req/s, p99 &minus;9.8%), <strong>Static H3 +13.2%</strong> (116.9k req/s, p99 &minus;8.4%), <strong>PHP H3 +3.2%</strong> (38.1k req/s, p99 &minus;2.1%), and <strong>Big H3 +1.2%</strong> (11.3k req/s, p99 &minus;2.6%).</p>
+      <!--chart:v028-throughput-->
+      <!--chart:v028-p99-->
+      <!--chart:v028-h3-throughput-->
+      <p><a href="assets/release-matched-2026-11-27.tsv">Same-VM 10-round matched H1/H2 TSV</a> · <a href="assets/release-matched-h3-2026-11-27.tsv">Same-VM 10-round matched HTTP/3 TSV</a></p>
     </section>
 
     <section>
