@@ -42,18 +42,17 @@ fixtures are random blobs. RPS = requests/sec (higher is better); latency in ms.
 <h2 id="v0-2-8">0.2.8 · Dedicated lab · November 27, 2026</h2>
 <div class="card">
 <p>Same-VM 10-round interleaved matched PGO comparison of <code>0.2.7</code> vs <code>0.2.8</code> on dedicated GCE <code>c4-highmem-8</code> VMs (loopback, 4 server / 4 load-generator vCPUs, <strong>340 runs, 0 errors</strong>). Covers HTTP/1.1, HTTP/2 (<code>h2load</code>), and HTTP/3 (native Rust <code>quinn</code>+<code>h3</code> client), including cookied guest cache hits with verified logged-in member isolation.</p>
-<table><thead><tr><th>HTTP/1.1 &amp; HTTP/2 Workload</th><th>0.2.7 req/s (matched)</th><th>0.2.8 req/s (matched)</th><th>Delta</th><th>0.2.7 p99 (ms)</th><th>0.2.8 p99 (ms)</th></tr></thead>
+<table><thead><tr><th>HTTP/1.1 &amp; HTTP/2 Workload (exact Nov 26 protocol)</th><th>0.2.7 req/s (matched)</th><th>0.2.8 req/s (matched)</th><th>Delta</th><th>0.2.7 p99 (ms)</th><th>0.2.8 p99 (ms)</th></tr></thead>
 <tbody>
-<tr><td>H2 empty body</td><td>1,950,268</td><td><strong>2,239,681</strong></td><td><strong>+14.84%</strong></td><td>0.444</td><td><strong>0.316</strong> (&minus;28.8%)</td></tr>
-<tr><td>H2 static 1 KiB</td><td>1,251,957</td><td><strong>1,316,177</strong></td><td><strong>+5.13%</strong></td><td>0.996</td><td>1.065</td></tr>
-<tr><td>H2 page-cache hit</td><td>911,025</td><td>899,071</td><td>&minus;1.31%</td><td>1.400</td><td><strong>1.245</strong> (&minus;11.1%)</td></tr>
-<tr><td>H2 cookied guest cache</td><td>113,837</td><td><strong>863,489</strong></td><td><strong>+658.53%</strong></td><td>16.665</td><td><strong>3.850</strong> (&minus;76.9%)</td></tr>
-<tr><td>H2 heavy .htaccess</td><td>910,829</td><td>888,842</td><td>&minus;2.41% (mean +0.13%)</td><td>1.520</td><td><strong>1.510</strong> (&minus;0.7%)</td></tr>
-<tr><td>H2 static 64 KiB</td><td>102,186</td><td><strong>108,510</strong></td><td><strong>+6.19%</strong></td><td>14.625</td><td><strong>9.765</strong> (&minus;33.2%)</td></tr>
-<tr><td>H1 static 1 KiB</td><td>307,009</td><td><strong>321,551</strong></td><td><strong>+4.74%</strong></td><td>1.010</td><td>1.015</td></tr>
-<tr><td>H1 heavy .htaccess</td><td>297,078</td><td><strong>309,480</strong></td><td><strong>+4.17%</strong></td><td>0.996</td><td>1.010</td></tr>
-<tr><td>H1 PHP/LSAPI</td><td>43,737</td><td><strong>50,211</strong></td><td><strong>+14.80%</strong></td><td>1.435</td><td><strong>1.345</strong> (&minus;6.3%)</td></tr>
-<tr><td>H2 PHP/LSAPI</td><td>42,383</td><td><strong>46,577</strong></td><td><strong>+9.90%</strong></td><td>6.770</td><td><strong>6.145</strong> (&minus;9.2%)</td></tr>
+<tr><td>H2 empty body (500k)</td><td>1,375,035</td><td><strong>1,465,797</strong></td><td><strong>+6.60%</strong></td><td>0.954</td><td><strong>0.952</strong> (&minus;0.2%)</td></tr>
+<tr><td>H2 static 1 KiB (500k)</td><td>1,268,554</td><td><strong>1,316,389</strong></td><td><strong>+3.77%</strong></td><td>0.920</td><td>0.932</td></tr>
+<tr><td>H2 heavy .htaccess (500k)</td><td>973,652</td><td><strong>1,029,233</strong></td><td><strong>+5.71%</strong></td><td>0.231</td><td><strong>0.213</strong> (&minus;7.8%)</td></tr>
+<tr><td>H2 cookied guest cache (60k)</td><td>113,837</td><td><strong>863,489</strong></td><td><strong>+658.53%</strong></td><td>16.665</td><td><strong>3.850</strong> (&minus;76.9%)</td></tr>
+<tr><td>H2 static 64 KiB (100k)</td><td>126,081</td><td><strong>128,823</strong></td><td><strong>+2.18%</strong></td><td>2.905</td><td><strong>2.335</strong> (&minus;19.6%)</td></tr>
+<tr><td>H1 static 1 KiB (300k)</td><td>365,541</td><td><strong>368,029</strong></td><td><strong>+0.68%</strong></td><td>0.572</td><td><strong>0.514</strong> (&minus;10.1%)</td></tr>
+<tr><td>H1 heavy .htaccess (300k)</td><td>337,594</td><td><strong>339,297</strong></td><td><strong>+0.50%</strong></td><td>0.466</td><td>0.516</td></tr>
+<tr><td>H1 PHP/LSAPI (60k)</td><td>46,829</td><td><strong>52,077</strong></td><td><strong>+11.21%</strong></td><td>1.395</td><td><strong>1.335</strong> (&minus;4.3%)</td></tr>
+<tr><td>H2 PHP/LSAPI (60k)</td><td>43,674</td><td><strong>48,119</strong></td><td><strong>+10.18%</strong></td><td>6.550</td><td><strong>6.040</strong> (&minus;7.8%)</td></tr>
 </tbody></table>
 <table><thead><tr><th>HTTP/3 Workload</th><th>0.2.7 req/s (matched)</th><th>0.2.8 req/s (matched)</th><th>Delta</th><th>0.2.7 p99 (ms)</th><th>0.2.8 p99 (ms)</th></tr></thead>
 <tbody>

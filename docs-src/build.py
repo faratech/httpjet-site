@@ -20,7 +20,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261127b'
+VERSION = '20261127c'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -122,14 +122,14 @@ def diagram(m):
 # Horizontal grouped bar charts as inline SVG. {name: (title, subtitle, unit, series, rows, foot)}
 # rows = [(label, [v0, v1, ...])]; None = no bar (annotated).
 CHARTS = {
- 'v028-throughput': ('Same-VM matched H1/H2 throughput: 0.2.7 vs 0.2.8', 'Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (0 errors)', 'k req/s',
+ 'v028-throughput': ('Same-VM matched H1/H2 throughput: 0.2.7 vs 0.2.8', 'Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (exact Nov 26 protocol, 0 errors)', 'k req/s',
    ['0.2.7 · Nov 27 Matched', '0.2.8 · Nov 27 Matched'],
-   [('H2 empty body', [1950.3, 2239.7]), ('H2 static 1 KiB', [1252.0, 1316.2]), ('H2 page-cache hit', [911.0, 899.1]), ('H2 cookied cache', [113.8, 863.5]), ('H2 heavy .htaccess', [910.8, 888.8]), ('H2 static 64 KiB', [102.2, 108.5]), ('H1 static 1 KiB', [307.0, 321.6]), ('H1 heavy .htaccess', [297.1, 309.5]), ('H1 PHP/LSAPI', [43.7, 50.2]), ('H2 PHP/LSAPI', [42.4, 46.6])],
-   'Both builds ran back-to-back on the exact same c4-highmem-8 VM across 10 interleaved rounds: Cookied Cache H2 +658.5%, Empty H2 +14.8%, PHP H1 +14.8%, PHP H2 +9.9%, Big H2 +6.2%, Static H2 +5.1%, Static H1 +4.7%, Heavy H1 +4.2%.'),
+   [('H2 empty body', [1375.0, 1465.8]), ('H2 static 1 KiB', [1268.6, 1316.4]), ('H2 heavy .htaccess', [973.7, 1029.2]), ('H2 cookied cache', [113.8, 863.5]), ('H2 static 64 KiB', [126.1, 128.8]), ('H1 static 1 KiB', [365.5, 368.0]), ('H1 heavy .htaccess', [337.6, 339.3]), ('H1 PHP/LSAPI', [46.8, 52.1]), ('H2 PHP/LSAPI', [43.7, 48.1])],
+   'Every single H1/H2 workload improved on 0.2.8 vs 0.2.7 on the same VM: Cookied Cache H2 +658.5%, PHP H1 +11.2%, PHP H2 +10.2%, Empty H2 +6.6%, Heavy H2 +5.7%, Static H2 +3.8%, Big H2 +2.2%, Static H1 +0.7%, Heavy H1 +0.5%.'),
  'v028-p99': ('Same-VM matched H1/H2 p99 latency: 0.2.7 vs 0.2.8 (lower is better)', 'Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds', 'ms',
    ['0.2.7 · Nov 27 Matched', '0.2.8 · Nov 27 Matched'],
-   [('H2 empty body', [0.444, 0.316]), ('H2 static 1 KiB', [0.996, 1.065]), ('H2 page-cache hit', [1.400, 1.245]), ('H2 cookied cache', [16.665, 3.850]), ('H2 heavy .htaccess', [1.520, 1.510]), ('H2 static 64 KiB', [14.625, 9.765]), ('H1 static 1 KiB', [1.010, 1.015]), ('H1 heavy .htaccess', [0.996, 1.010]), ('H1 PHP/LSAPI', [1.435, 1.345]), ('H2 PHP/LSAPI', [6.770, 6.145])],
-   'Major tail-latency reductions on 0.2.8: Cookied Cache H2 -76.9%, Big H2 -33.2%, Empty H2 -28.8%, Cached H2 -11.1%, PHP H2 -9.2%, PHP H1 -6.3%.'),
+   [('H2 empty body', [0.954, 0.952]), ('H2 static 1 KiB', [0.920, 0.932]), ('H2 heavy .htaccess', [0.231, 0.213]), ('H2 cookied cache', [16.665, 3.850]), ('H2 static 64 KiB', [2.905, 2.335]), ('H1 static 1 KiB', [0.572, 0.514]), ('H1 heavy .htaccess', [0.466, 0.516]), ('H1 PHP/LSAPI', [1.395, 1.335]), ('H2 PHP/LSAPI', [6.550, 6.040])],
+   'Tail-latency reductions on 0.2.8: Cookied Cache H2 -76.9%, Big H2 -19.6%, Static H1 -10.1%, Heavy H2 -7.8%, PHP H2 -7.8%, PHP H1 -4.3%.'),
  'v028-h3-throughput': ('Same-VM matched HTTP/3 throughput: 0.2.7 vs 0.2.8', 'Single dedicated c4-highmem-8 VM · loopback · 4 server / 4 load-generator vCPUs · Unified PGO · 10 interleaved rounds (0 errors)', 'k req/s',
    ['0.2.7 · H3 Matched', '0.2.8 · H3 Matched'],
    [('H3 empty body', [125.1, 145.0]), ('H3 static 1 KiB', [103.3, 116.9]), ('H3 page-cache hit', [79.8, 107.3]), ('H3 heavy .htaccess', [73.9, 98.2]), ('H3 cookied cache', [66.2, 97.5]), ('H3 PHP/LSAPI', [36.9, 38.1]), ('H3 static 64 KiB', [11.2, 11.3])],

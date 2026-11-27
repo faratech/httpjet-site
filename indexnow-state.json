@@ -1,13 +1,13 @@
 {
  "https://httpjet.net/": {
-  "hash": "3dd8f4d8d600b312844448efb990e3685c6e5a51efe8c5c7dd3525c3be84090e",
+  "hash": "66243f1a26c4498c787f7d1c86441f43093a9848c77063d386e3d632d64dcadc",
   "lastmod": "2026-11-27",
-  "submitted": "3dd8f4d8d600b312844448efb990e3685c6e5a51efe8c5c7dd3525c3be84090e"
+  "submitted": "66243f1a26c4498c787f7d1c86441f43093a9848c77063d386e3d632d64dcadc"
  },
  "https://httpjet.net/benchmarks/": {
-  "hash": "d283cc6503a27a9f8a623f66ccbaa08024e696e65f81ada7ba3735cb2261e4fc",
+  "hash": "743f491b81f36457fbc7ee5f2a7e8f8a895e9db85849c09f71a5ead004edd9f8",
   "lastmod": "2026-11-27",
-  "submitted": "d283cc6503a27a9f8a623f66ccbaa08024e696e65f81ada7ba3735cb2261e4fc"
+  "submitted": "743f491b81f36457fbc7ee5f2a7e8f8a895e9db85849c09f71a5ead004edd9f8"
  },
  "https://httpjet.net/docs/": {
   "hash": "9b047463a87e69f1e4b37b497e523ebd0ea9231026b494a2d2e9a412882fd921",
@@ -90,9 +90,9 @@
   "submitted": "019295ae42d41cfa69063cfc6b77e56c0e3839c0554295b201c746f558927444"
  },
  "https://httpjet.net/docs/performance": {
-  "hash": "4f5bc3c73993d3dc1c6c673993230d45ca33fdbe0d2645134e4cb3e52328148b",
+  "hash": "92566d09cef7a5b56f67816effd294cf0cf1d5c09c35842007f6f3c69ddf5859",
   "lastmod": "2026-11-27",
-  "submitted": "4f5bc3c73993d3dc1c6c673993230d45ca33fdbe0d2645134e4cb3e52328148b"
+  "submitted": "92566d09cef7a5b56f67816effd294cf0cf1d5c09c35842007f6f3c69ddf5859"
  },
  "https://httpjet.net/docs/protocols": {
   "hash": "87ec543afce1b1ee2f874fb669328b5e4b41f6770806b04ea700a81950b1e709",

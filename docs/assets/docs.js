@@ -5,7 +5,7 @@
   "use strict";
   var doc = document, root = doc.documentElement;
   var AUDIO_STORAGE_KEY = "hj_epic_audio_v1";
-  var DOCS_ASSET_VER = "20261127b";
+  var DOCS_ASSET_VER = "20261127c";
 
   var makeRng = function (seed) {
     return function () {
