@@ -155,10 +155,6 @@ def validate_benchmarks(assets, charts):
         if row["version"] == "v0.2.7":
             key = (row["version"], row["workload"])
             samples_by_run[key] = [float(row["median_rps"]) / 1000] * 3
-    for row in matched_27:
-        if row["version"] == "v0.2.8":
-            key = (row["version"], row["workload"])
-            samples_by_run[key] = [float(row["median_rps"]) / 1000] * 3
     script = (assets / "docs.js").read_text()
     start = script.index("var CURVES = [")
     end = script.index("var curCurve =", start)

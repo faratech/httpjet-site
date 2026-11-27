@@ -5,7 +5,7 @@
   "use strict";
   var doc = document, root = doc.documentElement;
   var AUDIO_STORAGE_KEY = "hj_epic_audio_v1";
-  var DOCS_ASSET_VER = "20261127a";
+  var DOCS_ASSET_VER = "20261127b";
 
   var makeRng = function (seed) {
     return function () {
@@ -2733,8 +2733,7 @@
             { idx: 20, tag: "v0.2.4", h2: 879.5, h1: 381.5, note: "Waves 1–11 optimizations" },
             {"idx": 21, "tag": "v0.2.5", "h2": 840.7, "h1": 382.6, "note": "Separate November 22 dedicated lab run", "separateRun": true},
             {"idx": 22, "tag": "v0.2.6", "h2": 1002.1, "h1": 390.4, "note": "Separate November 23 dedicated lab run", "separateRun": true},
-            {"idx": 23, "tag": "v0.2.7", "h2": 1045.4, "h1": 375.3, "note": "November 26 10-round matched lab (+10.0% H2 vs 0.2.6)", "separateRun": true},
-            {"idx": 24, "tag": "v0.2.8", "h2": 888.8, "h1": 309.5, "note": "November 27 10-round matched lab (+4.2% H1, +0.1% H2 mean vs 0.2.7)", "separateRun": true}
+            {"idx": 23, "tag": "v0.2.7", "h2": 1045.4, "h1": 375.3, "note": "November 26 10-round matched lab (+10.0% H2 vs 0.2.6)", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2768,8 +2767,7 @@
             { idx: 20, tag: "v0.2.4", h2: 1092.6, h1: 415.7, note: "Waves 1–11 optimizations" },
             {"idx": 21, "tag": "v0.2.5", "h2": 1166.5, "h1": 406.2, "note": "Separate November 22 dedicated lab run", "separateRun": true},
             {"idx": 22, "tag": "v0.2.6", "h2": 1353.9, "h1": 406.4, "note": "Separate November 23 dedicated lab run", "separateRun": true},
-            {"idx": 23, "tag": "v0.2.7", "h2": 1451.2, "h1": 390.8, "note": "November 26 10-round matched lab (+13.6% H2 vs 0.2.6)", "separateRun": true},
-            {"idx": 24, "tag": "v0.2.8", "h2": 1316.2, "h1": 321.6, "note": "November 27 10-round matched lab (+5.1% H2, +4.7% H1 vs 0.2.7)", "separateRun": true}
+            {"idx": 23, "tag": "v0.2.7", "h2": 1451.2, "h1": 390.8, "note": "November 26 10-round matched lab (+13.6% H2 vs 0.2.6)", "separateRun": true}
           ],
           series: [
             { key: "h2", label: "httpjet HTTP/2 (k rps)", color: "#22d3ee" },
@@ -2803,8 +2801,7 @@
             { idx: 20, tag: "v0.2.4", php: 41.8, cache: 849.6, note: "Waves 1–11 optimizations" },
             {"idx": 21, "tag": "v0.2.5", "php": 42.1, "cache": 900.3, "note": "Separate November 22 dedicated lab run", "separateRun": true},
             {"idx": 22, "tag": "v0.2.6", "php": 45.6, "cache": 1001.0, "note": "Separate November 23 dedicated lab run", "separateRun": true},
-            {"idx": 23, "tag": "v0.2.7", "php": 60.4, "cache": 1311.1, "note": "November 26 10-round matched lab (+32.3% PHP, +20.5% cache vs 0.2.6)", "separateRun": true},
-            {"idx": 24, "tag": "v0.2.8", "php": 50.2, "cache": 899.1, "note": "November 27 10-round matched lab (+14.8% PHP H1, +658.5% cookied cache vs 0.2.7)", "separateRun": true}
+            {"idx": 23, "tag": "v0.2.7", "php": 60.4, "cache": 1311.1, "note": "November 26 10-round matched lab (+32.3% PHP, +20.5% cache vs 0.2.6)", "separateRun": true}
           ],
           series: [
             { key: "php", label: "httpjet PHP/LSAPI H1 c=40 (k rps)", color: "#22d3ee" },
