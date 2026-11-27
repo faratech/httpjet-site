@@ -8,6 +8,6 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
-    "mermaid": "^12.3.0"
+    "mermaid": "^12.4.0"
   }
 }
