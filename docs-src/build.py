@@ -20,7 +20,7 @@ ROOT = os.path.abspath(os.environ.get('HTTPJET_SITE_ROOT') or os.path.dirname(HE
 DOCS = os.path.join(ROOT, 'docs')
 ASSETS = os.path.join(DOCS, 'assets')
 ESBUILD = os.path.join(HERE, 'node_modules', '.bin', 'esbuild')
-VERSION = '20261127c'
+VERSION = '20261127d'
 GA = 'G-ZR4WV214JT'
 SITE = 'https://httpjet.net'
 STATE_PATH = os.path.join(ROOT, 'indexnow-state.json')  # committed; NOT deployed (dist is allow-listed)
@@ -328,7 +328,7 @@ def head(slug, title_suffix, desc, nav_title, docs_min_css, lastmod):
                     "name": "How fast is httpjet compared to LiteSpeed, OpenLiteSpeed, and nginx?",
                     "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": "In synthetic benchmarks with a dedicated load-generator VM (h2load, c=50 x100, median of 3 rounds, 2026-11-11), httpjet 0.2.0 measured 1,258k req/s on HTTP/2 static empty bodies (OpenLiteSpeed 978k, nginx 484k) and 1,241k req/s on 1 KiB files (780k / 409k); a wrk HTTP/1.1 cross-check gave 572k vs 430k / 378k req/s. Earlier campaigns: 298k req/s on an 806-line .htaccess chain over HTTP/2 in a loopback PGO three-way (vs OpenLiteSpeed 283.3k and nginx 125.4k), 44.8k req/s on PHP over LSAPI over HTTP/1.1 (vs LiteSpeed 6.3.5 38.5k at the same concurrency and 41.2k at its best), and ~19.2k req/s on a 152 KB XenForo origin page-cache hit (about 40x an uncached PHP render)."
+                        "text": "In same-VM 10-round matched dedicated lab benchmarks (c4-highmem-8, 4 server / 4 load-generator vCPUs, Unified PGO, 2026-11-27), httpjet 0.2.8 measured 1,465.8k req/s on HTTP/2 empty bodies (+6.6% vs 0.2.7), 1,316.4k req/s on 1 KiB static files, 1,029.2k req/s on an 806-line .htaccess chain (+5.7%), 863.5k req/s on cookied guest page-cache hits (+658.5%), 52.1k req/s on PHP over LSAPI (+11.2%), and 145.0k req/s on HTTP/3 empty bodies (+15.9%). In the dedicated-client three-way (2026-11-11, c=50 x100), httpjet 0.2.0 measured 1,258k req/s on HTTP/2 empty bodies vs OpenLiteSpeed 978k and nginx 484k."
                     }
                 }
             ]
@@ -504,7 +504,7 @@ def pager(i):
         out += f'<a class="next" href="{href}"{" style=\"margin-left:auto\"" if not prev else ""}><div class="dir">Next →</div><div class="ttl">{nxt[1]}</div></a>'
     return out + '</nav>'
 
-FOOT = ('<p class="docfoot">httpjet · release behavior reviewed against <a href="https://github.com/faratech/httpjet/tree/v0.2.6-3">v0.2.6-3</a>; measurements and historical results are dated on their pages.<br>'
+FOOT = ('<p class="docfoot">httpjet · release behavior reviewed against <a href="https://github.com/faratech/httpjet/tree/v0.2.8">v0.2.8</a>; measurements and historical results are dated on their pages.<br>'
         'Source: <a href="https://github.com/faratech/httpjet">github.com/faratech/httpjet</a> · Home: <a href="https://httpjet.net/">httpjet.net</a> · Found an error? Open an issue on the repository.</p>')
 
 SLUGS = None
@@ -694,7 +694,7 @@ def main():
         '## Release and measurements',
         '',
         '- **Latest release and installation:** [GitHub Releases](https://github.com/faratech/httpjet/releases/latest). Linux io_uring is required. Check [capabilities](https://httpjet.net/docs/capabilities) for compatibility limits.',
-        '- **v0.2.6 lab (2026-11-23):** Dedicated c4-highmem-8 VM, loopback, four server and four load-generator vCPUs, Unified PGO, median of three rounds: H2 empty 1,524.4k requests/s, H2 page-cache hit 1,001.0k requests/s and H1 PHP/LSAPI 45.6k requests/s. These synthetic measurements are not production capacity. [Method and raw results](https://httpjet.net/docs/performance#release-0-2-6).',
+        '- **v0.2.8 lab (2026-11-27):** Dedicated c4-highmem-8 VMs, loopback, four server and four load-generator vCPUs, Unified PGO, 10 interleaved matched rounds vs v0.2.7: H2 empty 1,465.8k req/s (+6.6%), H2 static 1 KiB 1,316.4k req/s (+3.8%), H2 heavy .htaccess 1,029.2k req/s (+5.7%), H2 cookied guest cache 863.5k req/s (+658.5%), H1 PHP/LSAPI 52.1k req/s (+11.2%), H2 PHP/LSAPI 48.1k req/s (+10.2%), and HTTP/3 empty 145.0k req/s (+15.9%). These synthetic measurements are not production capacity. [Method and raw results](https://httpjet.net/docs/performance#release-0-2-8).',
         '- **Historical comparison:** In one 2026 loopback experiment a 152 KB forum page returned 19,215 requests/s from cache and 480 requests/s through PHP. See [Performance](https://httpjet.net/docs/performance) for the workload and caveats.',
         '- **Historical telemetry:** In the August 30, 2026 origin sample the mean request was 9.99 ms and LSAPI time to first byte was 8.96 ms. LSAPI time includes waiting and is not PHP CPU time.',
         '- **Full Documentation Corpus (single file):** [https://httpjet.net/llms-full.txt](https://httpjet.net/llms-full.txt)',

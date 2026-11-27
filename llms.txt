@@ -5,7 +5,7 @@
 ## Release and measurements
 
 - **Latest release and installation:** [GitHub Releases](https://github.com/faratech/httpjet/releases/latest). Linux io_uring is required. Check [capabilities](https://httpjet.net/docs/capabilities) for compatibility limits.
-- **v0.2.6 lab (2026-11-23):** Dedicated c4-highmem-8 VM, loopback, four server and four load-generator vCPUs, Unified PGO, median of three rounds: H2 empty 1,524.4k requests/s, H2 page-cache hit 1,001.0k requests/s and H1 PHP/LSAPI 45.6k requests/s. These synthetic measurements are not production capacity. [Method and raw results](https://httpjet.net/docs/performance#release-0-2-6).
+- **v0.2.8 lab (2026-11-27):** Dedicated c4-highmem-8 VMs, loopback, four server and four load-generator vCPUs, Unified PGO, 10 interleaved matched rounds vs v0.2.7: H2 empty 1,465.8k req/s (+6.6%), H2 static 1 KiB 1,316.4k req/s (+3.8%), H2 heavy .htaccess 1,029.2k req/s (+5.7%), H2 cookied guest cache 863.5k req/s (+658.5%), H1 PHP/LSAPI 52.1k req/s (+11.2%), H2 PHP/LSAPI 48.1k req/s (+10.2%), and HTTP/3 empty 145.0k req/s (+15.9%). These synthetic measurements are not production capacity. [Method and raw results](https://httpjet.net/docs/performance#release-0-2-8).
 - **Historical comparison:** In one 2026 loopback experiment a 152 KB forum page returned 19,215 requests/s from cache and 480 requests/s through PHP. See [Performance](https://httpjet.net/docs/performance) for the workload and caveats.
 - **Historical telemetry:** In the August 30, 2026 origin sample the mean request was 9.99 ms and LSAPI time to first byte was 8.96 ms. LSAPI time includes waiting and is not PHP CPU time.
 - **Full Documentation Corpus (single file):** [https://httpjet.net/llms-full.txt](https://httpjet.net/llms-full.txt)

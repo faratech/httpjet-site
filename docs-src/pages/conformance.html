@@ -41,7 +41,7 @@
           <tr><td><span class="crate">live (<code>#[ignore]</code>)</span></td><td>Spawn <code>lsphp</code>, read real certificates, bind ports, QUIC round-trips, Pebble issuance. Run individually with their prerequisites; never as one batch.</td><td><code>cargo test -- --ignored &lt;name&gt;</code></td></tr>
           <tr><td><span class="crate">scripts</span></td><td>Real-server fixtures on isolated loopback listeners: h2spec, ACME/OCSP/admin runtime tests, the cache gates, memo parity, OCI smoke.</td><td>see each page</td></tr>
         </tbody></table></div>
-      <p>Historical run: v0.1.10 reported 3,068 passing workspace tests. For a new release, record the exact commit, commands and results you verify.</p>
+      <p>Verified runs: v0.2.8 passed 3,302 workspace tests (v0.2.4: 3,237; v0.1.10: 3,068). For any new build, record the exact commit, commands and results you verify.</p>
       <!--diagram:verification-pyramid|<strong>Verification layers.</strong> Choose checks for the change and runtime you are qualifying. Release publication status separately records distribution coverage.-->
       <p>For a deployment, run the checks relevant to its enabled features. See the <a href="operations.html#deploy">deployment workflow</a> and the <a href="page-cache.html#gates">page-cache checks</a>.</p>
     </section>
@@ -59,7 +59,7 @@ cargo test --locked -p httpjet --features otel traced_quic_roundtrip -- --ignore
 
     <section>
       <h2 id="fuzz">Fuzzing</h2>
-      <p>The v0.2.6-3 source ships 14 fuzz targets: <code>fastcgi_records</code>, <code>h1_chunked_decode</code>, <code>h1_request_framing</code>, <code>h2_frames</code>, <code>h3_control</code>, <code>h3_request_stream</code>, <code>hpack_decode</code>, <code>hpack_roundtrip</code>, <code>lsapi_packet_stream</code>, <code>lsapi_resp_header</code>, <code>lscache_control</code>, <code>pagecache_container</code>, <code>proxy_protocol_parse</code>, <code>qpack_decode</code>. Each target checks the invariants documented in the <a href="https://github.com/faratech/httpjet/blob/v0.2.6-3/fuzz/README.md">public fuzzing guide</a>.</p>
+      <p>The v0.2.8 source ships 14 fuzz targets: <code>fastcgi_records</code>, <code>h1_chunked_decode</code>, <code>h1_request_framing</code>, <code>h2_frames</code>, <code>h3_control</code>, <code>h3_request_stream</code>, <code>hpack_decode</code>, <code>hpack_roundtrip</code>, <code>lsapi_packet_stream</code>, <code>lsapi_resp_header</code>, <code>lscache_control</code>, <code>pagecache_container</code>, <code>proxy_protocol_parse</code>, <code>qpack_decode</code>. Each target checks the invariants documented in the <a href="https://github.com/faratech/httpjet/blob/v0.2.8/fuzz/README.md">public fuzzing guide</a>.</p>
       <div class="codeframe"><div class="codeframe__bar"><span class="codeframe__dot"></span><span class="codeframe__label"><b>bounded fuzz</b></span></div><pre><code>FUZZ_TOOLCHAIN=nightly FUZZ_SECONDS=5 bash scripts/fuzz-bounded.sh h1_request_framing
 python3 scripts/fuzz-seeds.py     <span class="t-c"># regenerate the shared seed corpus</span></code></pre></div>
     </section>

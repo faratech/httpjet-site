@@ -9,7 +9,7 @@
 
 # Architecture
 
-httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Over 3,200 test functions span the workspace (3,237 green at v0.2.4).
+httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Over 3,300 test functions span the workspace (3,302 green at v0.2.8).
 
 ## Workspace shape
 
@@ -19,7 +19,7 @@ The dependency graph is acyclic, with several independent root crates including 
            1 binary + 19 libraries
            Rust 1.100.0+ · edition 2024
            Acyclic crate dependencies
-           3,237 tests at v0.2.4
+           3,302 tests at v0.2.8
            Vendored forks: monoio, monoio-rustls (real writev), dashmap, pprof
 
 ## Crate dependency graph

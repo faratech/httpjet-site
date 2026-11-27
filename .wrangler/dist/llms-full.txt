@@ -92,12 +92,12 @@ Start, operate, learn internals, check reference.
 
 See Performance for method and receipts.
 
-          1,258 k rps   h2 empty, c=50, dedicated client VM, median of 3, 0.2.0 (2026-11-11): OLS 978k, nginx 484k; 1 KiB 1,241k vs 780k/409k
+          1,465.8 k rps   v0.2.8 H2 empty body, dedicated lab, 10-round matched (+6.6% vs 0.2.7); H3 empty 145.0k (+15.9%)
           44.8 k rps   PHP/LSAPI h1, PGO loopback (2026-06): LiteSpeed ~38.5k
           40 ×   cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms
           146 /146   h2spec, native HTTP/2, TLS, three runs
           0.2 %   httpjet phases, June 2026 production (~138 µs/req); LSAPI elapsed time 86.5–98.8% of wall time
-          3,200 +   test functions, 20 crates; suite green at v0.2.4 (3,237 tests)
+          3,300 +   test functions, 20 crates; suite green at v0.2.8 (3,302 tests)
 
 ## Project status
 
@@ -105,7 +105,7 @@ See Performance for method and receipts.
 
 | Version | Check the latest public release |
 
-| Release history | Version 0.2.6 includes HTTP/1.1 and HTTP/2 request-path work, a guarded page-cache encoding change, and architecture-specific defaults for the optional accelerated HTTP/3 engine. Explore dated measurements and their methods in Performance . For release changes and packages, see GitHub Releases . |
+| Release history | Version 0.2.8 adds a synchronous borrowed HTTP/3 memo fast path, cached QPACK `field_section_size`, H2 Frame-1 single-shot batching, cookied guest response-memo with strict logged-in member isolation, O(1) LSAPI wire-header lookup, 64 KiB access-log batching, and 29 bug fixes. Explore dated measurements and their methods in Performance . For release changes and packages, see GitHub Releases . |
 
 | Configuration | LiteSpeed XML stays authoritative. Native directives stay opt-in. `check --strict` gates deploys. |
 
@@ -117,7 +117,7 @@ See Performance for method and receipts.
 
 | Optional features | `acme`, `ocsp`, `otel`, `ktls`, `profiling` build features. Each still needs runtime opt-in. |
 
-| Security posture | Reviews through 2026-10-23 plus October bug-bash (rounds 1–16, 0.0.6–0.1.1; five rounds in 0.1.10 closed 23 issues; see audit posture ). Defaults stay fail-closed. |
+| Security posture | Continuous security and RFC audits through v0.2.8 (29 issues fixed in 0.2.8, 36 in 0.2.4, 28 in 0.2.0, 22 in 0.1.10; see audit posture ). Defaults stay fail-closed. |
 
 | Release | Linux installer plus signed DEB, RPM and static archives via GitHub Releases . Full distribution matrix not completed for this release. |
 
@@ -1176,7 +1176,9 @@ Configure suEXEC (` `, off by default; uid 0 always rejected), chroot (`chrootMo
 
 | 2026-11-20 | 0.2.4 audit remediation + follow-up pass | 36 reliability and correctness fixes across H1/H2/H3 transport, page cache, rewrite/`.htaccess`, proxy pooling, TLS/OCSP lifecycle, and backend gateways; panic-lint ratchet reduced from 572 to 567 sites. |
 
-Gates re-run after each round: full suite (3,237 tests at 0.2.4; 3,171 at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
+| 2026-11-27 | 0.2.8 multi-wave security & RFC audit (#1310–#1340) | 29 fixes across HTTP/1/2/3 framing, LSAPI `HEAD`/body parity, hop-by-hop header stripping, WebSocket upgrade timeouts, Range parsing, IPv4-mapped IPv6 prefix folding, strict RFC 9111 delta-seconds, `hj-compress` q-value/expires guards, and loopback admin/metrics canonicalization. |
+
+Gates re-run after each round: full suite (3,302 tests at 0.2.8; 3,237 at 0.2.4; 3,171 at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
 
         i   Reporting
 Use private responsible disclosure per `SECURITY.md`, not a public issue. Findings reconcile against source and regression tests. Nothing here proves production exploitation, or absence of other vulnerabilities.
@@ -1664,7 +1666,7 @@ SUMMARY: See how the server fits together.
 
 # Architecture
 
-httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Over 3,200 test functions span the workspace (3,237 green at v0.2.4).
+httpjet is a Cargo workspace with **one binary crate** and **nineteen `hj-*` library crates**. Over 3,300 test functions span the workspace (3,302 green at v0.2.8).
 
 ## Workspace shape
 
@@ -1674,7 +1676,7 @@ The dependency graph is acyclic, with several independent root crates including 
            1 binary + 19 libraries
            Rust 1.100.0+ · edition 2024
            Acyclic crate dependencies
-           3,237 tests at v0.2.4
+           3,302 tests at v0.2.8
            Vendored forks: monoio, monoio-rustls (real writev), dashmap, pprof
 
 ## Crate dependency graph
@@ -2856,7 +2858,7 @@ SUMMARY: Every command, flag, and environment variable.
 
 # CLI reference
 
-One binary, four subcommands. You set persistent policy in XML. You set operational overrides on the command line. The serve flags are checked against the shipped v0.2.6 binary. Rows for optional features apply to builds that enable them.
+One binary, four subcommands. You set persistent policy in XML. You set operational overrides on the command line. The serve flags are checked against the shipped v0.2.8 binary. Rows for optional features apply to builds that enable them.
 
 ## Subcommands
 
@@ -2986,6 +2988,8 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 | --page-cache-303-prefixes   | (empty) | Comma-separated request-path prefixes under which an opted-in 303 may be stored (e.g. `/whats-new/`). A 303 anywhere else is never stored |
 
 | --page-cache-stream-fill-vhosts   | (empty) | Comma-separated vhost names whose cacheable page-cache misses WITHOUT a Content-Length (progressive template output) are sent to the client as the backend writes them and stored once the backend finishes, instead of being buffered whole first. Only identity-encoded public 200s; a body that errors, is cut short or grows past the object cap is served but never stored. Empty = off |
+
+| --page-cache-stream-fill-second-sighting-vhosts   | (empty) | Progressive-fill vhosts that require two sightings before capturing an ordinary public body. Empty = off |
 
 | --page-cache-egress-at-rest-vhosts   | (empty) | Keeps plain zstd storage for listed vhosts. Buffered misses only; storage grows. |
 
@@ -3664,7 +3668,7 @@ Suffix routing follows OLS order, including disclosure guard. Pool-less script h
 
 | scripts | Real-server fixtures on isolated loopback listeners: h2spec, ACME/OCSP/admin runtime tests, the cache gates, memo parity, OCI smoke. | see each page |
 
-Historical run: v0.1.10 reported 3,068 passing workspace tests. For a new release, record the exact commit, commands and results you verify.
+Verified runs: v0.2.8 passed 3,302 workspace tests (v0.2.4: 3,237; v0.1.10: 3,068). For any new build, record the exact commit, commands and results you verify.
 
 > [Diagram: verification-pyramid] Verification layers. Choose checks for the change and runtime you are qualifying. Release publication status separately records distribution coverage.
 
@@ -3687,7 +3691,7 @@ Hosted execution evidence is tracked separately from local runs; a runner label 
 
 ## Fuzzing
 
-The v0.2.6-3 source ships 14 fuzz targets: `fastcgi_records`, `h1_chunked_decode`, `h1_request_framing`, `h2_frames`, `h3_control`, `h3_request_stream`, `hpack_decode`, `hpack_roundtrip`, `lsapi_packet_stream`, `lsapi_resp_header`, `lscache_control`, `pagecache_container`, `proxy_protocol_parse`, `qpack_decode`. Each target checks the invariants documented in the public fuzzing guide .
+The v0.2.8 source ships 14 fuzz targets: `fastcgi_records`, `h1_chunked_decode`, `h1_request_framing`, `h2_frames`, `h3_control`, `h3_request_stream`, `hpack_decode`, `hpack_roundtrip`, `lsapi_packet_stream`, `lsapi_resp_header`, `lscache_control`, `pagecache_container`, `proxy_protocol_parse`, `qpack_decode`. Each target checks the invariants documented in the public fuzzing guide .
 
            **bounded fuzz**
 ```

@@ -9,7 +9,7 @@
 
 # CLI reference
 
-One binary, four subcommands. You set persistent policy in XML. You set operational overrides on the command line. The serve flags are checked against the shipped v0.2.6 binary. Rows for optional features apply to builds that enable them.
+One binary, four subcommands. You set persistent policy in XML. You set operational overrides on the command line. The serve flags are checked against the shipped v0.2.8 binary. Rows for optional features apply to builds that enable them.
 
 ## Subcommands
 
@@ -139,6 +139,8 @@ Type to filter; click a group to narrow. Defaults are the binary's; *(empty)* me
 | --page-cache-303-prefixes   | (empty) | Comma-separated request-path prefixes under which an opted-in 303 may be stored (e.g. `/whats-new/`). A 303 anywhere else is never stored |
 
 | --page-cache-stream-fill-vhosts   | (empty) | Comma-separated vhost names whose cacheable page-cache misses WITHOUT a Content-Length (progressive template output) are sent to the client as the backend writes them and stored once the backend finishes, instead of being buffered whole first. Only identity-encoded public 200s; a body that errors, is cut short or grows past the object cap is served but never stored. Empty = off |
+
+| --page-cache-stream-fill-second-sighting-vhosts   | (empty) | Progressive-fill vhosts that require two sightings before capturing an ordinary public body. Empty = off |
 
 | --page-cache-egress-at-rest-vhosts   | (empty) | Keeps plain zstd storage for listed vhosts. Buffered misses only; storage grows. |
 

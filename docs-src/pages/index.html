@@ -82,12 +82,12 @@
       <h2 id="numbers">By the numbers</h2>
       <p>See <a href="performance.html">Performance</a> for method and receipts.</p>
       <div class="stats">
-        <div class="stat accent"><div class="v">1,258<span class="u">k rps</span></div><div class="l">h2 empty, c=50, dedicated client VM, median of 3, 0.2.0 (2026-11-11): OLS 978k, nginx 484k; 1 KiB 1,241k vs 780k/409k</div></div>
+        <div class="stat accent"><div class="v">1,465.8<span class="u">k rps</span></div><div class="l">v0.2.8 H2 empty body, dedicated lab, 10-round matched (+6.6% vs 0.2.7); H3 empty 145.0k (+15.9%)</div></div>
         <div class="stat"><div class="v">44.8<span class="u">k rps</span></div><div class="l">PHP/LSAPI h1, PGO loopback (2026-06): LiteSpeed ~38.5k</div></div>
         <div class="stat accent"><div class="v">40<span class="u">×</span></div><div class="l">cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms</div></div>
         <div class="stat"><div class="v">146<span class="u">/146</span></div><div class="l">h2spec, native HTTP/2, TLS, three runs</div></div>
         <div class="stat"><div class="v">0.2<span class="u">%</span></div><div class="l">httpjet phases, June 2026 production (~138 µs/req); LSAPI elapsed time 86.5–98.8% of wall time</div></div>
-        <div class="stat accent"><div class="v">3,200<span class="u">+</span></div><div class="l">test functions, 20 crates; suite green at v0.2.4 (3,237 tests)</div></div>
+        <div class="stat accent"><div class="v">3,300<span class="u">+</span></div><div class="l">test functions, 20 crates; suite green at v0.2.8 (3,302 tests)</div></div>
       </div>
     </section>
 
@@ -98,13 +98,13 @@
           <thead><tr><th>Aspect</th><th>State</th></tr></thead>
           <tbody>
             <tr><td>Version</td><td><a href="https://github.com/faratech/httpjet/releases/latest">Check the latest public release</a></td></tr>
-            <tr><td>Release history</td><td>Version 0.2.6 includes HTTP/1.1 and HTTP/2 request-path work, a guarded page-cache encoding change, and architecture-specific defaults for the optional accelerated HTTP/3 engine. Explore dated measurements and their methods in <a href="performance.html">Performance</a>. For release changes and packages, see <a href="https://github.com/faratech/httpjet/releases">GitHub Releases</a>.</td></tr>
+            <tr><td>Release history</td><td>Version 0.2.8 adds a synchronous borrowed HTTP/3 memo fast path, cached QPACK <code>field_section_size</code>, H2 Frame-1 single-shot batching, cookied guest response-memo with strict logged-in member isolation, O(1) LSAPI wire-header lookup, 64 KiB access-log batching, and 29 bug fixes. Explore dated measurements and their methods in <a href="performance.html#release-0-2-8">Performance</a>. For release changes and packages, see <a href="https://github.com/faratech/httpjet/releases">GitHub Releases</a>.</td></tr>
             <tr><td>Configuration</td><td>LiteSpeed XML stays authoritative. Native directives stay opt-in. <code>check --strict</code> gates deploys.</td></tr>
             <tr><td>Transport</td><td>Pure io_uring (monoio), H1/H2/H3 only. No epoll fallback or Windows/macOS port.</td></tr>
             <tr><td>PHP</td><td>Native LSAPI; you supply <code>lsphp</code>. Production: persistent external pool, zero-downtime generation reloads.</td></tr>
             <tr><td>Page cache</td><td>Off by default; opt-in LSCache, private tier, cookie vary, tmpfs file tier, per-vhost dictionaries, generation namespaces. Live in production.</td></tr>
             <tr><td>Optional features</td><td><code>acme</code>, <code>ocsp</code>, <code>otel</code>, <code>ktls</code>, <code>profiling</code> build features. Each still needs runtime opt-in.</td></tr>
-            <tr><td>Security posture</td><td>Reviews through 2026-10-23 plus October bug-bash (rounds 1–16, 0.0.6–0.1.1; five rounds in 0.1.10 closed 23 issues; see <a href="security.html#audit">audit posture</a>). Defaults stay fail-closed.</td></tr>
+            <tr><td>Security posture</td><td>Continuous security and RFC audits through v0.2.8 (29 issues fixed in 0.2.8, 36 in 0.2.4, 28 in 0.2.0, 22 in 0.1.10; see <a href="security.html#audit">audit posture</a>). Defaults stay fail-closed.</td></tr>
             <tr><td>Release</td><td><a href="quickstart.html#install">Linux installer</a> plus signed DEB, RPM and static archives via <a href="https://github.com/faratech/httpjet/releases/latest">GitHub Releases</a>. Full distribution matrix not completed for this release.</td></tr>
           </tbody>
         </table>

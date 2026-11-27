@@ -68,7 +68,7 @@ Suffix routing follows OLS order, including disclosure guard. Pool-less script h
 
 | scripts | Real-server fixtures on isolated loopback listeners: h2spec, ACME/OCSP/admin runtime tests, the cache gates, memo parity, OCI smoke. | see each page |
 
-Historical run: v0.1.10 reported 3,068 passing workspace tests. For a new release, record the exact commit, commands and results you verify.
+Verified runs: v0.2.8 passed 3,302 workspace tests (v0.2.4: 3,237; v0.1.10: 3,068). For any new build, record the exact commit, commands and results you verify.
 
 > [Diagram: verification-pyramid] Verification layers. Choose checks for the change and runtime you are qualifying. Release publication status separately records distribution coverage.
 
@@ -91,7 +91,7 @@ Hosted execution evidence is tracked separately from local runs; a runner label 
 
 ## Fuzzing
 
-The v0.2.6-3 source ships 14 fuzz targets: `fastcgi_records`, `h1_chunked_decode`, `h1_request_framing`, `h2_frames`, `h3_control`, `h3_request_stream`, `hpack_decode`, `hpack_roundtrip`, `lsapi_packet_stream`, `lsapi_resp_header`, `lscache_control`, `pagecache_container`, `proxy_protocol_parse`, `qpack_decode`. Each target checks the invariants documented in the public fuzzing guide .
+The v0.2.8 source ships 14 fuzz targets: `fastcgi_records`, `h1_chunked_decode`, `h1_request_framing`, `h2_frames`, `h3_control`, `h3_request_stream`, `hpack_decode`, `hpack_roundtrip`, `lsapi_packet_stream`, `lsapi_resp_header`, `lscache_control`, `pagecache_container`, `proxy_protocol_parse`, `qpack_decode`. Each target checks the invariants documented in the public fuzzing guide .
 
            **bounded fuzz**
 ```

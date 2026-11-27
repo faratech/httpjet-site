@@ -1,5 +1,5 @@
     <h1>Architecture</h1>
-    <p class="lede">httpjet is a Cargo workspace with <strong>one binary crate</strong> and <strong>nineteen <code>hj-*</code> library crates</strong>. Over 3,200 test functions span the workspace (3,237 green at v0.2.4).</p>
+    <p class="lede">httpjet is a Cargo workspace with <strong>one binary crate</strong> and <strong>nineteen <code>hj-*</code> library crates</strong>. Over 3,300 test functions span the workspace (3,302 green at v0.2.8).</p>
 
     <section>
       <h2 id="workspace">Workspace shape</h2>
@@ -9,7 +9,7 @@
         <span class="chip"><span class="dot"></span>1 binary + 19 libraries</span>
         <span class="chip"><span class="dot"></span>Rust 1.100.0+ · edition 2024</span>
         <span class="chip"><span class="dot"></span>Acyclic crate dependencies</span>
-        <span class="chip"><span class="dot"></span>3,237 tests at v0.2.4</span>
+        <span class="chip"><span class="dot"></span>3,302 tests at v0.2.8</span>
         <span class="chip"><span class="dot"></span>Vendored forks: monoio, monoio-rustls (real writev), dashmap, pprof</span>
       </div>
     </section>
@@ -17,7 +17,7 @@
     <section>
       <h2 id="dag">Crate dependency graph</h2>
       <p><code>hj-config</code> parses LiteSpeed XML into one normalized model. <code>hj-core</code> re-exports that model for crates using the shared handler contract.</p>
-      <!--diagram:crate-map|<strong>Workspace relationships.</strong> Arrows show selected dependencies, not every edge. The binary assembles the server; optional certificate crates require build features. See <a href="https://github.com/faratech/httpjet/tree/v0.2.6-3/crates">the public source tree</a> for the crate manifests.-->
+      <!--diagram:crate-map|<strong>Workspace relationships.</strong> Arrows show selected dependencies, not every edge. The binary assembles the server; optional certificate crates require build features. See <a href="https://github.com/faratech/httpjet/tree/v0.2.8/crates">the public source tree</a> for the crate manifests.-->
     </section>
 
     <section>

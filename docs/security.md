@@ -153,7 +153,9 @@ Configure suEXEC (` `, off by default; uid 0 always rejected), chroot (`chrootMo
 
 | 2026-11-20 | 0.2.4 audit remediation + follow-up pass | 36 reliability and correctness fixes across H1/H2/H3 transport, page cache, rewrite/`.htaccess`, proxy pooling, TLS/OCSP lifecycle, and backend gateways; panic-lint ratchet reduced from 572 to 567 sites. |
 
-Gates re-run after each round: full suite (3,237 tests at 0.2.4; 3,171 at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
+| 2026-11-27 | 0.2.8 multi-wave security & RFC audit (#1310–#1340) | 29 fixes across HTTP/1/2/3 framing, LSAPI `HEAD`/body parity, hop-by-hop header stripping, WebSocket upgrade timeouts, Range parsing, IPv4-mapped IPv6 prefix folding, strict RFC 9111 delta-seconds, `hj-compress` q-value/expires guards, and loopback admin/metrics canonicalization. |
+
+Gates re-run after each round: full suite (3,302 tests at 0.2.8; 3,237 at 0.2.4; 3,171 at 0.2.0; 3,068 at 0.1.10), fast-memo parity, cache xurl/scheme/xhost, h2spec 146/146.
 
         i   Reporting
 Use private responsible disclosure per `SECURITY.md`, not a public issue. Findings reconcile against source and regression tests. Nothing here proves production exploitation, or absence of other vulnerabilities.

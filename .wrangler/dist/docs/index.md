@@ -91,12 +91,12 @@ Start, operate, learn internals, check reference.
 
 See Performance for method and receipts.
 
-          1,258 k rps   h2 empty, c=50, dedicated client VM, median of 3, 0.2.0 (2026-11-11): OLS 978k, nginx 484k; 1 KiB 1,241k vs 780k/409k
+          1,465.8 k rps   v0.2.8 H2 empty body, dedicated lab, 10-round matched (+6.6% vs 0.2.7); H3 empty 145.0k (+15.9%)
           44.8 k rps   PHP/LSAPI h1, PGO loopback (2026-06): LiteSpeed ~38.5k
           40 ×   cache hit vs PHP render: 19,215 vs 480 rps; p50 2 ms vs 34 ms
           146 /146   h2spec, native HTTP/2, TLS, three runs
           0.2 %   httpjet phases, June 2026 production (~138 µs/req); LSAPI elapsed time 86.5–98.8% of wall time
-          3,200 +   test functions, 20 crates; suite green at v0.2.4 (3,237 tests)
+          3,300 +   test functions, 20 crates; suite green at v0.2.8 (3,302 tests)
 
 ## Project status
 
@@ -104,7 +104,7 @@ See Performance for method and receipts.
 
 | Version | Check the latest public release |
 
-| Release history | Version 0.2.6 includes HTTP/1.1 and HTTP/2 request-path work, a guarded page-cache encoding change, and architecture-specific defaults for the optional accelerated HTTP/3 engine. Explore dated measurements and their methods in Performance . For release changes and packages, see GitHub Releases . |
+| Release history | Version 0.2.8 adds a synchronous borrowed HTTP/3 memo fast path, cached QPACK `field_section_size`, H2 Frame-1 single-shot batching, cookied guest response-memo with strict logged-in member isolation, O(1) LSAPI wire-header lookup, 64 KiB access-log batching, and 29 bug fixes. Explore dated measurements and their methods in Performance . For release changes and packages, see GitHub Releases . |
 
 | Configuration | LiteSpeed XML stays authoritative. Native directives stay opt-in. `check --strict` gates deploys. |
 
@@ -116,6 +116,6 @@ See Performance for method and receipts.
 
 | Optional features | `acme`, `ocsp`, `otel`, `ktls`, `profiling` build features. Each still needs runtime opt-in. |
 
-| Security posture | Reviews through 2026-10-23 plus October bug-bash (rounds 1–16, 0.0.6–0.1.1; five rounds in 0.1.10 closed 23 issues; see audit posture ). Defaults stay fail-closed. |
+| Security posture | Continuous security and RFC audits through v0.2.8 (29 issues fixed in 0.2.8, 36 in 0.2.4, 28 in 0.2.0, 22 in 0.1.10; see audit posture ). Defaults stay fail-closed. |
 
 | Release | Linux installer plus signed DEB, RPM and static archives via GitHub Releases . Full distribution matrix not completed for this release. |
